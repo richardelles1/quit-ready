@@ -75,7 +75,7 @@ export async function registerRoutes(
     const doc = new PDFDocument({ margin: 50 });
     
     res.setHeader('Content-Type', 'application/pdf');
-    res.setHeader('Content-Disposition', \`attachment; filename="QuitReady_Report_\${sim.id}.pdf"\`);
+    res.setHeader('Content-Disposition', `attachment; filename="QuitReady_Report_${sim.id}.pdf"`);
     
     doc.pipe(res);
     
@@ -90,7 +90,7 @@ export async function registerRoutes(
     // Page 2: Executive Snapshot
     doc.fontSize(24).fillColor('black').text('Executive Snapshot');
     doc.moveDown();
-    doc.fontSize(16).text(\`Readiness Index: \${sim.readinessIndex} / 100\`);
+    doc.fontSize(16).text(`Readiness Index: ${sim.readinessIndex} / 100`);
     doc.moveDown();
     
     let interpretation = "";
@@ -99,20 +99,20 @@ export async function registerRoutes(
     else if (sim.readinessIndex <= 80) interpretation = "Moderate Stability";
     else interpretation = "Strong Stability";
     
-    doc.fontSize(14).text(\`Status: \${interpretation}\`);
+    doc.fontSize(14).text(`Status: ${interpretation}`);
     doc.moveDown();
-    doc.text(\`Execution Stability: \${sim.executionStability}\`);
+    doc.text(`Execution Stability: ${sim.executionStability}`);
     doc.addPage();
 
     // Page 3: Score Breakdown
     doc.fontSize(24).text('Axis Breakdown Bars');
     doc.moveDown();
-    doc.fontSize(14).text(\`Liquidity-Weighted Runway (35 pts): \${sim.liquidityScore}\`);
-    doc.text(\`Revenue Stability & Ramp (25 pts): \${sim.revenueScore}\`);
-    doc.text(\`Fixed Cost Pressure (15 pts): \${sim.fixedCostScore}\`);
-    doc.text(\`Healthcare Exposure (10 pts): \${sim.healthcareScore}\`);
-    doc.text(\`Safety Buffer Margin (10 pts): \${sim.bufferScore}\`);
-    doc.text(\`Tax Modeling Inclusion (5 pts): \${sim.taxScore}\`);
+    doc.fontSize(14).text(`Liquidity-Weighted Runway (35 pts): ${sim.liquidityScore}`);
+    doc.text(`Revenue Stability & Ramp (25 pts): ${sim.revenueScore}`);
+    doc.text(`Fixed Cost Pressure (15 pts): ${sim.fixedCostScore}`);
+    doc.text(`Healthcare Exposure (10 pts): ${sim.healthcareScore}`);
+    doc.text(`Safety Buffer Margin (10 pts): ${sim.bufferScore}`);
+    doc.text(`Tax Modeling Inclusion (5 pts): ${sim.taxScore}`);
     doc.addPage();
     
     // (Additional pages would be generated here according to spec... keeping it simple for the MVP)
