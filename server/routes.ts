@@ -53,9 +53,9 @@ function pct100(values: number[]): number[] {
 const t1 = (s: Simulation) => s.cash;
 const t2 = (s: Simulation) => Math.round(s.brokerage * 0.80);
 const t3 = (s: Simulation) => Math.round(s.roth + s.traditional * 0.50 + s.realEstate * 0.30);
-const pas = (s: Simulation) => t1(s) + t2(s); // Primary Accessible Savings
+const pas = (s: Simulation) => t1(s) + t2(s); // Tier 1 Liquid Capital
 
-// Primary Savings Runway: months until T1+T2 exhausted
+// Tier 1 Runway: months until T1+T2 exhausted
 function psRunway(s: Simulation, revMult = 1.0, rampOverride?: number,
   extraBurn: (m: number) => number = () => 0): number {
   if (s.tmib <= 0) return 999;
@@ -327,7 +327,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     const validationErrors = validateReport(sim);
     if (validationErrors.length > 0) {
       return res.status(422).json({
-        message: 'Report validation failed — please re-run the simulation.',
+        message: 'Report validation failed. Please re-run the simulation.',
         errors: validationErrors,
       });
     }
@@ -424,7 +424,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       const score = sim.structuralBreakpointScore;
       const scoreLabel = score >= 86 ? 'Strong Buffer Position' : score >= 70 ? 'Structurally Stable'
         : score >= 50 ? 'Moderately Exposed' : 'Structurally Fragile';
-      // marginLabel is income-based (surplus vs. income) — NOT score-based (per spec)
+      // marginLabel is income-based (surplus vs. income). NOT score-based (per spec)
       // Computed here using sim values directly (before Page 1 derived vars are in scope)
       const _incomeForMargin = (sim.currentSalary ?? 0) + (sim.isDualIncome ? (sim.partnerIncome ?? 0) : 0);
       const _hcForMargin = sim.healthcareDelta ?? sim.healthcareMonthlyCost;
@@ -437,7 +437,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
         : _marginPct >= -0.05 ? 'Thin structural margin'
         : 'Negative structural margin';
 
-      // Pre-PDF validation — block PDF with console.error on integrity failures
+      // Pre-PDF validation. block PDF with console.error on integrity failures
       const validationErrors = validateReport(sim);
       if (validationErrors.length > 0) {
         validationErrors.forEach(e => console.error(`[QR PDF Validation] ${e}`));
@@ -457,7 +457,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       let y = 0;
 
       // ════════════════════════════════════════════════════════════════════
-      // PAGE 1 — EXECUTIVE SNAPSHOT
+      // PAGE 1. EXECUTIVE SNAPSHOT
       // ════════════════════════════════════════════════════════════════════
       hdr(doc, date); y = 42;
       y = secHead(doc, 1, 'Your Financial Position Today',
@@ -465,7 +465,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
 
       const totalIncome = (sim.currentSalary ?? 0) + (sim.isDualIncome ? (sim.partnerIncome ?? 0) : 0);
       // grossOutflowPDF = all expense components BEFORE partner income offset
-      // tmib already subtracts partner income — must not mix tmib with totalIncome or partner is counted twice
+      // tmib already subtracts partner income. Do not mix tmib with totalIncome or partner is counted twice
       const grossOutflowPDF = (sim.livingExpenses ?? 0) + (sim.monthlyDebtPayments ?? 0) + hc +
         (sim.selfEmploymentTax ?? 0) + (sim.businessCostBaseline ?? 0);
       const grossSurplus = totalIncome - grossOutflowPDF;
@@ -477,13 +477,13 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       ], y);
 
       y = statRow(doc, [
-        { label: 'Primary Accessible Savings (Cash + Brokerage)', val: fmtM(pasCap) },
-        { label: 'Primary Savings Runway — Base Case', val: fmtRunway(psrBase) },
+        { label: 'Tier 1 Liquid Capital (Cash + Brokerage)', val: fmtM(pasCap) },
+        { label: 'Tier 1 Runway, Base Case', val: fmtRunway(psrBase) },
         { label: 'Risk Position Score', val: `${score}/100` },
       ], y);
 
       // Identity line
-      const identityLine = `${marginLabel} — based on your current income and monthly outflow structure.`;
+      const identityLine = `${marginLabel}. Based on your current income and monthly outflow structure.`;
       const marginBg = score >= 70 ? '#f0fdf4' : score >= 50 ? '#fffbeb' : '#fef2f2';
       const marginBorder = score >= 70 ? C.green : score >= 50 ? C.amber : C.red;
       doc.rect(L, y, W, 36).fill(marginBg);
@@ -493,7 +493,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
 
       // Mini scenario snapshot
       doc.rect(L, y, W, 22).fill(C.navy);
-      [['Scenario', L + 8], ['Primary Savings Runway', L + 175], ['Full Runway', L + 310], ['Restricted Assets?', L + 400]].forEach(([h, x]) => {
+      [['Scenario', L + 8], ['Tier 1 Runway', L + 175], ['Full Capital Depth', L + 310], ['Tier 2 Required?', L + 400]].forEach(([h, x]) => {
         doc.fillColor(C.white).fontSize(7.5).font('Helvetica-Bold').text(h as string, x as number, y + 7);
       });
       y += 22;
@@ -510,24 +510,39 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
           .text(sc.r3 ? 'Yes' : 'No', L + 400, y + 7);
         y += 24;
       });
+      y += 10;
+
+      // Score interpretation
+      const scoreInterpretation = score >= 86
+        ? `A score of ${score} reflects a strong buffer position. Your capital depth and income structure are well-aligned to absorb a standard ramp period, including meaningful revenue underperformance.`
+        : score >= 70
+        ? `A score of ${score} reflects a structurally stable position. The transition is viable under expected conditions and remains defensible under moderate stress. The primary risk is execution speed.`
+        : score >= 50
+        ? `A score of ${score} reflects moderate structural exposure. Your position is workable under expected conditions but carries meaningful sensitivity to revenue timing and early shortfalls.`
+        : `A score of ${score} reflects structural fragility. The gap between a viable outcome and a distressed one is narrow. Strengthening Tier 1 Liquid Capital or reducing outflow before the transition would improve the position.`;
+      y = insight(doc, 'What This Score Means', scoreInterpretation, y);
+
+      // Tier 1 vs Full Capital Depth explanation
+      const tier1Explanation = `Tier 1 Runway is the true comfort window. It reflects how long your penalty-free capital (cash and brokerage) can sustain the net gap between outflow and revenue. Full Capital Depth extends the runway further only if Tier 2 Contingent Capital (retirement accounts, home equity) is drawn. Tier 2 access carries tax obligations and permanent compounding loss. Tier 1 Runway is the number that matters most.`;
+      y = insight(doc, 'Tier 1 Runway vs. Full Capital Depth', tier1Explanation, y);
 
       ftr(doc, 1);
 
       // ════════════════════════════════════════════════════════════════════
-      // PAGE 2 — INCOME STRENGTH & STABILITY
+      // PAGE 2. INCOME STRENGTH & STABILITY
       // ════════════════════════════════════════════════════════════════════
       doc.addPage(); hdr(doc, date); y = 42;
       y = secHead(doc, 2, 'Income Strength & Stability',
         'Your current income picture and how it compares to the outflow structure that would be required after a transition.', y);
 
-      // Income table — uses gross outflow (before partner offset) to avoid double-counting
+      // Income table. uses gross outflow (before partner offset) to avoid double-counting
       const partnerIncomePDF = sim.isDualIncome ? (sim.partnerIncome ?? 0) : 0;
       const incomeRows = [
         { label: 'Your monthly take-home income (current)', val: fmtM(sim.currentSalary ?? 0) },
         ...(sim.isDualIncome && sim.partnerIncome > 0
           ? [{ label: 'Partner monthly take-home income', val: fmtM(sim.partnerIncome) }] : []),
         { label: 'Total household monthly income', val: fmtM(totalIncome) },
-        { label: 'Total monthly outflow — all expenses', val: fmtM(grossOutflowPDF) },
+        { label: 'Total monthly outflow. all expenses', val: fmtM(grossOutflowPDF) },
         ...(partnerIncomePDF > 0 ? [{ label: 'Less: partner income offset', val: `(${fmtM(partnerIncomePDF)})` }] : []),
         { label: 'Net gap (savings + new revenue must cover)', val: fmtM(sim.tmib) },
         { label: 'Monthly surplus / (deficit) vs. total income', val: (grossSurplus >= 0 ? '+' : '') + fmtM(grossSurplus) },
@@ -544,7 +559,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       });
       y += 10;
 
-      // Income vs Outflow bar — use gross outflow for honest comparison
+      // Income vs Outflow bar. use gross outflow for honest comparison
       doc.fillColor(C.muted).fontSize(8).font('Helvetica-Bold').text('INCOME VS. TOTAL OUTFLOW', L, y); y += 12;
       const maxBar = Math.max(totalIncome, grossOutflowPDF, 1);
       const incomeBarW = Math.round((totalIncome / maxBar) * W);
@@ -565,13 +580,25 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
 
       // Paragraph — use gross comparison for income vs. outflow narrative
       const incomeVerb = totalIncome > grossOutflowPDF * 1.1 ? 'exceeds' : totalIncome >= grossOutflowPDF * 0.9 ? 'roughly matches' : 'falls below';
-      const incomeP = `Today, your household income ${incomeVerb} your total monthly outflow structure. ${grossSurplus >= 0 ? `The ${fmtM(grossSurplus)}/month household surplus reflects total income against all expenses combined.${partnerIncomePDF > 0 ? ` After the partner income offset of ${fmtM(partnerIncomePDF)}, the net gap that savings or new business revenue must cover is ${fmtM(sim.tmib)}/month.` : ''}` : `The ${fmtM(Math.abs(grossSurplus))}/month shortfall means total expenses exceed total income today — the transition would require drawing from savings from day one.`}`;
-      y = insight(doc, 'What This Means', incomeP, y);
+      const incomeP = `Today, your household income ${incomeVerb} your total monthly outflow structure. ${grossSurplus >= 0 ? `The ${fmtM(grossSurplus)}/month household surplus reflects total income against all expenses combined.${partnerIncomePDF > 0 ? ` After the partner income offset of ${fmtM(partnerIncomePDF)}, the net gap that savings or new business revenue must cover is ${fmtM(sim.tmib)}/month.` : ''}` : `The ${fmtM(Math.abs(grossSurplus))}/month shortfall means total expenses exceed total income today. The transition would require drawing from savings from day one.`}`;
+      y = insight(doc, 'Current Household Income Position', incomeP, y);
+
+      // What changes after transition
+      const transitionP = grossSurplus >= 0
+        ? `After the transition, your earned income stops. The monthly gap that savings and new revenue must cover is ${fmtM(sim.tmib)}/month. This is not your full outflow. It is the net amount remaining after any continuing partner income is applied. Until new revenue reaches the net gap, savings are the bridge.`
+        : `After the transition, the existing shortfall compounds. There is no earned income cushion to absorb slow revenue. Every month without full revenue coverage draws from capital.`;
+      y = insight(doc, 'What Changes After the Transition', transitionP, y);
+
+      // Partner income context (if applicable)
+      if (partnerIncomePDF > 0) {
+        const partnerP = `Partner income of ${fmtM(partnerIncomePDF)}/month reduces the net gap directly. It is the single largest structural cushion in this position. If that income is interrupted (even temporarily), the monthly burden on savings increases by the same amount. This is why partner income stability is a key risk variable.`;
+        y = insight(doc, 'Why Partner Income Matters', partnerP, y);
+      }
 
       ftr(doc, 2);
 
       // ════════════════════════════════════════════════════════════════════
-      // PAGE 3 — MONTHLY OUTFLOW BREAKDOWN
+      // PAGE 3. MONTHLY OUTFLOW BREAKDOWN
       // ════════════════════════════════════════════════════════════════════
       doc.addPage(); hdr(doc, date); y = 42;
       y = secHead(doc, 3, 'Where Your Money Goes Each Month',
@@ -585,7 +612,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
 
       const definitions = [
         'Day-to-day household expenses, not including loan payments or healthcare',
-        'Contractual minimum payments — cannot be skipped without credit damage or default',
+        'Contractual minimum payments. Cannot be skipped without credit damage or default',
         'Post-transition premium cost change versus current employer coverage',
         'Reserve against self-employment tax obligations (28% of projected revenue)',
         'Recurring business operating expenses needed to generate revenue',
@@ -639,11 +666,11 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       ftr(doc, 3);
 
       // ════════════════════════════════════════════════════════════════════
-      // PAGE 4 — DEBT STRUCTURE & EXPOSURE
+      // PAGE 4. DEBT STRUCTURE & EXPOSURE
       // ════════════════════════════════════════════════════════════════════
       doc.addPage(); hdr(doc, date); y = 42;
       y = secHead(doc, 4, 'Debt Structure & Exposure',
-        'Outstanding loan balances are context — they do not directly change your monthly outflow. They reflect structural leverage and long-term risk exposure.', y);
+        'Outstanding loan balances are context. They do not directly change your monthly outflow. They reflect structural leverage and long-term risk exposure.', y);
 
       doc.rect(L, y, W, 34).fill(C.mid);
       doc.fillColor(C.muted).fontSize(7.5).font('Helvetica').text('TOTAL OUTSTANDING DEBT BALANCE', L + 10, y + 8);
@@ -653,7 +680,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       y += 46;
 
       // Debt context note
-      const debtNote = `Your monthly debt payment of ${fmtM(sim.monthlyDebtPayments)} is the required minimum and is included in your monthly outflow. The outstanding balance of ${fmtM(totalDebtVal)} does not affect your month-to-month outflow directly — it is the total you owe across all loans. It affects long-term financial flexibility and the time required to become fully debt-free.`;
+      const debtNote = `Your monthly debt payment of ${fmtM(sim.monthlyDebtPayments)} is the required minimum and is included in your monthly outflow. The outstanding balance of ${fmtM(totalDebtVal)} does not affect your month-to-month outflow directly. It is the total you owe across all loans and affects long-term financial flexibility and the time required to become fully debt-free.`;
       y = insight(doc, 'How Debt Balances Differ From Debt Payments', debtNote, y);
 
       // Debt exposure
@@ -662,16 +689,26 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
         const debtRatioPct = Math.round(debtRatio * 100);
         y = statRow(doc, [
           { label: 'Outstanding Debt Balance', val: fmtM(totalDebtVal) },
-          { label: 'Total Accessible Savings', val: fmtM(sim.accessibleCapital) },
+          { label: 'Full Capital Depth', val: fmtM(sim.accessibleCapital) },
           { label: 'Debt-to-Savings Ratio', val: `${debtRatioPct}%`, color: debtRatioPct > 70 ? C.red : C.coal },
         ], y);
         if (debtRatioPct > 70) {
           doc.rect(L, y, W, 40).fill('#fef2f2');
           doc.rect(L, y, 3, 40).fill(C.red);
           doc.fillColor(C.red).fontSize(8.5).font('Helvetica-Bold').text('ELEVATED DEBT EXPOSURE', L + 12, y + 8);
-          doc.fillColor(C.coal).fontSize(9).font('Helvetica').text(`Outstanding debt of ${fmtM(totalDebtVal)} represents ${debtRatioPct}% of your accessible savings — above the 70% elevated threshold. This narrows recovery options under stress.`, L + 12, y + 20, { width: W - 24 });
+          doc.fillColor(C.coal).fontSize(9).font('Helvetica').text(`Outstanding debt of ${fmtM(totalDebtVal)} represents ${debtRatioPct}% of your total capital, which is above the 70% elevated threshold. This level of leverage narrows recovery options under stress and reduces long-term flexibility.`, L + 12, y + 20, { width: W - 24 });
           y += 48;
         }
+        // Leverage narrative for non-zero debt
+        const leverageInterp = sim.debtExposureRatio > 0.70
+          ? `A debt-to-capital ratio above 70% is a compounding risk factor in any transition. If revenue underperforms, the loan minimums remain fixed while capital erodes. Reducing outstanding balance before the transition, or ensuring debt payments are covered by partner income, meaningfully improves the structural position.`
+          : sim.debtExposureRatio > 0.35
+          ? `Moderate leverage at ${Math.round(sim.debtExposureRatio * 100)}% of total capital. The required minimums are already accounted for in your monthly outflow. This level of debt is not structurally disqualifying, but it does reduce the buffer available if revenue arrives late.`
+          : `A debt-to-capital ratio of ${Math.round(sim.debtExposureRatio * 100)}% is within a manageable range. Loan minimums are included in your monthly outflow and the balance does not materially constrain the runway calculation.`;
+        y = insight(doc, 'Debt Leverage Interpretation', leverageInterp, y);
+      } else {
+        y = insight(doc, 'Debt Leverage Interpretation',
+          'Carrying no outstanding debt is a structural advantage. You enter this transition with no mandatory loan repayments compressing your capital. Your monthly outflow is driven entirely by living costs and any new obligations you add.', y);
       }
 
       // Mortgage clarity note
@@ -684,16 +721,16 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       ftr(doc, 4);
 
       // ════════════════════════════════════════════════════════════════════
-      // PAGE 5 — PRIMARY SAVINGS RUNWAY (DEFINITION PAGE)
+      // PAGE 5. PRIMARY SAVINGS RUNWAY (DEFINITION PAGE)
       // ════════════════════════════════════════════════════════════════════
       doc.addPage(); hdr(doc, date); y = 42;
-      y = secHead(doc, 5, 'Primary Savings Runway',
+      y = secHead(doc, 5, 'Tier 1 Runway',
         'How long your readily accessible savings can sustain the gap between outflow and revenue.', y);
 
       // Definitions
       const defBlocks = [
-        { title: 'Primary Accessible Savings (Cash + Brokerage)', body: `${fmtM(pasCap)} total. This is your first line of defense — money you can access without penalties, taxes, or significant delay. It includes cash, checking, savings, HYSA (counted at 100%) and taxable brokerage accounts (counted at 80% for capital gains exposure).` },
-        { title: 'Restricted or Long-Term Assets (Retirement + Home Equity)', body: `${fmtM(t3Cap)} total. These assets are not considered primary runway. Accessing retirement funds early triggers income taxes and a 10% penalty — permanently reducing long-term compounding. Home equity is slow, costly, and market-dependent. Restricted assets are emergency capital, not a plan.` },
+        { title: 'Tier 1 Liquid Capital (Cash + Brokerage)', body: `${fmtM(pasCap)} total. This is your first line of defense. Money you can access without penalties, taxes, or significant delay. It includes cash, checking, savings, HYSA (counted at 100%) and taxable brokerage accounts (counted at 80% for capital gains exposure).` },
+        { title: 'Tier 2 Contingent Capital (Retirement + Home Equity)', body: `${fmtM(t3Cap)} total. These assets are not considered primary runway. Accessing retirement funds early triggers income taxes and a 10% penalty, permanently reducing long-term compounding. Home equity is slow, costly, and market-dependent. Tier 2 assets are emergency capital, not a plan.` },
       ];
       defBlocks.forEach((b, i) => {
         const h = 60;
@@ -710,17 +747,17 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
         { label: 'Your Amount', x: L + 310 }, { label: 'Counted As', x: L + 420 },
       ], y);
       const tierRows = [
-        { label: 'Cash & HYSA', cat: 'Primary', haircut: '100% (no deduction)', raw: sim.cash, counted: t1(sim) },
-        { label: 'Brokerage accounts', cat: 'Primary', haircut: '80% (capital gains)', raw: sim.brokerage, counted: t2(sim) },
-        { label: 'Roth IRA contributions', cat: 'Restricted', haircut: '100% (still retirement)', raw: sim.roth, counted: Math.round(sim.roth) },
-        { label: 'Traditional IRA / 401(k)', cat: 'Restricted', haircut: '50% (taxes + penalty)', raw: sim.traditional, counted: Math.round(sim.traditional * 0.50) },
-        { label: 'Home equity', cat: 'Restricted', haircut: '30% (illiquid, costly)', raw: sim.realEstate, counted: Math.round(sim.realEstate * 0.30) },
+        { label: 'Cash & HYSA', cat: 'Tier 1', haircut: '100% (no deduction)', raw: sim.cash, counted: t1(sim) },
+        { label: 'Brokerage accounts', cat: 'Tier 1', haircut: '80% (capital gains)', raw: sim.brokerage, counted: t2(sim) },
+        { label: 'Roth IRA contributions', cat: 'Tier 2', haircut: '100% (still retirement)', raw: sim.roth, counted: Math.round(sim.roth) },
+        { label: 'Traditional IRA / 401(k)', cat: 'Tier 2', haircut: '50% (taxes + penalty)', raw: sim.traditional, counted: Math.round(sim.traditional * 0.50) },
+        { label: 'Home equity', cat: 'Tier 2', haircut: '30% (illiquid, costly)', raw: sim.realEstate, counted: Math.round(sim.realEstate * 0.30) },
       ].filter(r => r.raw > 0);
 
       tierRows.forEach((row, i) => {
-        const bg = row.cat === 'Restricted' ? (i % 2 === 0 ? '#fffbeb' : '#fef9c3') : i % 2 === 0 ? C.light : C.mid;
+        const bg = row.cat === 'Tier 2' ? (i % 2 === 0 ? '#fffbeb' : '#fef9c3') : i % 2 === 0 ? C.light : C.mid;
         doc.rect(L, y, W, 24).fill(bg);
-        const catColor = row.cat === 'Restricted' ? C.amber : C.navy;
+        const catColor = row.cat === 'Tier 2' ? C.amber : C.navy;
         doc.fillColor(C.coal).fontSize(9).font('Helvetica').text(row.label, L + 8, y + 7, { width: 198 });
         doc.fillColor(C.muted).fontSize(7.5).font('Helvetica').text(row.haircut, L + 210, y + 7, { width: 96 });
         doc.fillColor(C.coal).fontSize(9).font('Helvetica').text(fmtM(row.raw), L + 310, y + 7);
@@ -730,16 +767,16 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
 
       // Totals
       doc.rect(L, y, W, 28).fill('#f0f9ff');
-      doc.fillColor(C.blue).fontSize(9).font('Helvetica-Bold').text('Primary Accessible Savings (Cash + Brokerage)', L + 8, y + 9);
+      doc.fillColor(C.blue).fontSize(9).font('Helvetica-Bold').text('Tier 1 Liquid Capital (Cash + Brokerage)', L + 8, y + 9);
       doc.fillColor(C.blue).fontSize(12).font('Times-Bold').text(fmtM(pasCap), L, y + 9, { width: W - 10, align: 'right' });
       y += 28;
       doc.rect(L, y, W, 28).fill(C.navy);
-      doc.fillColor('#94a3b8').fontSize(8).font('Helvetica').text('Total Accessible Savings (All Tiers)', L + 8, y + 9);
+      doc.fillColor('#94a3b8').fontSize(8).font('Helvetica').text('Full Capital Depth (All Tiers)', L + 8, y + 9);
       doc.fillColor(C.white).fontSize(13).font('Times-Bold').text(fmtM(sim.accessibleCapital), L, y + 9, { width: W - 10, align: 'right' });
       y += 36;
 
       // Runway + pressure point
-      doc.fillColor(C.muted).fontSize(8).font('Helvetica-Bold').text('PRIMARY SAVINGS RUNWAY — BASE CASE', L, y); y += 10;
+      doc.fillColor(C.muted).fontSize(8).font('Helvetica-Bold').text('TIER 1 RUNWAY, BASE CASE', L, y); y += 10;
       doc.fillColor(C.navy).fontSize(22).font('Times-Bold').text(fmtRunway(psrBase), L, y); y += 28;
       if (pm30 < 999) {
         doc.fillColor(C.muted).fontSize(9).font('Helvetica')
@@ -750,59 +787,80 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       ftr(doc, 5);
 
       // ════════════════════════════════════════════════════════════════════
-      // PAGE 6 — STRESS SCENARIO MODELING
+      // PAGE 6. STRESS SCENARIO MODELING
       // ════════════════════════════════════════════════════════════════════
       doc.addPage(); hdr(doc, date); y = 42;
       y = secHead(doc, 6, 'Stress Scenario Modeling',
-        'Three revenue outcomes tested against your outflow structure. Your Primary Accessible Savings and total savings runway in each.', y);
+        'Three revenue outcomes tested against your outflow structure. Your Tier 1 Liquid Capital and total savings runway in each.', y);
 
       const scenarios = [
-        { name: 'Revenue arrives on time and hits target', tag: 'Base case', psr: psrBase, full: frBase, pm: pmBase, revMult: 1.00, needsT3: t3Cap > 0 && psrBase < frBase },
-        { name: 'Revenue underperforms target by 15%', tag: 'Moderate contraction', psr: psr15, full: fr15, pm: pm15, revMult: 0.85, needsT3: t3Cap > 0 && psr15 < fr15 },
-        { name: 'Revenue materially underperforms by 30%', tag: 'Severe contraction', psr: psr30, full: fr30, pm: pm30, revMult: 0.70, needsT3: t3Cap > 0 && psr30 < fr30 },
+        {
+          name: 'Revenue arrives on time and hits target', tag: 'Base case',
+          psr: psrBase, full: frBase, pm: pmBase, needsT3: t3Cap > 0 && psrBase < frBase,
+          interp: psrBase >= 36
+            ? `At ${fmtRunway(psrBase)} of Tier 1 Runway, this scenario shows a comfortable starting position. Capital draw is gradual through the ramp, and the trajectory stabilizes as revenue builds.`
+            : psrBase >= 18
+            ? `At ${fmtRunway(psrBase)} of Tier 1 Runway, the base case is workable but leaves limited room for execution delays. Revenue arriving on time is a structural assumption in this scenario.`
+            : `At ${fmtRunway(psrBase)} under expected conditions, the base case is tight. Revenue performance at or above target is required to keep this timeline viable.`,
+        },
+        {
+          name: 'Revenue underperforms target by 15%', tag: 'Moderate contraction',
+          psr: psr15, full: fr15, pm: pm15, needsT3: t3Cap > 0 && psr15 < fr15,
+          interp: Math.abs(psrBase - psr15) < 3
+            ? `A 15% revenue shortfall reduces Tier 1 Runway by only ${Math.abs(psrBase - psr15)} months versus base case. The position is relatively resilient to moderate underperformance.`
+            : `A 15% revenue shortfall reduces Tier 1 Runway from ${fmtRunway(psrBase)} to ${fmtRunway(psr15)}. This is the scenario most likely to occur. It deserves more weight than the base case.`,
+        },
+        {
+          name: 'Revenue materially underperforms by 30%', tag: 'Severe contraction',
+          psr: psr30, full: fr30, pm: pm30, needsT3: t3Cap > 0 && psr30 < fr30,
+          interp: psr30 >= 18
+            ? `Even under a 30% revenue shortfall, Tier 1 Runway extends to ${fmtRunway(psr30)}. This scenario represents meaningful stress that does not fundamentally break the structure.`
+            : psr30 >= 9
+            ? `A 30% revenue shortfall compresses Tier 1 Runway to ${fmtRunway(psr30)}. This is the scenario that meaningfully changes risk posture. Recovery would depend on either controlling outflow or accelerating revenue.`
+            : `A 30% shortfall exhausts Tier 1 Liquid Capital within ${fmtRunway(psr30)}. This is the structurally significant scenario. Entering with a signed contract or a smaller outflow base would be the most effective mitigation.`,
+        },
       ];
 
       scenarios.forEach((sc, i) => {
         const bg = i === 2 ? '#fef2f2' : i === 1 ? '#fffbeb' : '#f0fdf4';
         const bc = i === 2 ? C.red : i === 1 ? C.amber : C.green;
-        const h = 90;
+        const h = 115;
         doc.rect(L, y, W, h).fill(bg);
         doc.rect(L, y, 3, h).fill(bc);
         doc.fillColor(C.muted).fontSize(7.5).font('Helvetica-Bold').text(sc.tag.toUpperCase(), L + 12, y + 8);
-        doc.fillColor(C.coal).fontSize(11).font('Helvetica-Bold').text(sc.name, L + 12, y + 20, { width: W - 24 });
-        doc.fillColor(C.muted).fontSize(8).font('Helvetica').text('Primary Savings Runway', L + 12, y + 40);
-        doc.fillColor(bc).fontSize(14).font('Times-Bold').text(fmtRunway(sc.psr), L + 12, y + 52);
-        doc.fillColor(C.muted).fontSize(8).font('Helvetica').text('Full Runway', L + 220, y + 40);
-        doc.fillColor(C.coal).fontSize(14).font('Times-Bold').text(fmtRunway(sc.full), L + 220, y + 52);
-        doc.fillColor(C.muted).fontSize(8).font('Helvetica').text('Restricted assets req\'d?', L + 370, y + 40);
-        doc.fillColor(sc.needsT3 ? C.red : C.green).fontSize(14).font('Times-Bold').text(sc.needsT3 ? 'Yes' : 'No', L + 370, y + 52);
-        if (sc.pm < 999) {
-          doc.fillColor(C.muted).fontSize(8).font('Helvetica').text(`Pressure begins around: ${fmtRunwayShort(sc.pm)}`, L + 12, y + 74, { width: W - 24 });
-        }
-        y += h + 8;
+        doc.fillColor(C.coal).fontSize(10).font('Helvetica-Bold').text(sc.name, L + 12, y + 20, { width: W - 24 });
+        doc.fillColor(C.muted).fontSize(8).font('Helvetica').text('Tier 1 Runway', L + 12, y + 38);
+        doc.fillColor(bc).fontSize(13).font('Times-Bold').text(fmtRunway(sc.psr), L + 12, y + 48);
+        doc.fillColor(C.muted).fontSize(8).font('Helvetica').text('Full Capital Depth', L + 200, y + 38);
+        doc.fillColor(C.coal).fontSize(13).font('Times-Bold').text(fmtRunway(sc.full), L + 200, y + 48);
+        doc.fillColor(C.muted).fontSize(8).font('Helvetica').text('Tier 2 Required?', L + 370, y + 38);
+        doc.fillColor(sc.needsT3 ? C.red : C.green).fontSize(13).font('Times-Bold').text(sc.needsT3 ? 'Yes' : 'No', L + 370, y + 48);
+        doc.fillColor(C.coal).fontSize(8.5).font('Helvetica').text(sc.interp, L + 12, y + 70, { width: W - 24, lineGap: 1.5 });
+        y += h + 6;
       });
+      y += 4;
 
-      y = insight(doc, 'What "Pressure Begins" Means',
-        'Pressure is defined as when your Primary Accessible Savings drops within 6 months of exhaustion under that scenario\'s revenue level. Before that point, the drawdown exists but the timeline is comfortable. After that point, each month carries meaningful urgency.', y);
+      y = insight(doc, 'The Scenario That Matters Most',
+        'The severe contraction (−30%) scenario is the one that reveals real structural exposure. If Tier 1 Runway holds above 12 months under that scenario, the position is defensible. If it falls below 6 months, the transition requires strengthening before proceeding. Pressure begins when Tier 1 Liquid Capital drops within 6 months of exhaustion under that revenue level.', y);
 
       ftr(doc, 6);
 
       // ════════════════════════════════════════════════════════════════════
-      // PAGE 7 — REVENUE TIMING SENSITIVITY
+      // PAGE 7. REVENUE TIMING SENSITIVITY
       // ════════════════════════════════════════════════════════════════════
       doc.addPage(); hdr(doc, date); y = 42;
       y = secHead(doc, 7, 'Revenue Timing Sensitivity',
-        `Your base ramp is ${sim.rampDuration} months. This shows how arriving early or late by 3 months changes your Primary Savings Runway.`, y);
+        `Your base ramp is ${sim.rampDuration} months. This shows how arriving early or late by 3 months changes your Tier 1 Runway.`, y);
 
       const timingRows = [
         { label: 'Revenue ramp 3 months early', ramp: Math.max(0, sim.rampDuration - 3), psr: rampEarly3 },
-        { label: `Revenue ramp on time (base — ${sim.rampDuration} months)`, ramp: sim.rampDuration, psr: psrBase },
+        { label: `Revenue ramp on time, base case (${sim.rampDuration} months)`, ramp: sim.rampDuration, psr: psrBase },
         { label: 'Revenue ramp 3 months late', ramp: sim.rampDuration + 3, psr: rampLate3 },
       ];
 
       y = tableHead(doc, [
         { label: 'Scenario', x: L + 8 }, { label: 'Ramp Duration', x: L + 265 },
-        { label: 'Primary Savings Runway', x: L + 365 },
+        { label: 'Tier 1 Runway', x: L + 365 },
       ], y);
       timingRows.forEach((row, i) => {
         const isBase = i === 1;
@@ -817,8 +875,8 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
 
       const rampDelta = rampLate3 >= 999 ? null : psrBase >= 999 ? null : psrBase - rampLate3;
       const rampText = rampDelta !== null && rampDelta > 0
-        ? `A 3-month delay in your revenue ramp reduces your Primary Savings Runway by approximately ${rampDelta} months — from ${fmtRunway(psrBase)} to ${fmtRunway(rampLate3)}. Entering the transition with client commitments already secured can eliminate this risk entirely.`
-        : `Your capital position is strong enough that a 3-month ramp delay does not materially change the Primary Savings Runway. Execution timing is still meaningful, but the risk to your financial position is contained.`;
+        ? `A 3-month delay in your revenue ramp reduces your Tier 1 Runway by approximately ${rampDelta} months, from ${fmtRunway(psrBase)} to ${fmtRunway(rampLate3)}. Entering the transition with client commitments already secured can eliminate this risk entirely.`
+        : `Your capital position is strong enough that a 3-month ramp delay does not materially change the Tier 1 Runway. Execution timing is still meaningful, but the risk to your financial position is contained.`;
       y = insight(doc, 'What A 3-Month Delay Means', rampText, y);
 
       // Fill with interpretation block if there's space
@@ -828,32 +886,32 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       ftr(doc, 7);
 
       // ════════════════════════════════════════════════════════════════════
-      // PAGE 8 — HOUSEHOLD SHOCK SCENARIOS
+      // PAGE 8. HOUSEHOLD SHOCK SCENARIOS
       // ════════════════════════════════════════════════════════════════════
       doc.addPage(); hdr(doc, date); y = 42;
       y = secHead(doc, 8, 'Household Shock Scenarios',
-        'Secondary events that compound the transition. These are not predictions — they\'re edge cases worth quantifying before making a major move.', y);
+        'Secondary events that compound the transition. These are not predictions. they\'re edge cases worth quantifying before making a major move.', y);
 
       const shockRows = [
         {
-          name: 'Partner income loss — 6 months',
+          name: 'Partner income loss. 6 months',
           desc: sim.isDualIncome && sim.partnerIncome > 0
             ? `Partner income of ${fmtM(sim.partnerIncome)}/month stops for 6 months, then resumes. Burn increases by that amount during the loss period.`
-            : 'Not applicable — no partner income entered.',
+            : 'Not applicable. No partner income entered.',
           psr: psrPartnerLoss, full: frPartnerLoss,
           needsT3: t3Cap > 0 && psrPartnerLoss < frPartnerLoss,
           applicable: sim.isDualIncome && sim.partnerIncome > 0,
         },
         {
           name: 'New child',
-          desc: `Assumptions: ${fmtM(CHILD_ONETIME)} one-time setup cost + ${fmtM(CHILD_MONTHLY)}/month ongoing (childcare, supplies, insurance adjustments). These are estimates — actual costs vary significantly.`,
+          desc: `Assumptions: ${fmtM(CHILD_ONETIME)} one-time setup cost + ${fmtM(CHILD_MONTHLY)}/month ongoing (childcare, supplies, insurance adjustments). These are estimates. actual costs vary significantly.`,
           psr: psrNewChild, full: fullRunway(sim, 1.00, undefined, () => CHILD_MONTHLY),
           needsT3: t3Cap > 0 && psrNewChild < fullRunway(sim, 1.00, undefined, () => CHILD_MONTHLY),
           applicable: true,
         },
         {
-          name: 'Combined — partner loss (6 months) + new child',
-          desc: 'Both shocks occurring simultaneously — the most conservative household stress test.',
+          name: 'Combined: partner loss (6 months) + new child',
+          desc: 'Both shocks occurring simultaneously. The most conservative household stress test.',
           psr: psrCombined, full: fullRunway(sim, 1.00, undefined, (m) => CHILD_MONTHLY + (m <= 6 && sim.isDualIncome ? (sim.partnerIncome ?? 0) : 0)),
           needsT3: t3Cap > 0,
           applicable: sim.isDualIncome,
@@ -867,9 +925,9 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
         doc.rect(L, y, W, h).fill(bg);
         doc.fillColor(C.coal).fontSize(10).font('Helvetica-Bold').text(sh.name, L + 10, y + 8, { width: W - 20 });
         doc.fillColor(C.muted).fontSize(8.5).font('Helvetica').text(sh.desc, L + 10, y + 24, { width: 260, lineGap: 1 });
-        doc.fillColor(C.muted).fontSize(7.5).font('Helvetica').text('Primary Savings Runway', L + 285, y + 14);
+        doc.fillColor(C.muted).fontSize(7.5).font('Helvetica').text('Tier 1 Runway', L + 285, y + 14);
         doc.fillColor(C.navy).fontSize(13).font('Times-Bold').text(fmtRunway(sh.psr), L + 285, y + 26);
-        doc.fillColor(C.muted).fontSize(7.5).font('Helvetica').text('Restricted assets req\'d?', L + 285, y + 50);
+        doc.fillColor(C.muted).fontSize(7.5).font('Helvetica').text('Tier 2 Required?', L + 285, y + 50);
         doc.fillColor(sh.needsT3 ? C.red : C.green).fontSize(11).font('Helvetica-Bold')
           .text(sh.needsT3 ? 'Yes' : 'No', L + 285, y + 62);
         y += h + 6;
@@ -877,12 +935,12 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       y += 6;
 
       y = insight(doc, 'The Pattern Behind Household Shocks',
-        `These scenarios matter because they\'re correlated — difficult personal events tend to cluster. A partner job loss during a transition period is not unusual. A new child changes financial structure for years. The question isn\'t whether these will happen — it\'s whether the runway is wide enough to absorb one if it does.`, y);
+        `These scenarios matter because they\'re correlated. difficult personal events tend to cluster. A partner job loss during a transition period is not unusual. A new child changes financial structure for years. The question isn\'t whether these will happen. it\'s whether the runway is wide enough to absorb one if it does.`, y);
 
       ftr(doc, 8);
 
       // ════════════════════════════════════════════════════════════════════
-      // PAGE 9 — SAVINGS TIER TIMELINE
+      // PAGE 9. SAVINGS TIER TIMELINE
       // ════════════════════════════════════════════════════════════════════
       doc.addPage(); hdr(doc, date); y = 42;
       y = secHead(doc, 9, 'Savings Tier Timeline',
@@ -893,11 +951,11 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       const hasStage2 = t3Cap > 0 && stage1End < stage2End;
 
       const stages = [
-        { label: 'Stage 1 — Primary Accessible Savings', cap: fmtM(pasCap), color: C.blue, bg: '#f0f9ff', border: C.blue,
+        { label: 'Stage 1. Tier 1 Liquid Capital', cap: fmtM(pasCap), color: C.blue, bg: '#f0f9ff', border: C.blue,
           desc: `Cash, HYSA, and brokerage accounts. No penalties. This stage ends around ${fmtRunway(stage1End)} under severe stress.` },
-        ...(hasStage2 ? [{ label: 'Stage 2 — Restricted or Long-Term Assets', cap: fmtM(t3Cap), color: C.amber, bg: '#fffbeb', border: C.amber,
-          desc: `Retirement accounts and home equity. Accessing these early triggers taxes and penalties. This stage begins if Stage 1 is exhausted — around ${fmtRunway(stage1End)}.` }] : []),
-        { label: 'Stage 3 — Total Capital Exhaustion', cap: 'n/a', color: C.red, bg: '#fef2f2', border: C.red,
+        ...(hasStage2 ? [{ label: 'Stage 2. Tier 2 Contingent Capital', cap: fmtM(t3Cap), color: C.amber, bg: '#fffbeb', border: C.amber,
+          desc: `Retirement accounts and home equity. Accessing these early triggers taxes and penalties. This stage begins if Stage 1 is exhausted. around ${fmtRunway(stage1End)}.` }] : []),
+        { label: 'Stage 3. Total Capital Exhaustion', cap: 'n/a', color: C.red, bg: '#fef2f2', border: C.red,
           desc: `All savings exhausted. ${stage2End >= 999 ? 'Not reached within the model range under any scenario.' : `Projected around ${fmtRunway(stage2End)} under severe contraction.`}` },
       ];
 
@@ -935,11 +993,11 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       ftr(doc, 9);
 
       // ════════════════════════════════════════════════════════════════════
-      // PAGE 10 — REVENUE VS LIQUIDITY CURVE
+      // PAGE 10. REVENUE VS LIQUIDITY CURVE
       // ════════════════════════════════════════════════════════════════════
       doc.addPage(); hdr(doc, date); y = 42;
       y = secHead(doc, 10, 'Revenue vs. Liquidity Curve',
-        'How your Primary Accessible Savings depletes over time under two revenue scenarios. The gap between lines reflects how much revenue performance changes your position.', y);
+        'How your Tier 1 Liquid Capital depletes over time under two revenue scenarios. The gap between lines reflects how much revenue performance changes your position.', y);
 
       const CHART_MONTHS = 36;
       const baseData = capitalSeries(sim, 1.00, CHART_MONTHS);
@@ -962,60 +1020,123 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
 
       // Context
       y = statRow(doc, [
-        { label: 'Base Case — Primary Savings Runway', val: fmtRunway(psrBase) },
-        { label: 'Severe (−30%) — Primary Savings Runway', val: fmtRunway(psr30) },
+        { label: 'Base Case. Tier 1 Runway', val: fmtRunway(psrBase) },
+        { label: 'Severe (−30%). Tier 1 Runway', val: fmtRunway(psr30) },
         { label: 'Difference', val: psr30 >= 999 || psrBase >= 999 ? '—' : `${psrBase - psr30} months` },
       ], y);
 
       y = insight(doc, 'Reading This Chart',
-        `The upper line (dark) shows your Primary Accessible Savings position under expected revenue. The lower line (gray) shows the same under a 30% revenue shortfall. Where the lower line drops to zero is when Primary Accessible Savings would be exhausted under severe stress — and Restricted assets would be needed if the full runway extends beyond that point.`, y);
+        `The upper line (dark) shows your Tier 1 Liquid Capital position under expected revenue. The lower line (gray) shows the same under a 30% revenue shortfall. Where the lower line drops to zero is when Tier 1 Liquid Capital would be exhausted under severe stress. and Tier 2 assets would be needed if the full runway extends beyond that point.`, y);
 
       ftr(doc, 10);
 
       // ════════════════════════════════════════════════════════════════════
-      // PAGE 11 — WHAT MOVES THE NEEDLE
+      // PAGE 11. HOW TO WIDEN THE RUNWAY
       // ════════════════════════════════════════════════════════════════════
       doc.addPage(); hdr(doc, date); y = 42;
-      y = secHead(doc, 11, 'What Moves the Needle',
-        'Ranked levers by impact on your Primary Savings Runway under severe stress (−30%). These are sensitivity results — not prescriptions.', y);
+      y = secHead(doc, 11, 'How to Widen the Runway',
+        'Four categories of structural levers. Each one affects Tier 1 Runway under stress. These are not recommendations. They are quantified options for your consideration.', y);
 
-      const l500  = calcBurnLever(500),  l1k = calcBurnLever(1000), l2k = calcBurnLever(2000);
-      const r500  = calcRevLever(500),   r1k = calcRevLever(1000);
       const llEarly3 = psRunway(sim, 1.00, Math.max(0, sim.rampDuration - 3));
 
-      // Rank levers by impact on psr30
+      // Top 3 sensitivity results — computed here, rendered at top of page
       const leverImpacts = [
-        { name: 'Reduce Monthly Outflow by $500', delta: calcBurnLever(500) < 999 && psr30 < 999 ? calcBurnLever(500) - psr30 : (calcBurnLever(500) >= 999 ? 999 : 0), what: `Reducing outflow by ${fmtM(500)}/month to ${fmtM(sim.tmib - 500)} raises Primary Savings Runway from ${fmtRunway(psr30)} to ${fmtRunway(calcBurnLever(500))} under severe stress.` },
-        { name: 'Reduce Monthly Outflow by $1,000', delta: calcBurnLever(1000) < 999 && psr30 < 999 ? calcBurnLever(1000) - psr30 : (calcBurnLever(1000) >= 999 ? 999 : 0), what: `Reducing outflow by ${fmtM(1000)}/month to ${fmtM(sim.tmib - 1000)} raises Primary Savings Runway from ${fmtRunway(psr30)} to ${fmtRunway(calcBurnLever(1000))} under severe stress.` },
-        { name: 'Reduce Monthly Outflow by $2,000', delta: calcBurnLever(2000) < 999 && psr30 < 999 ? calcBurnLever(2000) - psr30 : (calcBurnLever(2000) >= 999 ? 999 : 0), what: `Reducing outflow by ${fmtM(2000)}/month to ${fmtM(Math.max(0, sim.tmib - 2000))} raises Primary Savings Runway from ${fmtRunway(psr30)} to ${fmtRunway(calcBurnLever(2000))} under severe stress.` },
-        { name: 'Increase Revenue Target by $500/month', delta: calcRevLever(500) < 999 && psr30 < 999 ? calcRevLever(500) - psr30 : (calcRevLever(500) >= 999 ? 999 : 0), what: `Raising stable revenue target by ${fmtM(500)}/month raises Primary Savings Runway from ${fmtRunway(psr30)} to ${fmtRunway(calcRevLever(500))} under severe stress.` },
-        { name: 'Increase Revenue Target by $1,000/month', delta: calcRevLever(1000) < 999 && psr30 < 999 ? calcRevLever(1000) - psr30 : (calcRevLever(1000) >= 999 ? 999 : 0), what: `Raising stable revenue target by ${fmtM(1000)}/month raises Primary Savings Runway from ${fmtRunway(psr30)} to ${fmtRunway(calcRevLever(1000))} under severe stress.` },
-        { name: 'Revenue ramp 3 months earlier', delta: llEarly3 < 999 && psr30 < 999 ? llEarly3 - psr30 : (llEarly3 >= 999 ? 999 : 0), what: `A 3-month earlier revenue ramp raises Primary Savings Runway from ${fmtRunway(psr30)} to ${fmtRunway(llEarly3)} under severe stress. Each month of earlier revenue reduces capital dependency significantly.` },
+        { name: 'Reduce Monthly Outflow by $500', delta: calcBurnLever(500) < 999 && psr30 < 999 ? calcBurnLever(500) - psr30 : (calcBurnLever(500) >= 999 ? 999 : 0), what: `Outflow falls to ${fmtM(sim.tmib - 500)}/month. Tier 1 Runway extends from ${fmtRunway(psr30)} to ${fmtRunway(calcBurnLever(500))} under severe stress.` },
+        { name: 'Reduce Monthly Outflow by $1,000', delta: calcBurnLever(1000) < 999 && psr30 < 999 ? calcBurnLever(1000) - psr30 : (calcBurnLever(1000) >= 999 ? 999 : 0), what: `Outflow falls to ${fmtM(sim.tmib - 1000)}/month. Tier 1 Runway extends from ${fmtRunway(psr30)} to ${fmtRunway(calcBurnLever(1000))} under severe stress.` },
+        { name: 'Reduce Monthly Outflow by $2,000', delta: calcBurnLever(2000) < 999 && psr30 < 999 ? calcBurnLever(2000) - psr30 : (calcBurnLever(2000) >= 999 ? 999 : 0), what: `Outflow falls to ${fmtM(Math.max(0, sim.tmib - 2000))}/month. Tier 1 Runway extends from ${fmtRunway(psr30)} to ${fmtRunway(calcBurnLever(2000))} under severe stress.` },
+        { name: 'Increase Revenue Target by $500/month', delta: calcRevLever(500) < 999 && psr30 < 999 ? calcRevLever(500) - psr30 : (calcRevLever(500) >= 999 ? 999 : 0), what: `Revenue target rises to ${fmtM(sim.expectedRevenue + 500)}/month. Tier 1 Runway extends from ${fmtRunway(psr30)} to ${fmtRunway(calcRevLever(500))} under severe stress.` },
+        { name: 'Increase Revenue Target by $1,000/month', delta: calcRevLever(1000) < 999 && psr30 < 999 ? calcRevLever(1000) - psr30 : (calcRevLever(1000) >= 999 ? 999 : 0), what: `Revenue target rises to ${fmtM(sim.expectedRevenue + 1000)}/month. Tier 1 Runway extends from ${fmtRunway(psr30)} to ${fmtRunway(calcRevLever(1000))} under severe stress.` },
+        { name: 'Revenue ramp 3 months earlier', delta: llEarly3 < 999 && psr30 < 999 ? llEarly3 - psr30 : (llEarly3 >= 999 ? 999 : 0), what: `Ramp shortens to ${Math.max(0, sim.rampDuration - 3)} months. Tier 1 Runway extends from ${fmtRunway(psr30)} to ${fmtRunway(llEarly3)} under severe stress. Each earlier month eliminates one month of full-burden drawdown.` },
       ].filter(l => l.delta > 0 || l.delta === 999).sort((a, b) => (b.delta === 999 ? 999 : b.delta) - (a.delta === 999 ? 999 : a.delta)).slice(0, 3);
 
+      // Sensitivity results header
+      doc.fillColor(C.muted).fontSize(7.5).font('Helvetica-Bold').text('YOUR TOP SENSITIVITY RESULTS', L, y); y += 10;
       leverImpacts.forEach((lev, i) => {
-        const deltaStr = lev.delta >= 999 ? 'Unlimited (fully cash-flow positive)' : `+${lev.delta} months`;
-        const h = Math.max(60, Math.ceil(lev.what.length / 78) * 10 + 38);
-        doc.rect(L, y, W, h).fill(i % 2 === 0 ? C.light : C.mid);
-        doc.fillColor(C.muted).fontSize(7.5).font('Helvetica-Bold').text(`LEVER ${i + 1}`, L + 10, y + 8);
-        doc.fillColor(C.navy).fontSize(10).font('Helvetica-Bold').text(lev.name, L + 10, y + 20, { width: 320 });
-        doc.fillColor(C.green).fontSize(13).font('Times-Bold').text(deltaStr, L + 340, y + 18);
-        doc.fillColor(C.coal).fontSize(9).font('Helvetica').text(lev.what, L + 10, y + 36, { width: W - 20, lineGap: 1.5 });
-        y += h + 6;
+        const deltaStr = lev.delta >= 999 ? 'Fully cash-flow positive' : `+${lev.delta} months`;
+        doc.rect(L, y, W, 50).fill(i % 2 === 0 ? C.light : C.mid);
+        doc.fillColor(C.muted).fontSize(7).font('Helvetica-Bold').text(`LEVER ${i + 1}`, L + 10, y + 7);
+        doc.fillColor(C.navy).fontSize(9.5).font('Helvetica-Bold').text(lev.name, L + 10, y + 17, { width: 310 });
+        doc.fillColor(C.green).fontSize(12).font('Times-Bold').text(deltaStr, L + 330, y + 15);
+        doc.fillColor(C.coal).fontSize(8.5).font('Helvetica').text(lev.what, L + 10, y + 31, { width: W - 20, lineGap: 1.5 });
+        y += 50;
       });
-      y += 8;
+      y += 12;
 
-      doc.fillColor(C.muted).fontSize(8).font('Helvetica-Oblique')
-        .text('These are sensitivity calculations based on your inputs. They show how much each lever moves your position — not whether you should pull it. Financial decisions involve tradeoffs not captured here. Consult a qualified professional before acting.', L, y, { width: W, lineGap: 2 });
+      // Four advisory categories
+      const advisoryCategories = [
+        {
+          title: 'Cash Flow Levers',
+          color: C.navy,
+          bg: C.mid,
+          items: [
+            'Reduce fixed obligations before your transition date.',
+            'Refinance high-interest debt to lower required minimums.',
+            'Trim discretionary spending to increase monthly surplus.',
+            'Convert fixed costs to variable where possible.',
+          ],
+        },
+        {
+          title: 'Revenue De-Risking Levers',
+          color: C.blue,
+          bg: '#f0f9ff',
+          items: [
+            'Secure pre-transition contracts or retainer agreements.',
+            'Maintain part-time or consulting income during the ramp.',
+            'Enter with a client pipeline already in progress.',
+            'Delay the leap to shorten ramp exposure and reduce capital needed.',
+          ],
+        },
+        {
+          title: 'Structural Cushion Levers',
+          color: C.green,
+          bg: '#f0fdf4',
+          items: [
+            'Increase Tier 1 Liquid Capital before making the transition.',
+            'Reduce outstanding leverage before the leap date.',
+            'Shift brokerage holdings to cash to reduce haircut exposure.',
+          ],
+        },
+        {
+          title: 'Risk Compression Tactics',
+          color: C.amber,
+          bg: '#fffbeb',
+          items: [
+            'Set a 6-month checkpoint with defined revenue thresholds.',
+            'Define a minimum monthly revenue floor before drawing from savings.',
+            'Establish a re-entry trigger: the point at which you return to employment.',
+            'Create a fallback income floor through part-time or contract work.',
+          ],
+        },
+      ];
+
+      const catColW = Math.floor(W / 2);
+      let catX = L, catY = y;
+      advisoryCategories.forEach((cat, ci) => {
+        const col = ci % 2;
+        const row = Math.floor(ci / 2);
+        const cx = L + col * catColW;
+        const cy = catY + row * 90;
+        const h = 84;
+        doc.rect(cx, cy, catColW - 4, h).fill(cat.bg);
+        doc.rect(cx, cy, 3, h).fill(cat.color);
+        doc.fillColor(cat.color).fontSize(8).font('Helvetica-Bold').text(cat.title.toUpperCase(), cx + 10, cy + 8, { width: catColW - 18 });
+        cat.items.forEach((item, ii) => {
+          doc.fillColor(C.coal).fontSize(7.5).font('Helvetica').text(`\u2022 ${item}`, cx + 10, cy + 22 + ii * 13, { width: catColW - 20 });
+        });
+      });
+      y = catY + 90 * 2 + 12;
+
+      doc.fillColor(C.muted).fontSize(7.5).font('Helvetica-Oblique')
+        .text('These are structural options, not instructions. Each lever has tradeoffs not captured in this model. Consult a qualified professional before making significant financial or career decisions.', L, y, { width: W, lineGap: 2 });
 
       ftr(doc, 11);
 
       // ════════════════════════════════════════════════════════════════════
-      // PAGE 12 — SCENARIO COMPARISON GRID
+      // PAGE 12. SCENARIO COMPARISON GRID
       // ════════════════════════════════════════════════════════════════════
       doc.addPage(); hdr(doc, date); y = 42;
       y = secHead(doc, 12, 'Scenario Comparison',
-        'All scenarios side by side for quick reference. Primary Savings Runway is the T1+T2 exhaustion point. Full Runway uses all accessible savings.', y);
+        'All scenarios side by side for quick reference. Tier 1 Runway is the T1+T2 exhaustion point. Full Capital Depth uses all accessible savings.', y);
 
       const cols = [
         { label: 'Base', psr: psrBase, full: frBase, r3: t3Cap > 0 && psrBase < frBase, pm: pmBase },
@@ -1035,9 +1156,9 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       y += 26;
 
       const gridRows = [
-        { label: 'Primary Savings Runway', vals: cols.map(c => fmtRunwayShort(c.psr)) },
-        { label: 'Full Runway', vals: cols.map(c => fmtRunwayShort(c.full)) },
-        { label: 'Restricted assets req\'d?', vals: cols.map(c => c.r3 ? 'Yes' : 'No'), colors: cols.map(c => c.r3 ? C.red : C.green) },
+        { label: 'Tier 1 Runway', vals: cols.map(c => fmtRunwayShort(c.psr)) },
+        { label: 'Full Capital Depth', vals: cols.map(c => fmtRunwayShort(c.full)) },
+        { label: 'Tier 2 Required?', vals: cols.map(c => c.r3 ? 'Yes' : 'No'), colors: cols.map(c => c.r3 ? C.red : C.green) },
         { label: 'Pressure begins', vals: cols.map(c => c.pm >= 999 ? 'None' : fmtRunwayShort(c.pm)) },
       ];
 
@@ -1054,25 +1175,25 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       y += 16;
 
       y = insight(doc, 'Reading This Grid',
-        `Each column represents a distinct revenue or household scenario. Primary Savings Runway is when your Primary Accessible Savings (cash + brokerage) runs out. Full Runway extends beyond that if Restricted or Long-Term Assets are drawn. "Restricted assets req\'d?" = Yes means there is a gap between primary savings and full depletion that would require accessing retirement or home equity.`, y);
+        `Each column represents a distinct revenue or household scenario. Tier 1 Runway is when your Tier 1 Liquid Capital (cash + brokerage) runs out. Full Capital Depth extends beyond that if Tier 2 Contingent Capital is drawn. "Tier 2 Required?" = Yes means there is a gap between Tier 1 Liquid Capital and full capital depth that would require accessing retirement or home equity.`, y);
 
       ftr(doc, 12);
 
       // ════════════════════════════════════════════════════════════════════
-      // PAGE 13 — RISK PROFILE SUMMARY
+      // PAGE 13. RISK PROFILE SUMMARY
       // ════════════════════════════════════════════════════════════════════
       doc.addPage(); hdr(doc, date); y = 42;
       y = secHead(doc, 13, 'Risk Profile Summary',
-        `Structural Breakpoint Score: ${score}/100 — ${scoreLabel}`, y);
+        `Structural Breakpoint Score: ${score}/100. ${scoreLabel}`, y);
 
       const riskBlocks = [
         {
           num: 1, title: 'Structural Position',
           body: score >= 70
-            ? `Your financial structure is defensible under expected conditions. Primary Accessible Savings of ${fmtM(pasCap)} supports a runway of ${fmtRunway(psrBase)} at target revenue. The transition is viable as currently modeled.`
+            ? `Your financial structure is defensible under expected conditions. Tier 1 Liquid Capital of ${fmtM(pasCap)} supports a runway of ${fmtRunway(psrBase)} at target revenue. The transition is viable as currently modeled.`
             : score >= 50
-            ? `Your financial structure is workable but tight. Primary Accessible Savings of ${fmtM(pasCap)} provides ${fmtRunway(psrBase)} under expected conditions — but the margin narrows quickly under stress.`
-            : `Your financial structure carries meaningful pressure. Primary Accessible Savings of ${fmtM(pasCap)} may not be sufficient to absorb revenue delays or shortfalls without entering Restricted asset territory early in the transition.`,
+            ? `Your financial structure is workable but tight. Tier 1 Liquid Capital of ${fmtM(pasCap)} provides ${fmtRunway(psrBase)} under expected conditions. but the margin narrows quickly under stress.`
+            : `Your financial structure carries meaningful pressure. Tier 1 Liquid Capital of ${fmtM(pasCap)} may not be sufficient to absorb revenue delays or shortfalls without entering Tier 2 asset territory early in the transition.`,
         },
         {
           num: 2, title: 'Primary Risk Driver',
@@ -1088,15 +1209,15 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
         {
           num: 3, title: 'Pressure Timeline',
           body: pm30 >= 999
-            ? `No pressure timeline was identified under any modeled scenario. Your Primary Accessible Savings appear sufficient to cover the transition without reaching a critical depletion point within the model range.`
-            : `Under severe income contraction (−30%), financial pressure is estimated to begin around ${fmtRunway(pm30)}. This is when Primary Accessible Savings would drop within 6 months of exhaustion — the inflection point where each month carries meaningful urgency.`,
+            ? `No pressure timeline was identified under any modeled scenario. Your Tier 1 Liquid Capital appears sufficient to cover the transition without reaching a critical depletion point within the model range.`
+            : `Under severe income contraction (−30%), financial pressure is estimated to begin around ${fmtRunway(pm30)}. This is when Tier 1 Liquid Capital would drop within 6 months of exhaustion. the inflection point where each month carries meaningful urgency.`,
         },
         {
           num: 4, title: 'Execution Sensitivity',
           body: (() => {
             const rampDeltaMonths = rampLate3 < 999 && psrBase < 999 ? psrBase - rampLate3 : 0;
-            if (rampDeltaMonths > 6) return `This profile is highly sensitive to ramp timing. A 3-month late revenue ramp reduces Primary Savings Runway by approximately ${rampDeltaMonths} months. Entering with pre-existing revenue or signed clients materially reduces this sensitivity.`;
-            if (psr30 < 12) return `This profile is sensitive to revenue shortfalls in the first year. Under severe contraction, Primary Savings Runway drops to ${fmtRunway(psr30)} — leaving limited margin for extended underperformance. Early client acquisition or a confirmed anchor contract would substantially de-risk the first year.`;
+            if (rampDeltaMonths > 6) return `This profile is highly sensitive to ramp timing. A 3-month late revenue ramp reduces Tier 1 Runway by approximately ${rampDeltaMonths} months. Entering with pre-existing revenue or signed clients materially reduces this sensitivity.`;
+            if (psr30 < 12) return `This profile is sensitive to revenue shortfalls in the first year. Under severe contraction, Tier 1 Runway drops to ${fmtRunway(psr30)}. leaving limited margin for extended underperformance. Early client acquisition or a confirmed anchor contract would substantially de-risk the first year.`;
             return `This profile shows moderate execution sensitivity. Revenue arriving on time or slightly early provides comfortable positioning. The primary execution risk is a simultaneous revenue shortfall and unexpected household expense event.`;
           })(),
         },
@@ -1115,75 +1236,67 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       ftr(doc, 13);
 
       // ════════════════════════════════════════════════════════════════════
-      // PAGE 14 — FINAL SYNTHESIS
+      // PAGE 14. GLOSSARY
       // ════════════════════════════════════════════════════════════════════
       doc.addPage(); hdr(doc, date); y = 42;
-      y = secHead(doc, 14, 'What This Means Based on Your Inputs',
-        'A plain-English synthesis. No advice. No prescriptions. Just what the numbers show.', y);
+      y = secHead(doc, 14, 'Glossary of Terms',
+        'Plain-language definitions for every metric and concept used in this report.', y);
 
-      const synthBlocks = [
+      const glossaryTerms = [
         {
-          title: 'Structural Stability',
-          body: _surplusForMargin < 0
-            ? `Current monthly outflow exceeds total household income by ${fmtM(Math.abs(_surplusForMargin))}. The transition would begin drawing from savings on day one, before accounting for ramp delays or revenue shortfalls. The capital position requires careful review before committing to a timeline.`
-            : score >= 70
-            ? `Your financial structure supports this transition under expected conditions. Primary Accessible Savings of ${fmtM(pasCap)} provides ${fmtRunway(psrBase)} of Primary Savings Runway at target revenue — sufficient buffer to absorb a slow start without immediately entering Restricted asset territory.`
-            : score >= 50
-            ? `Your financial structure is workable. The transition is feasible under expected conditions, but there is limited margin if revenue arrives slower or lower than planned. The first 12 months are the highest-risk period.`
-            : `Your financial structure shows meaningful fragility. Primary Accessible Savings may not be sufficient to sustain the transition through a standard ramp period if revenue underperforms. The window between viable and distressed is narrow.`,
+          term: 'Tier 1 Liquid Capital',
+          def: 'Cash, checking, savings, and taxable brokerage accounts. These are available without penalty, tax consequence, or meaningful delay. Cash is counted at 100%. Brokerage is counted at 80% to reflect potential capital gains exposure on sale.',
         },
         {
-          title: 'What Actually Drives the Risk',
-          body: (() => {
-            const fixedShare = grossOutflow > 0 ? (sim.monthlyDebtPayments ?? 0) / grossOutflow : 0;
-            const hcShare = grossOutflow > 0 ? hc / grossOutflow : 0;
-            const rampRisk = sim.rampDuration > 8;
-            if (fixedShare > 0.25) return `Debt payments (${fmtM(sim.monthlyDebtPayments)}/month) represent ${Math.round(fixedShare * 100)}% of outflow and cannot be reduced without structural change. This creates an inflexible floor that amplifies the impact of any revenue shortfall.`;
-            if (hcShare > 0.18) return `Healthcare transition cost (${fmtM(hc)}/month) represents ${Math.round(hcShare * 100)}% of outflow. This is the highest-leverage controllable cost — alternative coverage or income-based subsidies could materially change the structure.`;
-            if (rampRisk) return `A ${sim.rampDuration}-month revenue ramp is the primary driver. The longer the ramp, the more capital must cover the full gap before revenue becomes reliable. Every month of ramp extension compounds this exposure.`;
-            return `Revenue reliability (${sim.volatilityPercent}% monthly variance) creates the primary risk. With ${sim.volatilityPercent}% variance, the model conservatively discounts monthly revenue — meaning actual results need to be consistently above the volatile baseline to track with projections.`;
-          })(),
+          term: 'Tier 2 Contingent Capital',
+          def: 'Retirement accounts (Roth IRA, Traditional IRA, 401k) and home equity. These are accessible but carry tax obligations, early withdrawal penalties, or liquidity constraints. Roth contributions are counted at 100%. Traditional accounts are counted at 50% after estimated taxes and penalties. Home equity is counted at 30%.',
         },
         {
-          title: 'When Pressure Begins Under Severe Stress',
-          body: pm30 >= 999
-            ? `No meaningful pressure timeline was identified under severe contraction (−30%). Your Primary Accessible Savings appear sufficient to absorb this scenario through the full model range. This is the strongest indicator of financial resilience in this profile.`
-            : `Under severe income contraction (−30%), financial pressure is estimated to begin around ${fmtRunway(pm30)}. That is when Primary Accessible Savings falls within 6 months of exhaustion. If revenue does not recover before that point, decisions about Restricted assets would become relevant.`,
+          term: 'Tier 3 Structural Capital',
+          def: 'A category not separately modeled in this report. Refers to highly illiquid assets such as business equity, closely held real estate, or deferred compensation that cannot be accessed without significant cost, time, or structural change.',
         },
         {
-          title: 'Two Highest-Impact Stabilizers',
-          body: (() => {
-            const burns = [calcBurnLever(500) - psr30, calcBurnLever(1000) - psr30, calcRevLever(500) - psr30, calcRevLever(1000) - psr30, llEarly3 - psr30].filter(d => d > 0);
-            const maxDelta = Math.max(...burns, 0);
-            const burnDelta = calcBurnLever(1000) < 999 && psr30 < 999 ? calcBurnLever(1000) - psr30 : null;
-            const revDelta = calcRevLever(1000) < 999 && psr30 < 999 ? calcRevLever(1000) - psr30 : null;
-            const lev1 = burnDelta !== null
-              ? `Reducing outflow by ${fmtM(1000)}/month would extend Primary Savings Runway by approximately ${burnDelta} months under severe stress.`
-              : `Increasing stable revenue by ${fmtM(1000)}/month would extend Primary Savings Runway by approximately ${revDelta ?? '—'} months under severe stress.`;
-            const lev2 = revDelta !== null && revDelta > 0
-              ? `Increasing stable revenue target by ${fmtM(1000)}/month would extend Primary Savings Runway by approximately ${revDelta} months under severe stress.`
-              : `Entering with revenue already flowing or client commitments in hand would eliminate 3 months of ramp exposure — estimated at ${psrBase >= 999 ? 'significant' : `${Math.max(0, rampEarly3 - psrBase)} months`} of additional runway.`;
-            return `First: ${lev1}\n\nSecond: ${lev2}`;
-          })(),
+          term: 'Tier 1 Runway',
+          def: 'The number of months your Tier 1 Liquid Capital would last before being fully exhausted, given your net monthly gap and the modeled revenue ramp. This is the primary comfort window. When it ends, Tier 2 Contingent Capital would be required to continue.',
+        },
+        {
+          term: 'Full Capital Depth',
+          def: 'The total runway available if all savings tiers (Tier 1 and Tier 2) are drawn down sequentially. This represents the deepest possible runway before all accessible capital is exhausted. It extends Tier 1 Runway only when Tier 2 assets are present.',
+        },
+        {
+          term: 'Net Gap',
+          def: 'The monthly shortfall that savings and new business revenue must cover after accounting for all expense components and any continuing partner income. Net gap equals gross outflow minus partner income. If revenue covers the full net gap, no savings are drawn.',
+        },
+        {
+          term: 'Pressure Point',
+          def: 'The month at which Tier 1 Liquid Capital drops within 6 months of exhaustion under the modeled scenario. Before the pressure point, the drawdown exists but the timeline is manageable. After it, each month requires more deliberate action.',
+        },
+        {
+          term: 'Ramp Timing',
+          def: 'The period during which revenue is building toward its full target. This model assumes revenue reaches 50% of target at the midpoint of the ramp and 100% by the end. Earlier ramps reduce capital dependency. Later ramps increase it.',
+        },
+        {
+          term: 'Structural Breakpoint Score',
+          def: 'A composite 0-to-100 score that reflects the overall resilience of your financial position across capital depth, runway, outflow structure, and scenario stress. Scores above 70 indicate a structurally stable position. Scores below 50 indicate meaningful fragility.',
         },
       ];
 
-      synthBlocks.forEach(block => {
-        const lines = Math.max(3, Math.ceil(block.body.length / 84));
-        const h = lines * 10 + 38;
-        doc.rect(L, y, W, h).fill(C.light);
+      glossaryTerms.forEach((entry, i) => {
+        const defLines = Math.max(2, Math.ceil(entry.def.length / 88));
+        const h = defLines * 10 + 30;
+        doc.rect(L, y, W, h).fill(i % 2 === 0 ? C.light : C.mid);
         doc.rect(L, y, 3, h).fill(C.navy);
-        doc.fillColor(C.navy).fontSize(10).font('Helvetica-Bold').text(block.title, L + 12, y + 10);
-        doc.fillColor(C.coal).fontSize(9.5).font('Helvetica').text(block.body, L + 12, y + 26, { width: W - 24, lineGap: 2 });
-        y += h + 8;
+        doc.fillColor(C.navy).fontSize(9).font('Helvetica-Bold').text(entry.term, L + 12, y + 9, { width: W - 24 });
+        doc.fillColor(C.coal).fontSize(8.5).font('Helvetica').text(entry.def, L + 12, y + 21, { width: W - 24, lineGap: 1.5 });
+        y += h + 4;
       });
+      y += 8;
 
-      // Final disclaimer
-      doc.rect(L, y, W, 44).fill(C.mid);
-      doc.rect(L, y, 3, 44).fill(C.muted);
-      doc.fillColor(C.muted).fontSize(8.5).font('Helvetica-Bold').text('IMPORTANT', L + 12, y + 8);
-      doc.fillColor(C.muted).fontSize(8).font('Helvetica').text('This report is a deterministic financial simulation. It is not financial advice, tax advice, or a prediction of future outcomes. All figures depend entirely on your inputs. Consult a qualified financial professional before making major financial or career decisions.', L + 12, y + 20, { width: W - 24, lineGap: 1.5 });
-      y += 52;
+      doc.rect(L, y, W, 36).fill(C.mid);
+      doc.rect(L, y, 3, 36).fill(C.muted);
+      doc.fillColor(C.muted).fontSize(8).font('Helvetica-Bold').text('IMPORTANT NOTICE', L + 12, y + 8);
+      doc.fillColor(C.muted).fontSize(7.5).font('Helvetica').text('This report is a structural simulation based on your inputs. It is not financial advice, tax advice, or a prediction of future outcomes. All figures depend entirely on the information provided. Consult a qualified financial professional before making major financial or career decisions.', L + 12, y + 18, { width: W - 24, lineGap: 1.5 });
+      y += 44;
 
       ftr(doc, 14);
       doc.end();

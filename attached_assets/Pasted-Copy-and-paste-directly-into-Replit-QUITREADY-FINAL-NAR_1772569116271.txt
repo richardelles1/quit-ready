@@ -1,0 +1,328 @@
+Copy and paste directly into Replit.
+
+⸻
+
+QUITREADY — FINAL NARRATIVE + STRUCTURE REFINEMENT
+
+SCOPE: REPORT VIEW + PDF EXPORT ONLY
+
+CONSTRAINT: KEEP 14 PAGES
+
+DO NOT MODIFY CORE MODEL MATH
+
+You are performing one structured refinement pass on the existing 14-page report.
+
+You must:
+	•	Keep the report at 14 pages
+	•	Keep all existing math and scenario logic intact
+	•	Make the Report and PDF identical in content and structure
+	•	Remove all em dashes and replace with periods or commas
+	•	Improve clarity, spacing, and hierarchy
+	•	Strengthen narrative spine across entire report
+	•	Rename capital tiers consistently
+	•	Expand “What Moves the Needle” into a full advisory page
+	•	Add a glossary page as Page 14
+
+Do NOT:
+	•	Change calculations
+	•	Add new features
+	•	Remove scenario sections
+	•	Inflate page count
+	•	Add motivational fluff
+
+⸻
+
+GLOBAL LANGUAGE RULES
+	1.	Remove all em dashes.
+	2.	Use short sentences.
+	3.	Replace technical tone with calm advisory tone.
+	4.	Avoid phrases like “deterministic simulation.”
+	5.	Do not sound like AI.
+	6.	No dramatic punctuation.
+	7.	No emojis.
+	8.	No overconfident statements.
+
+Tone should feel like a private advisory memo.
+
+⸻
+
+CAPITAL TIER RENAMING (APPLY EVERYWHERE)
+
+Replace all references to:
+	•	“Primary Accessible Savings”
+	•	“Restricted assets”
+	•	“Total Accessible Savings”
+
+With:
+
+Tier 1 — Liquid Capital (Penalty-Free)
+Tier 2 — Contingent Capital (Tax or Penalty Exposure)
+Tier 3 — Structural Capital (Home Equity or Illiquid Assets)
+
+Use consistently:
+	•	Tier 1 Runway
+	•	Full Capital Depth
+	•	Tier 2 Required?
+
+All charts, tables, and summaries must reflect this naming.
+
+⸻
+
+PAGE-BY-PAGE STRUCTURE
+
+Maintain 14 pages exactly.
+
+⸻
+
+PAGE 1 — Executive Snapshot
+
+Keep structure but improve interpretation.
+
+Under Risk Position Score, add:
+
+One sentence explaining what the score means in human terms.
+Example structure:
+
+“A score of 57 indicates moderate structural exposure. Your position is stable under expected conditions, but meaningfully sensitive under prolonged stress.”
+
+Add a short paragraph explaining:
+	•	Difference between Tier 1 Runway and Full Capital Depth
+	•	Why Tier 1 is the true comfort window
+
+Improve spacing between summary blocks.
+
+⸻
+
+PAGE 2 — Income & Structural Position
+
+Clarify:
+	•	Total income vs total outflow
+	•	Partner income offset
+	•	What “net gap” really means
+
+Add 2–3 plain-language interpretive paragraphs explaining:
+	•	Why surplus exists today
+	•	What changes after transition
+	•	Why partner income matters
+
+⸻
+
+PAGE 3 — Monthly Outflow Breakdown
+
+Clarify difference between:
+	•	Living expenses
+	•	Debt payments
+	•	Tax reserve
+	•	Business costs
+
+Add plain-language explanation of:
+
+Credit card spending vs debt minimums.
+Explain that monthly operating expenses and required loan payments are different categories.
+
+Improve table spacing.
+
+⸻
+
+PAGE 4 — Debt Structure
+
+Strengthen narrative:
+
+Explain clearly:
+	•	Debt balance does not change monthly burn
+	•	Debt payments create structural rigidity
+	•	Why leverage narrows flexibility under stress
+
+Add one interpretive paragraph connecting leverage to risk profile.
+
+⸻
+
+PAGE 5 — Capital Structure
+
+Rename tiers and restructure explanation.
+
+Explain clearly:
+
+Tier 1 is money available without penalties or delay.
+Tier 2 is accessible but reduces long-term wealth.
+Tier 3 is slow or costly to access.
+
+Add interpretation:
+
+Tier 1 runway is the real comfort window.
+Tier 2 is emergency capital, not a strategy.
+
+Improve visual separation between tiers.
+
+⸻
+
+PAGE 6 — Stress Scenario Modeling
+
+Keep 3 scenarios.
+
+Under each scenario, add 2–3 interpretive sentences:
+
+Explain what that runway length actually means in human terms.
+
+Add one summary paragraph:
+
+Highlight which scenario meaningfully changes risk posture.
+
+⸻
+
+PAGE 7 — Revenue Timing Sensitivity
+
+Strengthen explanation of timing risk.
+
+Add narrative:
+
+Timing risk often matters more than total capital.
+Arriving with signed revenue reduces capital dependency.
+
+Interpret slope change, not just months lost.
+
+⸻
+
+PAGE 8 — Household Shock Scenarios
+
+Keep existing scenarios.
+
+Add narrative section:
+
+Explain why shock clustering matters.
+Explain why testing edge cases is planning, not pessimism.
+
+Improve spacing between scenarios.
+
+⸻
+
+PAGE 9 — Savings Tier Timeline
+
+Clarify stage transitions:
+
+Stage 1 — Tier 1 depletion
+Stage 2 — Tier 2 activation
+Stage 3 — Total capital exhaustion
+
+Add interpretation:
+
+Tier 2 activation is escalation, not failure.
+Explain what decisions typically occur at Stage 1 depletion.
+
+⸻
+
+PAGE 10 — Revenue vs Liquidity Curve
+
+Strengthen chart interpretation.
+
+Explain:
+	•	What the gap between lines represents
+	•	Why slope matters more than endpoint
+	•	What pressure zone visually represents
+
+Add clear paragraph under chart.
+
+⸻
+
+PAGE 11 — Expanded “How to Widen the Runway”
+
+This is now a full advisory page.
+
+Structure into four sections:
+	1.	Cash Flow Levers
+Examples:
+Reduce fixed obligations
+Refinance high-interest debt
+Trim discretionary spending
+Convert fixed costs to variable
+	2.	Revenue De-Risking Levers
+Secure pre-leap contracts
+Maintain part-time income
+Enter with client pipeline
+Delay leap to shorten ramp exposure
+	3.	Structural Cushion Levers
+Increase Tier 1 liquidity before leap
+Reduce leverage prior to transition
+Shift brokerage to cash temporarily
+	4.	Risk Compression Tactics
+Set a 6-month review checkpoint
+Define minimum revenue threshold
+Establish re-entry trigger
+Create fallback income floor
+
+For each lever, explain how it affects Tier 1 Runway under stress.
+
+No prescriptions. No moral tone. Only structural impact.
+
+⸻
+
+PAGE 12 — Scenario Comparison Grid
+
+Improve readability and spacing.
+
+Add short narrative below table explaining:
+
+How to read the grid.
+Which column represents structural exposure.
+What Tier 2 Required means.
+
+⸻
+
+PAGE 13 — Risk Profile Summary
+
+Rewrite to reinforce narrative spine.
+
+Structure into:
+	1.	Structural Stability
+	2.	Primary Risk Driver
+	3.	Timeline Sensitivity
+	4.	What Would Materially Improve Position
+
+Make interpretation clear and human.
+
+⸻
+
+PAGE 14 — Glossary
+
+Add clean glossary.
+
+Define:
+
+Tier 1 Liquid Capital
+Tier 2 Contingent Capital
+Tier 3 Structural Capital
+Tier 1 Runway
+Full Capital Depth
+Pressure Point
+Ramp Timing
+Structural Breakpoint Score
+Net Gap
+
+Definitions must be simple and short.
+
+No jargon.
+
+⸻
+
+SPACING & HIERARCHY RULES
+	•	Increase vertical spacing between sections
+	•	Add subtle divider lines
+	•	Limit bolding to key metrics
+	•	Keep paragraph length under 5 lines
+	•	Ensure consistent typography hierarchy
+	•	Ensure PDF matches report exactly
+
+⸻
+
+FINAL CHECK
+
+Before completion:
+	•	No em dashes remain
+	•	Tier naming consistent everywhere
+	•	14 pages exactly
+	•	No blank sections
+	•	No math changes
+	•	Report and PDF identical
+	•	Narrative spine clearly visible across pages
+
+Proceed with implementation.

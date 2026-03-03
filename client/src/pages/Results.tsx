@@ -268,7 +268,7 @@ function SavingsCurve({ sim, pas: pasCap }: { sim: SimulationResult; pas: number
             <span>Pressure point</span>
           </div>
         )}
-        <span className="text-muted-foreground/40 ml-auto">X: months · Y: Primary Accessible Savings</span>
+        <span className="text-muted-foreground/40 ml-auto">X: months · Y: Tier 1 Liquid Capital</span>
       </div>
     </div>
   );
@@ -322,14 +322,14 @@ export default function Results() {
   // Capital tiers
   const tier1 = sim.cash;
   const tier2 = Math.round(sim.brokerage * 0.80);
-  const pas = tier1 + tier2; // Primary Accessible Savings
+  const pas = tier1 + tier2; // Tier 1 Liquid Capital
   const t3Roth = Math.round(sim.roth);
   const t3Trad = Math.round(sim.traditional * 0.50);
   const t3RE   = Math.round(sim.realEstate * 0.30);
   const t3Total = t3Roth + t3Trad + t3RE;
   const reliesOnRestricted = t3Total > 0 && pas < sim.tmib * 12;
 
-  // Primary Savings Runway (when PAS exhausted)
+  // Tier 1 Runway (when PAS exhausted)
   const psrBase = calcPrimaryRunway(sim, 1.00);
   const psr15   = calcPrimaryRunway(sim, 0.85);
   const psr30   = calcPrimaryRunway(sim, 0.70);
@@ -370,37 +370,37 @@ export default function Results() {
   const totalIncome = (sim.currentSalary ?? 0) + (sim.isDualIncome ? partnerOff : 0);
   const grossSurplus = totalIncome - grossOutflow; // correct: income vs. all expenses
 
-  // Structural margin label — income-based (not score-based)
+  // Structural margin label, income-based (not score-based)
   const marginLabel = getMarginLabel(grossSurplus, totalIncome);
 
-  // Pre-render validation (console warnings only — does not block screen)
+  // Pre-render validation (console warnings only, does not block screen)
   if (process.env.NODE_ENV !== 'production') {
     const pctSum = pcts.reduce((a, b) => a + b, 0);
     if (pctSum !== 100) console.warn(`[QR Validation] Outflow pcts sum to ${pctSum}, expected 100`);
-    if (grossSurplus < 0 && marginLabel.includes('Strong')) console.warn('[QR Validation] Deficit but Strong margin label — check income inputs');
-    if (pas < 0) console.warn('[QR Validation] Negative Primary Accessible Savings');
+    if (grossSurplus < 0 && marginLabel.includes('Strong')) console.warn('[QR Validation] Deficit but Strong margin label. check income inputs');
+    if (pas < 0) console.warn('[QR Validation] Negative Tier 1 Liquid Capital');
   }
 
-  // Advisor paragraph — narrative-consistent (no strong language when deficit exists)
+  // Advisor paragraph, narrative-consistent (no strong language when deficit exists)
   const advisorSummary = grossSurplus < 0
     ? `Your current household outflow exceeds total income by ${fmt(Math.abs(grossSurplus))}/month. Any transition would begin drawing from savings on day one, before accounting for ramp delays or revenue shortfalls. The capital position requires careful review before committing to a timeline.`
     : score >= 70
-    ? `Your financial structure is defensible under expected conditions. Primary Accessible Savings of ${fmt(pas)} provides ${fmtRunway(psrBase)} of Primary Savings Runway at base case. The transition is viable as modeled — the primary variable is execution speed.`
+    ? `Your financial structure is defensible under expected conditions. Tier 1 Liquid Capital of ${fmt(pas)} provides ${fmtRunway(psrBase)} of Tier 1 Runway at base case. The transition is viable as modeled. The primary variable is execution speed.`
     : score >= 50
-    ? `Your position is workable but carries meaningful exposure. A slower-than-expected ramp or early income shortfall could exhaust Primary Accessible Savings sooner than planned, pushing toward Restricted or Long-Term Assets.`
-    : `Your Primary Accessible Savings may not sustain this transition through a standard ramp period under revenue underperformance. The margin between a viable outcome and a distressed one is narrow under the modeled inputs.`;
+    ? `Your position is workable but carries meaningful exposure. A slower-than-expected ramp or early income shortfall could exhaust Tier 1 Liquid Capital sooner than planned, pushing toward Tier 2 Contingent Capital.`
+    : `Your Tier 1 Liquid Capital may not sustain this transition through a standard ramp period under revenue underperformance. The margin between a viable outcome and a distressed one is narrow under the modeled inputs.`;
 
-  // Restricted assets clarification sentence (per spec)
+  // Tier 2 assets clarification sentence (per spec)
   const restrictedClarification = reliesOnRestricted
-    ? `While Primary Accessible Savings depletes in ${psr30 >= 999 ? '24+ years' : fmtRunway(psr30)} under severe stress, total capital depth extends runway to ${fmtRunway(sim.runway30Down)} if Restricted or Long-Term Assets are accessed. These are emergency capital — not a planned source of transition funding.`
+    ? `While Tier 1 Liquid Capital depletes in ${psr30 >= 999 ? '24+ years' : fmtRunway(psr30)} under severe stress, total capital depth extends runway to ${fmtRunway(sim.runway30Down)} if Tier 2 Contingent Capital is accessed. This is emergency capital. Not a planned source of transition funding.`
     : null;
 
   const hcPct = grossOutflow > 0 ? Math.round((hc / grossOutflow) * 100) : 0;
   const advisorBestMove = hcPct >= 15
     ? `Healthcare cost (${hcPct}% of gross outflow) is the highest-leverage controllable cost. Partner coverage or income-based ACA subsidies could shift the position materially.`
     : sim.rampDuration > 6
-    ? `Shortening your ramp timeline or entering with a signed client commitment would reduce the capital gap significantly — each month of earlier revenue eliminates one month of full-burden drawdown.`
-    : `Increasing stable revenue by ${fmt(1000)}/month would extend your Primary Savings Runway by approximately ${revDelta ? `${revDelta} months` : 'a meaningful amount'} under severe stress.`;
+    ? `Shortening your ramp timeline or entering with a signed client commitment would reduce the capital gap significantly. each month of earlier revenue eliminates one month of full-burden drawdown.`
+    : `Increasing stable revenue by ${fmt(1000)}/month would extend your Tier 1 Runway by approximately ${revDelta ? `${revDelta} months` : 'a meaningful amount'} under severe stress.`;
 
   return (
     <Layout>
@@ -432,7 +432,7 @@ export default function Results() {
 
           {/* ── 1. Executive Snapshot ─────────────────────────────────── */}
           <SectionCard className="mb-6">
-            <SectionHeader n={1}>Executive Snapshot — Your Financial Position Today</SectionHeader>
+            <SectionHeader n={1}>Executive Snapshot: Your Financial Position Today</SectionHeader>
             {/* Top 3 income/outflow tiles */}
             <div className="grid grid-cols-3 border-b border-border">
               {[
@@ -476,17 +476,17 @@ export default function Results() {
               </div>
             )}
 
-            {/* Primary Savings Runway — visual anchor */}
+            {/* Tier 1 Runway: visual anchor */}
             <div className={`mx-7 my-5 flex items-center justify-between px-5 py-4 rounded-lg border-2 ${psrStatusBg}`}>
               <div>
                 <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground mb-1">
-                  Primary Savings Runway — Severe Stress (−30% Revenue)
+                  Tier 1 Runway, Severe Stress (−30% Revenue)
                 </p>
                 <p className="text-2xl font-bold font-serif text-foreground" data-testid="text-ll-status">
                   {psr30 >= 999 ? '24+ years' : fmtRunway(psr30)}
                 </p>
                 <p className="text-xs text-muted-foreground mt-0.5">
-                  Primary Accessible Savings: {fmt(pas)} (Cash + Brokerage)
+                  Tier 1 Liquid Capital: {fmt(pas)} (Cash + Brokerage)
                 </p>
               </div>
               <div className={`text-xs font-bold uppercase tracking-wider px-3 py-1.5 rounded-md border ${psrStatusBg} ${psrStatusColor}`}>
@@ -494,12 +494,12 @@ export default function Results() {
               </div>
             </div>
 
-            {/* Second row — capital and runway metrics */}
+            {/* Second row: capital and runway metrics */}
             <div className="grid grid-cols-2 sm:grid-cols-4 border-t border-border">
               {[
-                { label: 'Primary Accessible Savings', val: fmt(pas), testid: 'metric-capital' },
-                { label: 'Total Accessible Savings', val: fmt(sim.accessibleCapital), testid: 'metric-total-capital' },
-                { label: 'Primary Savings Runway — Base', val: fmtRunway(psrBase), testid: 'metric-base-runway' },
+                { label: 'Tier 1 Liquid Capital', val: fmt(pas), testid: 'metric-capital' },
+                { label: 'Full Capital Depth', val: fmt(sim.accessibleCapital), testid: 'metric-total-capital' },
+                { label: 'Tier 1 Runway, Base', val: fmtRunway(psrBase), testid: 'metric-base-runway' },
                 { label: 'Risk Position Score', val: `${score} / 100`, testid: 'metric-worst-runway' },
               ].map((m, i) => (
                 <div key={m.label} className={`px-7 py-5 ${i < 3 ? 'border-r border-border' : ''}`} data-testid={m.testid}>
@@ -524,11 +524,11 @@ export default function Results() {
                   <p className="text-sm text-muted-foreground leading-relaxed">
                     {sim.breakpointMonth >= 999
                       ? 'No structural breakpoint found within the model range. Capital and revenue projections remain solvent across all modeled scenarios.'
-                      : `The earliest pressure point appears at ${fmtRunway(sim.breakpointMonth)} — under the ${sim.breakpointScenario} scenario.`}
+                      : `The earliest pressure point appears at ${fmtRunway(sim.breakpointMonth)}, under the ${sim.breakpointScenario} scenario.`}
                   </p>
                 </div>
               </div>
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-4">
                 {[
                   { range: '0 – 49', label: 'Structurally Fragile', active: score < 50 },
                   { range: '50 – 69', label: 'Moderately Exposed', active: score >= 50 && score < 70 },
@@ -541,6 +541,15 @@ export default function Results() {
                   </div>
                 ))}
               </div>
+              <p className="text-xs text-muted-foreground leading-relaxed border-t border-border pt-4">
+                {score >= 86
+                  ? `A score of ${score} reflects a structurally strong position. Tier 1 Liquid Capital covers the gap for a meaningful duration, the severe stress scenario does not produce a critical breakpoint, and the debt load is within a manageable range relative to capital. The primary risk to this position is a prolonged revenue delay.`
+                  : score >= 70
+                  ? `A score of ${score} reflects a stable but not insulated position. The base case and moderate contraction scenarios are manageable. The severe contraction scenario reveals meaningful exposure. The structure works if execution is close to plan.`
+                  : score >= 50
+                  ? `A score of ${score} reflects moderate exposure. The position is not immediately fragile, but revenue underperformance or a delayed ramp would accelerate capital drawdown. There is limited structural cushion for execution variability.`
+                  : `A score of ${score} reflects a structurally fragile position. Capital depth, revenue trajectory, and/or debt exposure are in a range that leaves little margin for error. Strengthening Tier 1 Liquid Capital or compressing outflow before the transition would materially change this reading.`}
+              </p>
             </div>
           </SectionCard>
 
@@ -574,11 +583,11 @@ export default function Results() {
               {grossOutflow > 0 && (
                 <div className="mt-5 pt-5 border-t border-border space-y-1.5">
                   <p className="text-xs text-muted-foreground leading-relaxed">
-                    <strong className="text-foreground">{pcts[0] + (pcts[1] ?? 0)}% is fixed obligations</strong> — living expenses and debt payments that will not decrease if revenue underperforms. These are the hardest costs to reduce under pressure.
+                    <strong className="text-foreground">{pcts[0] + (pcts[1] ?? 0)}% is fixed obligations</strong>. living expenses and debt payments that will not decrease if revenue underperforms. These are the hardest costs to reduce under pressure.
                   </p>
                   {sim.selfEmploymentTax > 0 && (
                     <p className="text-xs text-muted-foreground leading-relaxed">
-                      The <strong className="text-foreground">tax reserve</strong> ({pcts[outflowComponents.findIndex(c => c.val === sim.selfEmploymentTax)]}% of gross outflow) eases naturally in lower-revenue months — giving the outflow structure some flexibility tied to income.
+                      The <strong className="text-foreground">tax reserve</strong> ({pcts[outflowComponents.findIndex(c => c.val === sim.selfEmploymentTax)]}% of gross outflow) eases naturally in lower-revenue months. giving the outflow structure some flexibility tied to income.
                     </p>
                   )}
                   {(sim.totalDebt ?? 0) > 0 && (
@@ -591,10 +600,10 @@ export default function Results() {
             </div>
           </SectionCard>
 
-          {/* ── 4. Primary Savings Runway Scenarios ──────────────────── */}
+          {/* ── 4. Tier 1 Runway Scenarios ──────────────────── */}
           <SectionCard className="mb-6">
             <SectionHeader n={4}
-              sub="How long Primary Accessible Savings (cash + brokerage) would last before running out — in each scenario. Revenue stress reduces income; outflow stays constant.">
+              sub="How long Tier 1 Liquid Capital (cash + brokerage) would last before running out, in each scenario. Revenue stress reduces income; outflow stays constant.">
               Stress Scenario Modeling
             </SectionHeader>
             <div className="px-6 py-2">
@@ -609,8 +618,8 @@ export default function Results() {
                   <thead>
                     <tr className="border-b border-border">
                       <th className="text-left py-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Scenario</th>
-                      <th className="text-right py-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Primary Savings Runway</th>
-                      <th className="text-right py-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Full Runway</th>
+                      <th className="text-right py-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Tier 1 Runway</th>
+                      <th className="text-right py-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Full Capital Depth</th>
                       <th className="text-right py-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Restricted Assets?</th>
                     </tr>
                   </thead>
@@ -642,7 +651,7 @@ export default function Results() {
           {/* ── 5. Revenue vs. Savings Curve ──────────────────────────── */}
           <SectionCard className="mb-6">
             <SectionHeader n={5}
-              sub="How Primary Accessible Savings depletes over 36 months under base and severe scenarios.">
+              sub="How Tier 1 Liquid Capital depletes over 36 months under base and severe scenarios.">
               Revenue vs. Savings Curve
             </SectionHeader>
             <div className="px-6 py-5">
@@ -653,29 +662,29 @@ export default function Results() {
           {/* ── 6. Savings Tier Structure ─────────────────────────────── */}
           <SectionCard className="mb-6">
             <SectionHeader n={6}
-              sub="Your savings are layered by accessibility. Under stress, depletion follows this order. Restricted or Long-Term Assets are emergency capital — not primary runway.">
+              sub="Your savings are layered by accessibility. Under stress, depletion follows this order. Tier 2 Contingent Capital is emergency capital. Not primary runway.">
               Savings Tier Structure
             </SectionHeader>
             <div className="px-6 py-4">
               <div className="mb-5">
                 <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3">
-                  Primary Accessible Savings <span className="normal-case font-normal text-muted-foreground">(Cash + Brokerage — Stage 1)</span>
+                  Tier 1 Liquid Capital <span className="normal-case font-normal text-muted-foreground">(Cash + Brokerage, Stage 1)</span>
                 </p>
                 <div className="space-y-2">
                   {tier1 > 0 && (
                     <div className="flex items-center justify-between py-3 border border-border rounded-md px-4">
-                      <div><p className="text-sm font-medium text-foreground">Cash & HYSA</p><p className="text-xs text-muted-foreground">Counted at 100% — no penalty, no tax, no delay</p></div>
+                      <div><p className="text-sm font-medium text-foreground">Cash & HYSA</p><p className="text-xs text-muted-foreground">Counted at 100%. no penalty, no tax, no delay</p></div>
                       <p className="text-sm font-bold text-foreground">{fmt(tier1)}</p>
                     </div>
                   )}
                   {tier2 > 0 && (
                     <div className="flex items-center justify-between py-3 border border-border rounded-md px-4">
-                      <div><p className="text-sm font-medium text-foreground">Brokerage accounts</p><p className="text-xs text-muted-foreground">Counted at 80% — selling may trigger capital gains taxes</p></div>
+                      <div><p className="text-sm font-medium text-foreground">Brokerage accounts</p><p className="text-xs text-muted-foreground">Counted at 80%. selling may trigger capital gains taxes</p></div>
                       <p className="text-sm font-bold text-foreground">{fmt(tier2)}</p>
                     </div>
                   )}
                   <div className="flex items-center justify-between py-3 bg-blue-50 border border-blue-200 rounded-md px-4">
-                    <span className="text-sm font-bold text-blue-800">Primary Accessible Savings total</span>
+                    <span className="text-sm font-bold text-blue-800">Tier 1 Liquid Capital total</span>
                     <span className="text-base font-bold font-serif text-blue-800" data-testid="text-accessible-capital">{fmt(pas)}</span>
                   </div>
                 </div>
@@ -683,93 +692,167 @@ export default function Results() {
 
               <div className="mb-5">
                 <p className="text-xs font-semibold uppercase tracking-wider text-amber-700 mb-1">
-                  Restricted or Long-Term Assets <span className="normal-case font-normal">(Retirement + Home Equity — Stage 2, if needed)</span>
+                  Tier 2 Contingent Capital <span className="normal-case font-normal">(Retirement + Home Equity, Stage 2, if needed)</span>
                 </p>
                 <p className="text-xs text-muted-foreground mb-3 leading-relaxed">
-                  Not considered primary runway. Early access to retirement accounts typically triggers income taxes plus a 10% penalty — permanently reducing long-term compounding. Only used when Stage 1 is exhausted.
+                  Not considered primary runway. Early access to retirement accounts typically triggers income taxes plus a 10% penalty, permanently reducing long-term compounding. Only used when Stage 1 is exhausted.
                 </p>
                 {t3Total > 0 ? (
                   <div className="border border-amber-200 rounded-md overflow-hidden">
                     {t3Roth > 0 && (
                       <div className="flex items-center justify-between py-3 px-4 border-b border-amber-100">
-                        <div><p className="text-sm font-medium text-foreground">Roth IRA contributions</p><p className="text-xs text-muted-foreground">Counted at 100% (contributions only — still retirement capital)</p></div>
+                        <div><p className="text-sm font-medium text-foreground">Roth IRA contributions</p><p className="text-xs text-muted-foreground">Counted at 100% (contributions only. still retirement capital)</p></div>
                         <p className="text-sm font-bold text-foreground">{fmt(t3Roth)}</p>
                       </div>
                     )}
                     {t3Trad > 0 && (
                       <div className="flex items-center justify-between py-3 px-4 border-b border-amber-100">
-                        <div><p className="text-sm font-medium text-foreground">Traditional IRA / 401(k)</p><p className="text-xs text-muted-foreground">Counted at 50% — income taxes + 10% early withdrawal penalty</p></div>
+                        <div><p className="text-sm font-medium text-foreground">Traditional IRA / 401(k)</p><p className="text-xs text-muted-foreground">Counted at 50%. income taxes + 10% early withdrawal penalty</p></div>
                         <p className="text-sm font-bold text-foreground">{fmt(t3Trad)}</p>
                       </div>
                     )}
                     {t3RE > 0 && (
                       <div className="flex items-center justify-between py-3 px-4">
-                        <div><p className="text-sm font-medium text-foreground">Home equity</p><p className="text-xs text-muted-foreground">Counted at 30% — illiquid, costly to access, market-dependent</p></div>
+                        <div><p className="text-sm font-medium text-foreground">Home equity</p><p className="text-xs text-muted-foreground">Counted at 30%. illiquid, costly to access, market-dependent</p></div>
                         <p className="text-sm font-bold text-foreground">{fmt(t3RE)}</p>
                       </div>
                     )}
                   </div>
                 ) : (
-                  <p className="text-sm text-muted-foreground italic">No Restricted or Long-Term Assets entered.</p>
+                  <p className="text-sm text-muted-foreground italic">No Tier 2 Contingent Capital entered.</p>
                 )}
                 {reliesOnRestricted && (
                   <div className="mt-3 flex items-start gap-2.5 p-3.5 bg-amber-50 border border-amber-200 rounded-md">
                     <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
                     <p className="text-xs text-amber-700 leading-relaxed">
-                      Primary Accessible Savings ({fmt(pas)}) covers less than 12 months of net outflow under stress. You are not liquid enough to sustain this transition without entering Restricted asset territory — treat that as emergency capital, not a plan.
+                      Tier 1 Liquid Capital ({fmt(pas)}) covers less than 12 months of net outflow under stress. You are not liquid enough to sustain this transition without entering Tier 2 asset territory. treat that as emergency capital, not a plan.
                     </p>
                   </div>
                 )}
               </div>
 
               <div className="flex items-center justify-between py-4 border-t border-border bg-muted/10 -mx-6 px-6 rounded-b-md">
-                <span className="text-sm font-bold text-foreground">Total Accessible Savings (all tiers)</span>
+                <span className="text-sm font-bold text-foreground">Full Capital Depth (all tiers)</span>
                 <span className="text-xl font-bold font-serif text-foreground">{fmt(sim.accessibleCapital)}</span>
               </div>
             </div>
           </SectionCard>
 
-          {/* ── 7. What Moves the Needle ──────────────────────────────── */}
+          {/* ── 7. How to Widen the Runway ───────────────────────────── */}
           <SectionCard className="mb-6">
             <SectionHeader n={7}
-              sub="Sensitivity results — how much each change extends Primary Savings Runway under severe stress (−30%). Not prescriptions.">
-              What Moves the Needle
+              sub="Four categories of structural options. Each affects Tier 1 Runway under stress. Sensitivity calculations only. No prescriptions.">
+              How to Widen the Runway
             </SectionHeader>
-            <div className="px-6 py-4 space-y-3">
-              {burnDelta !== null && burnDelta > 0 && (
-                <div className="p-4 rounded-md border border-border bg-muted/20">
-                  <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-1.5">Reducing outflow by $1,000/month</p>
-                  <p className="text-sm text-foreground leading-relaxed">
-                    Extends Primary Savings Runway by approximately <strong>{burnDelta} months</strong> under severe stress — from {fmtRunway(sev30)} to {fmtRunway(burnMinus1k)}.
-                    <span className="text-muted-foreground ml-2 text-xs">Sensitivity result only — not a recommendation.</span>
-                  </p>
+            <div className="px-6 py-4">
+              {/* Top sensitivity results */}
+              {(burnDelta !== null && burnDelta > 0) || (revDelta !== null && revDelta > 0) || hcPct >= 15 ? (
+                <div className="mb-6">
+                  <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground mb-3">Your Top Sensitivity Results</p>
+                  <div className="space-y-2.5">
+                    {burnDelta !== null && burnDelta > 0 && (
+                      <div className="flex items-start justify-between gap-4 p-3.5 rounded-md border border-border bg-muted/10">
+                        <div className="flex-1">
+                          <p className="text-xs font-semibold text-foreground mb-0.5">Reduce outflow by $1,000/month</p>
+                          <p className="text-xs text-muted-foreground leading-relaxed">
+                            Outflow drops to <strong className="text-foreground">{fmt(sim.tmib - 1000)}/month</strong>. Tier 1 Runway extends from {fmtRunway(sev30)} to {fmtRunway(burnMinus1k)} under severe stress.
+                          </p>
+                        </div>
+                        <span className="text-sm font-bold text-green-700 shrink-0">+{burnDelta} mo</span>
+                      </div>
+                    )}
+                    {revDelta !== null && revDelta > 0 && (
+                      <div className="flex items-start justify-between gap-4 p-3.5 rounded-md border border-border bg-muted/10">
+                        <div className="flex-1">
+                          <p className="text-xs font-semibold text-foreground mb-0.5">Increase revenue target by $1,000/month</p>
+                          <p className="text-xs text-muted-foreground leading-relaxed">
+                            Revenue target rises to <strong className="text-foreground">{fmt(sim.expectedRevenue + 1000)}/month</strong>. Tier 1 Runway extends from {fmtRunway(sev30)} to {fmtRunway(revPlus1k)} under severe stress.
+                          </p>
+                        </div>
+                        <span className="text-sm font-bold text-green-700 shrink-0">+{revDelta} mo</span>
+                      </div>
+                    )}
+                    {hcPct >= 15 && (
+                      <div className="flex items-start justify-between gap-4 p-3.5 rounded-md border border-border bg-muted/10">
+                        <div className="flex-1">
+                          <p className="text-xs font-semibold text-foreground mb-0.5">Healthcare: {hcPct}% of gross outflow</p>
+                          <p className="text-xs text-muted-foreground leading-relaxed">
+                            At {fmt(hc)}/month, healthcare is a material outflow component. Partner coverage or income-based ACA subsidies could shift the structure significantly.
+                          </p>
+                        </div>
+                        <span className="text-xs text-muted-foreground shrink-0">High leverage</span>
+                      </div>
+                    )}
+                  </div>
                 </div>
-              )}
-              {revDelta !== null && revDelta > 0 && (
-                <div className="p-4 rounded-md border border-border bg-muted/20">
-                  <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-1.5">Increasing stable revenue by $1,000/month</p>
-                  <p className="text-sm text-foreground leading-relaxed">
-                    Extends Primary Savings Runway by approximately <strong>{revDelta} months</strong> under severe stress — from {fmtRunway(sev30)} to {fmtRunway(revPlus1k)}.
-                    <span className="text-muted-foreground ml-2 text-xs">Sensitivity result only — not a recommendation.</span>
-                  </p>
-                </div>
-              )}
-              {hcPct >= 15 && (
-                <div className="p-4 rounded-md border border-border bg-muted/20">
-                  <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-1.5">Healthcare cost — {hcPct}% of gross outflow</p>
-                  <p className="text-sm text-foreground leading-relaxed">
-                    At {fmt(hc)}/month, healthcare is a notable outflow component. Partner coverage or income-based ACA subsidies could shift the structure materially.
-                    <span className="text-muted-foreground ml-2 text-xs">Sensitivity result only — not a recommendation.</span>
-                  </p>
-                </div>
-              )}
+              ) : null}
+
+              {/* Four advisory categories */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {[
+                  {
+                    title: 'Cash Flow Levers',
+                    color: 'border-l-foreground',
+                    items: [
+                      'Reduce fixed obligations before your transition date.',
+                      'Refinance high-interest debt to lower required minimums.',
+                      'Trim discretionary spending to increase monthly surplus.',
+                      'Convert fixed costs to variable where possible.',
+                    ],
+                  },
+                  {
+                    title: 'Revenue De-Risking Levers',
+                    color: 'border-l-blue-600',
+                    items: [
+                      'Secure pre-transition contracts or retainer agreements.',
+                      'Maintain part-time or consulting income during the ramp.',
+                      'Enter with a client pipeline already in progress.',
+                      'Delay the leap to shorten ramp exposure and reduce capital needed.',
+                    ],
+                  },
+                  {
+                    title: 'Structural Cushion Levers',
+                    color: 'border-l-green-600',
+                    items: [
+                      'Increase Tier 1 Liquid Capital before making the transition.',
+                      'Reduce outstanding leverage before the leap date.',
+                      'Shift brokerage holdings to cash to reduce haircut exposure.',
+                    ],
+                  },
+                  {
+                    title: 'Risk Compression Tactics',
+                    color: 'border-l-amber-600',
+                    items: [
+                      'Set a 6-month checkpoint with defined revenue thresholds.',
+                      'Define a minimum monthly revenue floor before drawing from savings.',
+                      'Establish a re-entry trigger: the point at which you return to employment.',
+                      'Create a fallback income floor through part-time or contract work.',
+                    ],
+                  },
+                ].map(cat => (
+                  <div key={cat.title} className={`p-4 rounded-md border border-border bg-muted/5 border-l-4 ${cat.color}`}>
+                    <p className="text-xs font-bold uppercase tracking-wider text-foreground mb-2.5">{cat.title}</p>
+                    <ul className="space-y-1.5">
+                      {cat.items.map(item => (
+                        <li key={item} className="text-xs text-muted-foreground leading-relaxed flex gap-2">
+                          <span className="text-foreground/30 shrink-0 mt-0.5">&#8226;</span>
+                          <span>{item}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                ))}
+              </div>
+              <p className="text-[10px] text-muted-foreground/60 italic mt-4 pt-4 border-t border-border">
+                These are structural options, not instructions. Each lever has tradeoffs not captured in this model. Consult a qualified professional before making significant financial or career decisions.
+              </p>
             </div>
           </SectionCard>
 
           {/* ── 8. Scenario Comparison Grid ──────────────────────────── */}
           <SectionCard className="mb-6">
             <SectionHeader n={8}
-              sub="All scenarios side by side. Primary Savings Runway = when cash + brokerage runs out. Full Runway uses all accessible savings including restricted assets.">
+              sub="All scenarios side by side. Tier 1 Runway = when cash + brokerage runs out. Full Capital Depth uses all accessible savings including restricted assets.">
               Scenario Comparison
             </SectionHeader>
             <div className="px-6 py-4 overflow-x-auto">
@@ -784,9 +867,9 @@ export default function Results() {
                 </thead>
                 <tbody>
                   {[
-                    { label: 'Primary Savings Runway', vals: [fmtRunway(psrBase), fmtRunway(psr15), fmtRunway(psr30), fmtRunway(psrRampDelay)] },
-                    { label: 'Full Runway', vals: [fmtRunway(sim.baseRunway), fmtRunway(sim.runway15Down), fmtRunway(sim.runway30Down), fmtRunway(sim.runwayRampDelay)] },
-                    { label: 'Restricted assets required?', vals: [psrBase, psr15, psr30, psrRampDelay].map((p, i) => {
+                    { label: 'Tier 1 Runway', vals: [fmtRunway(psrBase), fmtRunway(psr15), fmtRunway(psr30), fmtRunway(psrRampDelay)] },
+                    { label: 'Full Capital Depth', vals: [fmtRunway(sim.baseRunway), fmtRunway(sim.runway15Down), fmtRunway(sim.runway30Down), fmtRunway(sim.runwayRampDelay)] },
+                    { label: 'Tier 2 Required?', vals: [psrBase, psr15, psr30, psrRampDelay].map((p, i) => {
                       const full = [sim.baseRunway, sim.runway15Down, sim.runway30Down, sim.runwayRampDelay][i];
                       return t3Total > 0 && p < full ? 'Yes' : 'No';
                     }) },
@@ -819,7 +902,7 @@ export default function Results() {
                   <p className="text-sm text-muted-foreground leading-relaxed">{advisorSummary}</p>
                 </div>
               </div>
-              {/* Restricted assets clarification (when reliesOnRestricted) */}
+              {/* Tier 2 assets clarification (when reliesOnRestricted) */}
               {restrictedClarification && (
                 <div className="flex items-start gap-3 p-4 bg-amber-50 border border-amber-200 rounded-lg">
                   <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
@@ -834,7 +917,7 @@ export default function Results() {
               </div>
               <p className="text-sm text-muted-foreground leading-relaxed -mt-2">{advisorBestMove}</p>
               <p className="text-[10px] text-muted-foreground/60 italic border-t border-border pt-4">
-                This report is a financial simulation based on your inputs. It is not financial, tax, or legal advice. All sensitivity calculations show directional impact only — actual outcomes depend on factors not captured in this model. Consult a qualified professional before making any significant financial decision.
+                This report is a financial simulation based on your inputs. It is not financial, tax, or legal advice. All sensitivity calculations show directional impact only. Actual outcomes depend on factors not captured in this model. Consult a qualified professional before making any significant financial decision.
               </p>
             </div>
           </SectionCard>
