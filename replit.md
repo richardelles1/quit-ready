@@ -86,10 +86,17 @@ A deterministic, conservative financial stress engine for U.S. professionals mod
 - Total Outstanding Debt: context ONLY — never in outflow % breakdown, never in runway math
 
 ## Math Integrity
-- Outflow = livingExpenses + monthlyDebtPayments + healthcareDelta + selfEmploymentTax + businessCostBaseline − partnerIncome
-- Validation before PDF: non-negative runways, stage ordering (PAS ≤ full runway), outflow consistency
-- PDF blocked with 422 if validation fails
-- Pre-render validation function in server/routes.ts
+- grossOutflow = livingExpenses + monthlyDebtPayments + healthcareDelta + selfEmploymentTax + businessCostBaseline (BEFORE partner offset)
+- tmib = grossOutflow − partnerIncome (net gap savings/new revenue must cover)
+- Executive Snapshot: shows totalIncome vs grossOutflow → grossSurplus (no double-counting)
+- Partner income offset shown separately as "Net savings gap (TMIB)" note
+- Structural margin label: income-based (surplus/income) — NOT score-based
+  - >10% surplus → "Strong structural margin"
+  - 0–10% → "Moderate structural margin", -5% to 0 → "Thin", <-5% → "Negative"
+- Narrative consistency: deficit case triggers override text (no "strong" language when income < outflow)
+- Outflow percentages: always exactly 100% via pct100()
+- Pre-render validation in Results.tsx (console.warn) + routes.ts (console.error on PDF)
+- restrictedClarification sentence appears in Section 9 when reliesOnRestricted = true
 
 ## PDF Report (14 pages — current)
 1. Executive Snapshot — income/outflow/surplus tiles, PAS status pill, 3-scenario mini grid
@@ -108,12 +115,21 @@ A deterministic, conservative financial stress engine for U.S. professionals mod
 14. Final Synthesis — 4 paragraphs (stability, risk driver, pressure timeline, two stabilizers)
 
 ## Design Principles
-- Institutional minimalism — navy/charcoal/slate palette, Inter + Times-Bold
+- Institutional minimalism — navy/charcoal/slate palette, Inter + Times-Bold serif headings
 - No motivational tone, no emoji, no alarmist language
 - Plain English co-pilot voice ("your savings would cover about X years")
 - "Income contraction" not "shock" | "Liquidity exhausted" not "fails/breaks"
 - Conservative bias in all calculations
 - U.S.-only (healthcare/tax assumptions)
+
+## Screen Report Visual Architecture (Results.tsx)
+- SectionCard: border + shadow-sm + rounded-lg (premium card appearance)
+- SectionHeader: serif h2 title + "Section N" label in tracking-widest caps
+- Metric tiles: text-2xl bold serif for key numbers ($, runway months)
+- PSR as visual anchor: prominent border-2 callout box in Executive Snapshot
+- Background: bg-muted/20 (light institutional gray, not pure white)
+- SavingsCurve SVG: dollar Y-axis labels, pressure point red dot + label, month X-axis
+- Structural margin label displayed in header subtitle ("Strong/Moderate/Thin/Negative structural margin")
 
 ## API Endpoints
 - `POST /api/simulations` — Run simulation, store results

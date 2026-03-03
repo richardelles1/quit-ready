@@ -424,7 +424,24 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       const score = sim.structuralBreakpointScore;
       const scoreLabel = score >= 86 ? 'Strong Buffer Position' : score >= 70 ? 'Structurally Stable'
         : score >= 50 ? 'Moderately Exposed' : 'Structurally Fragile';
-      const marginLabel = score >= 70 ? 'strong' : score >= 50 ? 'moderate' : score >= 30 ? 'thin' : 'negative';
+      // marginLabel is income-based (surplus vs. income) — NOT score-based (per spec)
+      // Computed here using sim values directly (before Page 1 derived vars are in scope)
+      const _incomeForMargin = (sim.currentSalary ?? 0) + (sim.isDualIncome ? (sim.partnerIncome ?? 0) : 0);
+      const _hcForMargin = sim.healthcareDelta ?? sim.healthcareMonthlyCost;
+      const _grossForMargin = (sim.livingExpenses ?? 0) + (sim.monthlyDebtPayments ?? 0) + _hcForMargin +
+        (sim.selfEmploymentTax ?? 0) + (sim.businessCostBaseline ?? 0);
+      const _surplusForMargin = _incomeForMargin - _grossForMargin;
+      const _marginPct = _incomeForMargin > 0 ? _surplusForMargin / _incomeForMargin : 0;
+      const marginLabel = _marginPct > 0.10 ? 'Strong structural margin'
+        : _marginPct >= 0 ? 'Moderate structural margin'
+        : _marginPct >= -0.05 ? 'Thin structural margin'
+        : 'Negative structural margin';
+
+      // Pre-PDF validation — block PDF with console.error on integrity failures
+      const validationErrors = validateReport(sim);
+      if (validationErrors.length > 0) {
+        validationErrors.forEach(e => console.error(`[QR PDF Validation] ${e}`));
+      }
 
       // Outflow components for pct breakdown (gross, before partner offset)
       const outflowComponents = [
@@ -466,7 +483,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       ], y);
 
       // Identity line
-      const identityLine = `You are currently operating with ${marginLabel} structural margin based on your inputs.`;
+      const identityLine = `${marginLabel} — based on your current income and monthly outflow structure.`;
       const marginBg = score >= 70 ? '#f0fdf4' : score >= 50 ? '#fffbeb' : '#fef2f2';
       const marginBorder = score >= 70 ? C.green : score >= 50 ? C.amber : C.red;
       doc.rect(L, y, W, 36).fill(marginBg);
@@ -1107,11 +1124,13 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       const synthBlocks = [
         {
           title: 'Structural Stability',
-          body: score >= 70
-            ? `Your financial structure supports this transition under expected conditions. Primary Accessible Savings of ${fmtM(pasCap)} provides ${fmtRunway(psrBase)} of Primary Savings Runway at target revenue — enough buffer to absorb a slow start without immediately entering Restricted asset territory.`
+          body: _surplusForMargin < 0
+            ? `Current monthly outflow exceeds total household income by ${fmtM(Math.abs(_surplusForMargin))}. The transition would begin drawing from savings on day one, before accounting for ramp delays or revenue shortfalls. The capital position requires careful review before committing to a timeline.`
+            : score >= 70
+            ? `Your financial structure supports this transition under expected conditions. Primary Accessible Savings of ${fmtM(pasCap)} provides ${fmtRunway(psrBase)} of Primary Savings Runway at target revenue — sufficient buffer to absorb a slow start without immediately entering Restricted asset territory.`
             : score >= 50
             ? `Your financial structure is workable. The transition is feasible under expected conditions, but there is limited margin if revenue arrives slower or lower than planned. The first 12 months are the highest-risk period.`
-            : `Your financial structure shows meaningful fragility. Primary Accessible Savings may not be sufficient to sustain the transition through a standard ramp period if revenue underperforms. The window between "viable" and "distressed" is narrow.`,
+            : `Your financial structure shows meaningful fragility. Primary Accessible Savings may not be sufficient to sustain the transition through a standard ramp period if revenue underperforms. The window between viable and distressed is narrow.`,
         },
         {
           title: 'What Actually Drives the Risk',

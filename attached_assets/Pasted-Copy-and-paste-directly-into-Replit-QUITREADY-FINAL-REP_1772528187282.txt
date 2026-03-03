@@ -1,0 +1,207 @@
+Copy and paste directly into Replit:
+
+⸻
+
+QUITREADY — FINAL REPORT & PDF POLISH PASS
+
+OBJECTIVE: STUNNING VISUAL QUALITY + PERFECT NUMERICAL INTEGRITY
+
+SCOPE: REPORT VIEW + PDF EXPORT ONLY
+
+DO NOT MODIFY CORE BUSINESS LOGIC UNLESS FIXING A VERIFIED BUG
+
+⸻
+
+You are performing a final production-quality refinement of the QuitReady Report and its PDF output.
+
+Your objectives:
+	1.	Ensure 100% numerical consistency and internal logic alignment
+	2.	Eliminate all narrative contradictions
+	3.	Upgrade visual hierarchy and polish to a premium advisory-document standard
+	4.	Ensure PDF output mirrors the on-screen report exactly
+	5.	Make the document visually “worth $19” at first glance
+
+Do NOT:
+	•	Add new features
+	•	Change input flow
+	•	Modify underlying modeling assumptions (unless fixing clear inconsistencies)
+	•	Add fluff, emojis, or dramatic language
+
+Maintain:
+	•	Professional tone
+	•	Executive-grade clarity
+	•	Calm authority
+	•	Clean typography
+
+⸻
+
+SECTION 1 — NUMERICAL INTEGRITY LOCK
+
+Implement a pre-render validation layer before report generation:
+
+VALIDATION RULES (MANDATORY)
+	1.	Monthly Surplus / Deficit must equal:
+Total Monthly Income – Total Monthly Outflow
+	2.	Structural margin label must be derived algorithmically:
+	•	Surplus > 10% of income → “Strong structural margin”
+	•	Surplus between 0–10% → “Moderate structural margin”
+	•	Surplus between -5% and 0 → “Thin structural margin”
+	•	Surplus < -5% → “Negative structural margin”
+	3.	Outflow percentage breakdown must total exactly 100%.
+Handle rounding safely (adjust smallest category by rounding delta if needed).
+	4.	Primary Savings Runway must always equal:
+Primary Accessible Savings ÷ Net Monthly Gap
+	5.	“Restricted assets required?” must match timeline logic:
+If Full Runway > Primary Savings Runway → Yes
+Otherwise → No
+	6.	Pressure point must always be:
+6 months before Primary Savings exhaustion in that scenario.
+
+If any rule fails:
+	•	Block PDF generation
+	•	Display internal error in console
+
+⸻
+
+SECTION 2 — VISUAL UPGRADE REQUIREMENTS
+
+Upgrade report styling to premium advisory standard.
+
+GLOBAL VISUAL RULES
+
+• Use consistent page margins
+• Increase white space between sections
+• Use consistent section header styling
+• Use subtle divider lines between major sections
+• Use bold only for key numbers (max 3–4 per page)
+• Remove visual clutter
+• Align all tables perfectly
+
+⸻
+
+TYPOGRAPHY IMPROVEMENTS
+
+Use hierarchy:
+
+H1 — Large, bold, high contrast
+H2 — Medium, strong weight
+Body — Clean, readable
+Footnote — Muted, small
+
+All numbers:
+	•	Use comma separators
+	•	Use consistent font weight
+	•	Align decimals in tables
+
+⸻
+
+CHART REFINEMENT
+
+All charts must:
+	•	Use consistent color palette
+	•	Use one accent color for “Base”
+	•	Use muted gray for stress case
+	•	Avoid neon colors
+	•	Use clean axis labeling
+	•	Remove unnecessary gridlines
+
+Line charts:
+	•	Add subtle dot markers at pressure point
+	•	Add label annotation near key drop
+
+⸻
+
+SECTION 3 — NARRATIVE CONSISTENCY FIX
+
+Fix logical contradictions in narrative:
+
+If monthly deficit exists:
+Do NOT label structure as strong margin.
+
+If primary runway is < 12 months:
+Avoid language implying long comfort window.
+
+Add clarifying sentence where needed:
+
+If restricted assets required:
+“While primary savings deplete in X months, total capital depth extends runway significantly if required.”
+
+Never imply restricted assets are encouraged.
+Always frame them as emergency capital.
+
+⸻
+
+SECTION 4 — PAGE-BY-PAGE VISUAL ENHANCEMENT
+
+Apply these refinements:
+
+Page 1 — Executive Snapshot
+	•	Increase spacing between financial summary blocks
+	•	Make Primary Savings Runway the visual anchor
+	•	Use subtle background card for summary metrics
+
+Page 3 — Outflow Breakdown
+	•	Clean donut or stacked bar
+	•	Ensure 100% alignment
+	•	Remove redundant legend duplication
+
+Page 5 — Savings Runway
+	•	Visually separate Primary vs Restricted assets
+	•	Add subtle color coding (Primary = strong accent, Restricted = muted gray)
+
+Page 9 — Tier Timeline
+	•	Convert to horizontal visual timeline
+	•	Stage markers clearly labeled
+	•	Use progressive shading
+
+Page 10 — Liquidity Curve
+	•	Smooth line rendering
+	•	Clear legend
+	•	Pressure point labeled clearly but subtly
+
+Page 14 — Final Synthesis
+	•	Improve spacing
+	•	Remove density
+	•	Emphasize key conclusions visually
+	•	Avoid paragraph blocks longer than 4–5 lines
+
+⸻
+
+SECTION 5 — PDF PERFECTION
+
+PDF must:
+	•	Match report view exactly
+	•	Maintain vector clarity on charts
+	•	Avoid raster blur
+	•	Preserve typography hierarchy
+	•	Avoid page breaks mid-section
+	•	Include page numbers in consistent position
+	•	Maintain consistent margins
+	•	Include footer disclaimer on every page
+
+Add PDF rendering guard:
+	•	Wait until charts finish rendering
+	•	Confirm validation layer passes
+	•	Then generate PDF
+
+⸻
+
+SECTION 6 — FINAL QUALITY BAR
+
+Before marking complete, ensure:
+
+• No contradictory statements
+• No math mismatches
+• No layout crowding
+• No overlapping elements
+• No blank pages
+• All tables aligned
+• All scenario numbers consistent across pages
+
+The report must feel like:
+
+A private financial advisory memo
+Prepared deliberately
+Not a web export
+
+Proceed with implementation.

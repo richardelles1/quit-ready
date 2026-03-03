@@ -69,16 +69,19 @@ function calcPrimaryRunway(sim: SimulationResult, revMult: number, rampOverride?
 
 // ─── Shared UI ────────────────────────────────────────────────────────────
 function SectionCard({ children, className = "" }: { children: React.ReactNode; className?: string }) {
-  return <div className={`border border-border rounded-md ${className}`}>{children}</div>;
+  return <div className={`border border-border rounded-lg shadow-sm bg-white dark:bg-card overflow-hidden ${className}`}>{children}</div>;
 }
 
 function SectionHeader({ children, sub, n }: { children: React.ReactNode; sub?: string; n?: number }) {
   return (
-    <div className="px-6 py-4 border-b border-border">
-      <p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">
-        {n ? `${n}. ` : ''}{children}
-      </p>
-      {sub && <p className="text-xs text-muted-foreground/70 mt-1 leading-relaxed">{sub}</p>}
+    <div className="px-7 py-5 border-b border-border bg-muted/10">
+      {n !== undefined && (
+        <p className="text-[10px] font-bold uppercase tracking-[0.15em] text-muted-foreground/60 mb-1.5">
+          Section {n}
+        </p>
+      )}
+      <h2 className="text-base font-bold font-serif text-foreground leading-snug">{children}</h2>
+      {sub && <p className="text-xs text-muted-foreground mt-1.5 leading-relaxed max-w-2xl">{sub}</p>}
     </div>
   );
 }
@@ -106,6 +109,16 @@ function getScoreColors(score: number) {
   if (score >= 70) return { text: 'text-green-700', bg: 'bg-green-50', border: 'border-green-200' };
   if (score >= 50) return { text: 'text-amber-700', bg: 'bg-amber-50', border: 'border-amber-200' };
   return { text: 'text-red-700', bg: 'bg-red-50', border: 'border-red-200' };
+}
+
+// Income-based structural margin label (per spec)
+function getMarginLabel(surplus: number, income: number): string {
+  if (income <= 0) return 'No income basis';
+  const pct = surplus / income;
+  if (pct > 0.10) return 'Strong structural margin';
+  if (pct >= 0) return 'Moderate structural margin';
+  if (pct >= -0.05) return 'Thin structural margin';
+  return 'Negative structural margin';
 }
 
 // ─── Outflow composition bar ───────────────────────────────────────────────
@@ -157,13 +170,16 @@ function RunwayBar({ label, months, maxMonths }: { label: string; months: number
   );
 }
 
-// ─── Revenue vs. Savings curve (simplified SVG) ────────────────────────────
-function SavingsCurve({ sim, pas, hc }: { sim: SimulationResult; pas: number; hc: number }) {
-  const W = 480, H = 120, months = 36;
+// ─── Revenue vs. Savings curve (premium SVG) ────────────────────────────────
+function SavingsCurve({ sim, pas: pasCap }: { sim: SimulationResult; pas: number; hc: number }) {
+  const SVG_W = 520, SVG_H = 150, months = 36;
+  const PAD_L = 54, PAD_B = 24;
+  const chartW = SVG_W - PAD_L - 8;
+  const chartH = SVG_H - PAD_B;
   const vol = 1 - sim.volatilityPercent / 100;
 
   function series(revMult: number): number[] {
-    let cap = pas;
+    let cap = pasCap;
     const pts: number[] = [cap];
     for (let m = 1; m <= months; m++) {
       const rf = sim.rampDuration > 0 && m <= sim.rampDuration ? 0.50 * (m / sim.rampDuration) : 1.0;
@@ -173,34 +189,86 @@ function SavingsCurve({ sim, pas, hc }: { sim: SimulationResult; pas: number; hc
     return pts;
   }
 
+  function pressureMonthIdx(pts: number[]): number | null {
+    const drain = Math.max(0, sim.tmib - sim.expectedRevenue * 0.70 * vol);
+    if (drain <= 0) return null;
+    const threshold = drain * 6;
+    const idx = pts.findIndex(v => v <= threshold && v > 0);
+    return idx > 0 ? idx : null;
+  }
+
   const base = series(1.00);
   const severe = series(0.70);
-  const maxV = pas || 1;
+  const maxV = pasCap || 1;
+  const pm = pressureMonthIdx(severe);
+
+  const toX = (m: number) => PAD_L + (m / months) * chartW;
+  const toY = (v: number) => chartH - Math.max(0, (v / maxV)) * chartH;
 
   function toPath(pts: number[]): string {
-    return pts.map((v, i) => {
-      const x = Math.round((i / months) * W);
-      const y = Math.round(H - (v / maxV) * H);
-      return `${i === 0 ? 'M' : 'L'} ${x},${y}`;
+    return pts.slice(0, months + 1).map((v, i) => {
+      return `${i === 0 ? 'M' : 'L'} ${toX(i).toFixed(1)},${toY(v).toFixed(1)}`;
     }).join(' ');
   }
 
+  const yTicks = [0, 0.25, 0.5, 0.75, 1.0];
+  const fmtTick = (v: number) => {
+    const n = pasCap * v;
+    return n >= 1000000 ? `$${(n / 1000000).toFixed(1)}M` : n >= 1000 ? `$${Math.round(n / 1000)}k` : `$${Math.round(n)}`;
+  };
+
   return (
     <div className="relative">
-      <svg viewBox={`0 0 ${W} ${H + 20}`} className="w-full" style={{ height: 140 }}>
-        {[0.25, 0.5, 0.75, 1].map(p => (
-          <line key={p} x1="0" y1={H - p * H} x2={W} y2={H - p * H} stroke="#e2e8f0" strokeWidth="1" />
+      <svg viewBox={`0 0 ${SVG_W} ${SVG_H}`} className="w-full" style={{ height: 180 }}>
+        {yTicks.map(p => (
+          <g key={p}>
+            <line x1={PAD_L} y1={toY(pasCap * p)} x2={SVG_W - 8} y2={toY(pasCap * p)}
+              stroke={p === 0 ? '#cbd5e1' : '#f1f5f9'} strokeWidth={p === 0 ? 1.5 : 1} />
+            <text x={PAD_L - 4} y={toY(pasCap * p) + 3} textAnchor="end" fontSize="8" fill="#94a3b8"
+              fontFamily="system-ui">{fmtTick(p)}</text>
+          </g>
         ))}
-        <path d={toPath(base)} fill="none" stroke="#1e293b" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
-        <path d={toPath(severe)} fill="none" stroke="#94a3b8" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" strokeDasharray="6 3" />
         {[0, 6, 12, 18, 24, 30, 36].map(m => (
-          <text key={m} x={(m / months) * W} y={H + 16} textAnchor="middle" fontSize="9" fill="#94a3b8">{m}</text>
+          <g key={m}>
+            <line x1={toX(m)} y1={0} x2={toX(m)} y2={chartH} stroke="#f1f5f9" strokeWidth="1" />
+            <text x={toX(m)} y={SVG_H - 6} textAnchor="middle" fontSize="8" fill="#94a3b8"
+              fontFamily="system-ui">{m}</text>
+          </g>
         ))}
+        {pm !== null && pm <= months && (
+          <>
+            <line x1={toX(pm)} y1={0} x2={toX(pm)} y2={chartH}
+              stroke="#ef4444" strokeWidth="1" strokeDasharray="4 3" />
+            <circle cx={toX(pm)} cy={toY(severe[pm] ?? 0)} r="4" fill="#ef4444" />
+            <text x={toX(pm) + 6} y={toY(severe[pm] ?? 0) - 6} fontSize="8" fill="#ef4444"
+              fontFamily="system-ui" fontWeight="bold">Pressure ~{pm}mo</text>
+          </>
+        )}
+        <path d={toPath(base)} fill="none" stroke="#1e293b" strokeWidth="2.5"
+          strokeLinecap="round" strokeLinejoin="round" />
+        {base[months] > 0 && <circle cx={toX(months)} cy={toY(base[months])} r="3.5" fill="#1e293b" />}
+        <path d={toPath(severe)} fill="none" stroke="#94a3b8" strokeWidth="1.5"
+          strokeLinecap="round" strokeLinejoin="round" strokeDasharray="6 3" />
+        {severe.findIndex(v => v === 0) > 0 && severe.findIndex(v => v === 0) <= months && (
+          <circle cx={toX(severe.findIndex(v => v === 0))} cy={toY(0)} r="3.5" fill="#94a3b8" />
+        )}
       </svg>
-      <div className="flex gap-5 mt-1 text-xs text-muted-foreground">
-        <div className="flex items-center gap-1.5"><div className="w-5 h-0.5 bg-foreground rounded" /> Base case</div>
-        <div className="flex items-center gap-1.5"><div className="w-5 h-px bg-muted-foreground rounded border-dashed border-t" /> Severe (−30%)</div>
-        <span className="text-muted-foreground/50">X axis: months · Y axis: Primary Accessible Savings</span>
+      <div className="flex flex-wrap gap-x-5 gap-y-1.5 mt-2 text-xs text-muted-foreground">
+        <div className="flex items-center gap-1.5">
+          <div className="w-5 h-0.5 bg-foreground rounded" />
+          <span>Base case</span>
+        </div>
+        <div className="flex items-center gap-1.5">
+          <div className="w-5 h-px" style={{ borderTop: '1.5px dashed #94a3b8' }} />
+          <span>Severe (−30%)</span>
+        </div>
+        {pm !== null && (
+          <div className="flex items-center gap-1.5">
+            <div className="w-2 h-2 rounded-full bg-red-500" />
+            <span>Pressure point</span>
+          </div>
+        )}
+        <span className="text-muted-foreground/40 ml-auto">X: months · Y: Primary Accessible Savings</span>
       </div>
     </div>
   );
@@ -302,88 +370,141 @@ export default function Results() {
   const totalIncome = (sim.currentSalary ?? 0) + (sim.isDualIncome ? partnerOff : 0);
   const grossSurplus = totalIncome - grossOutflow; // correct: income vs. all expenses
 
-  // Advisor paragraph
-  const advisorSummary = score >= 70
-    ? `Your financial structure is defensible under expected conditions. Primary Accessible Savings of ${fmt(pas)} provides ${fmtRunway(psrBase)} of Primary Savings Runway. The transition is viable as modeled — the main variable is execution.`
+  // Structural margin label — income-based (not score-based)
+  const marginLabel = getMarginLabel(grossSurplus, totalIncome);
+
+  // Pre-render validation (console warnings only — does not block screen)
+  if (process.env.NODE_ENV !== 'production') {
+    const pctSum = pcts.reduce((a, b) => a + b, 0);
+    if (pctSum !== 100) console.warn(`[QR Validation] Outflow pcts sum to ${pctSum}, expected 100`);
+    if (grossSurplus < 0 && marginLabel.includes('Strong')) console.warn('[QR Validation] Deficit but Strong margin label — check income inputs');
+    if (pas < 0) console.warn('[QR Validation] Negative Primary Accessible Savings');
+  }
+
+  // Advisor paragraph — narrative-consistent (no strong language when deficit exists)
+  const advisorSummary = grossSurplus < 0
+    ? `Your current household outflow exceeds total income by ${fmt(Math.abs(grossSurplus))}/month. Any transition would begin drawing from savings on day one, before accounting for ramp delays or revenue shortfalls. The capital position requires careful review before committing to a timeline.`
+    : score >= 70
+    ? `Your financial structure is defensible under expected conditions. Primary Accessible Savings of ${fmt(pas)} provides ${fmtRunway(psrBase)} of Primary Savings Runway at base case. The transition is viable as modeled — the primary variable is execution speed.`
     : score >= 50
-    ? `Your position is workable but not comfortable. A slower-than-expected ramp or an early income shortfall could exhaust Primary Accessible Savings sooner than planned, pushing toward Restricted or Long-Term Assets.`
-    : `Your Primary Accessible Savings may not be sufficient to carry this transition through a standard ramp period if revenue underperforms. The window between viable and distressed is narrow under the modeled inputs.`;
+    ? `Your position is workable but carries meaningful exposure. A slower-than-expected ramp or early income shortfall could exhaust Primary Accessible Savings sooner than planned, pushing toward Restricted or Long-Term Assets.`
+    : `Your Primary Accessible Savings may not sustain this transition through a standard ramp period under revenue underperformance. The margin between a viable outcome and a distressed one is narrow under the modeled inputs.`;
+
+  // Restricted assets clarification sentence (per spec)
+  const restrictedClarification = reliesOnRestricted
+    ? `While Primary Accessible Savings depletes in ${psr30 >= 999 ? '24+ years' : fmtRunway(psr30)} under severe stress, total capital depth extends runway to ${fmtRunway(sim.runway30Down)} if Restricted or Long-Term Assets are accessed. These are emergency capital — not a planned source of transition funding.`
+    : null;
 
   const hcPct = grossOutflow > 0 ? Math.round((hc / grossOutflow) * 100) : 0;
   const advisorBestMove = hcPct >= 15
-    ? `Healthcare cost (${hcPct}% of gross outflow) is the highest-leverage controllable cost. Partner coverage or income-based subsidies could shift the position materially.`
+    ? `Healthcare cost (${hcPct}% of gross outflow) is the highest-leverage controllable cost. Partner coverage or income-based ACA subsidies could shift the position materially.`
     : sim.rampDuration > 6
     ? `Shortening your ramp timeline or entering with a signed client commitment would reduce the capital gap significantly — each month of earlier revenue eliminates one month of full-burden drawdown.`
-    : `Increasing stable revenue by even ${fmt(1000)}/month would extend your Primary Savings Runway by approximately ${revDelta ? `${revDelta} months` : 'a meaningful amount'} under severe stress.`;
+    : `Increasing stable revenue by ${fmt(1000)}/month would extend your Primary Savings Runway by approximately ${revDelta ? `${revDelta} months` : 'a meaningful amount'} under severe stress.`;
 
   return (
     <Layout>
-      <div className="flex-1 bg-background py-10">
+      <div className="flex-1 bg-muted/20 py-12">
         <div className="max-w-5xl mx-auto px-4 sm:px-6">
 
           {/* Report header */}
-          <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 mb-10">
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground mb-2">
-                QuitReady Financial Position Report · {reportDate}
-              </p>
-              <h1 className="text-3xl font-bold font-serif text-foreground leading-tight">
-                Here's what the numbers show — and what they mean.
-              </h1>
+          <div className="mb-10">
+            <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-5">
+              <div>
+                <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground mb-3">
+                  QuitReady · Financial Position Report
+                </p>
+                <h1 className="text-3xl sm:text-4xl font-bold font-serif text-foreground leading-tight mb-1">
+                  Structural Breakpoint Analysis
+                </h1>
+                <p className="text-sm text-muted-foreground">
+                  Prepared {reportDate} · {marginLabel}
+                </p>
+              </div>
+              <Button onClick={handleDownload} disabled={downloadPdf.isPending}
+                className="gap-2 shrink-0 mt-1" data-testid="button-download-pdf">
+                <Download className="w-4 h-4" />
+                {downloadPdf.isPending ? 'Generating PDF...' : 'Download Full Report'}
+              </Button>
             </div>
-            <Button onClick={handleDownload} disabled={downloadPdf.isPending} variant="outline" className="gap-2 shrink-0" data-testid="button-download-pdf">
-              <Download className="w-4 h-4" />
-              {downloadPdf.isPending ? 'Generating...' : 'Download full report'}
-            </Button>
+            <div className="mt-5 h-px bg-border" />
           </div>
 
           {/* ── 1. Executive Snapshot ─────────────────────────────────── */}
           <SectionCard className="mb-6">
             <SectionHeader n={1}>Executive Snapshot — Your Financial Position Today</SectionHeader>
-            <div className="grid grid-cols-2 sm:grid-cols-3 border-b border-border">
+            {/* Top 3 income/outflow tiles */}
+            <div className="grid grid-cols-3 border-b border-border">
               {[
-                { label: 'Total Monthly Income', val: fmt(totalIncome), testid: 'metric-income', sub: sim.isDualIncome && partnerOff > 0 ? `${fmt(sim.currentSalary ?? 0)} + ${fmt(partnerOff)} partner` : undefined },
-                { label: 'Total Monthly Outflow', val: fmt(grossOutflow), testid: 'metric-tmib', sub: 'All expenses, before partner income offset' },
-                { label: 'Monthly Surplus / Deficit', val: (grossSurplus >= 0 ? '+' : '') + fmt(grossSurplus), testid: 'metric-surplus', color: grossSurplus >= 0 ? 'text-green-700' : 'text-red-700', sub: grossSurplus >= 0 ? 'Household income exceeds total outflow' : 'Total outflow exceeds household income' },
+                {
+                  label: 'Total Monthly Income',
+                  val: fmt(totalIncome),
+                  testid: 'metric-income',
+                  sub: sim.isDualIncome && partnerOff > 0 ? `${fmt(sim.currentSalary ?? 0)} primary + ${fmt(partnerOff)} partner` : 'Current household income',
+                },
+                {
+                  label: 'Total Monthly Outflow',
+                  val: fmt(grossOutflow),
+                  testid: 'metric-tmib',
+                  sub: 'All expense components, before partner offset',
+                },
+                {
+                  label: 'Monthly Surplus / Deficit',
+                  val: (grossSurplus >= 0 ? '+' : '') + fmt(grossSurplus),
+                  testid: 'metric-surplus',
+                  color: grossSurplus >= 0 ? 'text-green-700' : 'text-red-700',
+                  sub: grossSurplus >= 0 ? 'Household income exceeds total outflow' : 'Total outflow exceeds household income',
+                },
               ].map((m, i) => (
-                <div key={m.label} className={`p-5 ${i < 2 ? 'border-r border-border' : ''}`} data-testid={m.testid}>
-                  <p className="text-xs text-muted-foreground uppercase tracking-wider mb-1">{m.label}</p>
-                  <p className={`text-lg font-bold font-serif ${m.color ?? 'text-foreground'}`}>{m.val}</p>
-                  {m.sub && <p className="text-xs text-muted-foreground/70 mt-0.5 leading-tight">{m.sub}</p>}
+                <div key={m.label} className={`px-7 py-6 ${i < 2 ? 'border-r border-border' : ''}`} data-testid={m.testid}>
+                  <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground/70 mb-2">{m.label}</p>
+                  <p className={`text-2xl font-bold font-serif ${m.color ?? 'text-foreground'}`}>{m.val}</p>
+                  {m.sub && <p className="text-xs text-muted-foreground/60 mt-1 leading-tight">{m.sub}</p>}
                 </div>
               ))}
             </div>
-            {/* TMIB clarification — shows what savings must cover */}
+
+            {/* Net savings gap clarification for dual-income */}
             {sim.isDualIncome && partnerOff > 0 && (
-              <div className="mx-6 mt-3 mb-1 px-4 py-2.5 bg-muted/20 border border-border rounded-md flex items-center justify-between gap-4">
+              <div className="mx-7 mt-4 mb-1 px-5 py-3 bg-muted/30 border border-border rounded-md flex items-center justify-between gap-4">
                 <p className="text-xs text-muted-foreground leading-relaxed">
-                  <span className="font-semibold text-foreground">Net savings gap:</span> {fmt(grossOutflow)} outflow − {fmt(partnerOff)} partner income = <span className="font-semibold text-foreground">{fmt(sim.tmib)}/month</span> that new business revenue and savings must cover.
+                  <span className="font-semibold text-foreground">Net savings gap (TMIB):</span>{' '}
+                  {fmt(grossOutflow)} outflow − {fmt(partnerOff)} partner income ={' '}
+                  <span className="font-semibold text-foreground">{fmt(sim.tmib)}/month</span> that new business revenue and savings must cover post-quit.
                 </p>
-                <span className="text-xs text-muted-foreground shrink-0 font-medium" data-testid="metric-tmib-net">{fmt(sim.tmib)}</span>
+                <span className="text-sm font-bold text-foreground shrink-0 font-serif" data-testid="metric-tmib-net">{fmt(sim.tmib)}</span>
               </div>
             )}
-            {/* Primary Savings Runway callout */}
-            <div className={`mx-6 my-4 flex items-center justify-between px-4 py-3 rounded-md border ${psrStatusBg}`}>
+
+            {/* Primary Savings Runway — visual anchor */}
+            <div className={`mx-7 my-5 flex items-center justify-between px-5 py-4 rounded-lg border-2 ${psrStatusBg}`}>
               <div>
-                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-0.5">Primary Accessible Savings (Cash + Brokerage)</p>
-                <p className="text-sm text-muted-foreground">
-                  {fmt(pas)} · Primary Savings Runway exhausted in <span className="font-bold text-foreground">{psr30 >= 999 ? '24+ years' : fmtRunwayShort(psr30)}</span> under severe stress (−30%)
+                <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground mb-1">
+                  Primary Savings Runway — Severe Stress (−30% Revenue)
+                </p>
+                <p className="text-2xl font-bold font-serif text-foreground" data-testid="text-ll-status">
+                  {psr30 >= 999 ? '24+ years' : fmtRunway(psr30)}
+                </p>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Primary Accessible Savings: {fmt(pas)} (Cash + Brokerage)
                 </p>
               </div>
-              <div className={`text-xs font-bold uppercase tracking-wider px-2 py-1 rounded ${psrStatusColor}`} data-testid="text-ll-status">
+              <div className={`text-xs font-bold uppercase tracking-wider px-3 py-1.5 rounded-md border ${psrStatusBg} ${psrStatusColor}`}>
                 {psrStatusLabel}
               </div>
             </div>
+
+            {/* Second row — capital and runway metrics */}
             <div className="grid grid-cols-2 sm:grid-cols-4 border-t border-border">
               {[
                 { label: 'Primary Accessible Savings', val: fmt(pas), testid: 'metric-capital' },
                 { label: 'Total Accessible Savings', val: fmt(sim.accessibleCapital), testid: 'metric-total-capital' },
-                { label: 'Primary Savings Runway', val: fmtRunway(psrBase), testid: 'metric-base-runway' },
-                { label: 'Risk Position Score', val: `${score}/100`, testid: 'metric-worst-runway' },
+                { label: 'Primary Savings Runway — Base', val: fmtRunway(psrBase), testid: 'metric-base-runway' },
+                { label: 'Risk Position Score', val: `${score} / 100`, testid: 'metric-worst-runway' },
               ].map((m, i) => (
-                <div key={m.label} className={`p-5 ${i < 3 ? 'border-r border-border' : ''}`} data-testid={m.testid}>
-                  <p className="text-xs text-muted-foreground uppercase tracking-wider mb-1.5">{m.label}</p>
-                  <p className="text-lg font-bold font-serif text-foreground">{m.val}</p>
+                <div key={m.label} className={`px-7 py-5 ${i < 3 ? 'border-r border-border' : ''}`} data-testid={m.testid}>
+                  <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground/70 mb-1.5">{m.label}</p>
+                  <p className="text-xl font-bold font-serif text-foreground">{m.val}</p>
                 </div>
               ))}
             </div>
@@ -687,26 +808,34 @@ export default function Results() {
           {/* ── 9. What This Means For You ───────────────────────────── */}
           <SectionCard className="mb-6">
             <SectionHeader n={9}>What This Means For You</SectionHeader>
-            <div className="p-6 space-y-5">
-              <div className="flex items-start gap-3">
-                <div className={`shrink-0 w-5 h-5 rounded-full flex items-center justify-center text-xs font-bold border ${sc.border} ${sc.bg} ${sc.text}`}>S</div>
-                <p className="text-sm text-muted-foreground leading-relaxed">{advisorSummary}</p>
+            <div className="px-7 py-6 space-y-5">
+              {/* Structural position summary */}
+              <div className={`flex gap-4 p-5 rounded-lg border ${sc.border} ${sc.bg}`}>
+                <div className={`shrink-0 w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold border-2 ${sc.border} ${sc.bg} ${sc.text}`}>
+                  {score}
+                </div>
+                <div>
+                  <p className={`text-xs font-bold uppercase tracking-wider mb-1.5 ${sc.text}`}>{getScoreLabel(score)}</p>
+                  <p className="text-sm text-muted-foreground leading-relaxed">{advisorSummary}</p>
+                </div>
               </div>
-              {reliesOnRestricted && (
-                <div className="flex items-start gap-2.5 p-3.5 bg-amber-50 border border-amber-200 rounded-md">
+              {/* Restricted assets clarification (when reliesOnRestricted) */}
+              {restrictedClarification && (
+                <div className="flex items-start gap-3 p-4 bg-amber-50 border border-amber-200 rounded-lg">
                   <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
-                  <p className="text-xs text-amber-700 leading-relaxed">
-                    Your Primary Accessible Savings ({fmt(pas)}) would likely be exhausted before the full transition completes under stress. At that point, Restricted or Long-Term Assets would be required — carrying significant tax, penalty, and long-term compounding costs.
-                  </p>
+                  <p className="text-sm text-amber-800 leading-relaxed">{restrictedClarification}</p>
                 </div>
               )}
-              <div className="flex items-start gap-3 pt-3 border-t border-border">
-                <div className={`shrink-0 w-5 h-5 rounded-full flex items-center justify-center text-xs font-bold border ${sc.border} ${sc.bg} ${sc.text}`}>↑</div>
-                <div>
-                  <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-1.5">Highest-impact lever</p>
-                  <p className="text-sm text-muted-foreground leading-relaxed">{advisorBestMove}</p>
+              {/* Highest-impact lever */}
+              <div className="flex items-start gap-4 pt-4 border-t border-border">
+                <div className="shrink-0 mt-0.5">
+                  <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground mb-1">Highest-leverage variable</p>
                 </div>
               </div>
+              <p className="text-sm text-muted-foreground leading-relaxed -mt-2">{advisorBestMove}</p>
+              <p className="text-[10px] text-muted-foreground/60 italic border-t border-border pt-4">
+                This report is a financial simulation based on your inputs. It is not financial, tax, or legal advice. All sensitivity calculations show directional impact only — actual outcomes depend on factors not captured in this model. Consult a qualified professional before making any significant financial decision.
+              </p>
             </div>
           </SectionCard>
 
