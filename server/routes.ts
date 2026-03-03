@@ -778,9 +778,14 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       // Runway + pressure point
       doc.fillColor(C.muted).fontSize(8).font('Helvetica-Bold').text('TIER 1 RUNWAY, BASE CASE', L, y); y += 10;
       doc.fillColor(C.navy).fontSize(22).font('Times-Bold').text(fmtRunway(psrBase), L, y); y += 28;
+      if (psrBase >= 999) {
+        doc.fillColor(C.muted).fontSize(8.5).font('Helvetica-Oblique')
+          .text('This result is very long because the model assumes revenue reaches its target during the ramp. Once revenue covers the monthly gap, savings stop declining. This does not mean savings alone could sustain the transition for 24 years.', L, y, { width: W, lineGap: 1.5 });
+        y += 36;
+      }
       if (pm30 < 999) {
         doc.fillColor(C.muted).fontSize(9).font('Helvetica')
-          .text(`Financial pressure would begin around ${fmtRunwayShort(pm30)} under severe income contraction (−30%).`, L, y, { width: W });
+          .text(`Under severe contraction (−30%), Tier 1 Liquid Capital would be exhausted in ${fmtRunway(psr30)}. Financial pressure begins around ${fmtRunwayShort(pm30)}.`, L, y, { width: W });
         y += 18;
       }
 
@@ -1009,24 +1014,32 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       lineChart(doc, baseData, severeData, maxCap, chartX, chartY, chartW, chartH, CHART_MONTHS);
       y += chartH + 30;
 
-      // Annotation: pressure point
+      // Annotation: Tier 1 depletion point
       if (pm30 < 999 && pm30 <= CHART_MONTHS) {
         const pmX = chartX + (pm30 / CHART_MONTHS) * chartW;
+        const labelX = pm30 > 24 ? pmX - 85 : pmX + 4;
         doc.moveTo(pmX, chartY).lineTo(pmX, chartY + chartH).strokeColor(C.red).lineWidth(1).dash(3, { space: 3 }).stroke();
         doc.undash();
-        doc.fillColor(C.red).fontSize(7.5).font('Helvetica-Bold')
-          .text(`Pressure begins ~${fmtRunwayShort(pm30)}`, pmX - 40, chartY - 12, { width: 80, align: 'center' });
+        doc.fillColor(C.red).fontSize(7).font('Helvetica-Bold').text('Tier 1 depletion', labelX, chartY - 14, { width: 80 });
+        doc.fillColor(C.red).fontSize(7).font('Helvetica').text(`~month ${pm30}`, labelX, chartY - 5, { width: 80 });
       }
 
-      // Context
+      // Break-even revenue note
+      doc.rect(L, y, W, 28).fill(C.light);
+      doc.fillColor(C.muted).fontSize(7.5).font('Helvetica-Bold').text('BREAK-EVEN REVENUE', L + 10, y + 8);
+      doc.fillColor(C.navy).fontSize(11).font('Times-Bold').text(fmtM(sim.tmib) + '/month', L, y + 7, { width: W - 10, align: 'right' });
+      doc.fillColor(C.muted).fontSize(7.5).font('Helvetica').text('Revenue required to fully cover the monthly gap. When revenue reaches this level, savings stop declining.', L + 10, y + 19, { width: W - 20 });
+      y += 36;
+
+      // Context stats
       y = statRow(doc, [
-        { label: 'Base Case. Tier 1 Runway', val: fmtRunway(psrBase) },
-        { label: 'Severe (−30%). Tier 1 Runway', val: fmtRunway(psr30) },
-        { label: 'Difference', val: psr30 >= 999 || psrBase >= 999 ? '—' : `${psrBase - psr30} months` },
+        { label: 'Base Case, Tier 1 Runway', val: fmtRunway(psrBase) },
+        { label: 'Severe (−30%), Tier 1 Runway', val: fmtRunway(psr30) },
+        { label: 'Difference', val: psr30 >= 999 || psrBase >= 999 ? 'N/A' : `${psrBase - psr30} months` },
       ], y);
 
       y = insight(doc, 'Reading This Chart',
-        `The upper line (dark) shows your Tier 1 Liquid Capital position under expected revenue. The lower line (gray) shows the same under a 30% revenue shortfall. Where the lower line drops to zero is when Tier 1 Liquid Capital would be exhausted under severe stress. and Tier 2 assets would be needed if the full runway extends beyond that point.`, y);
+        `The upper line shows Tier 1 Liquid Capital under expected revenue conditions. The lower line shows the same position under a 30% revenue shortfall. Under expected conditions, revenue ramps toward its target and savings stabilize. Under severe underperformance, savings continue declining until Tier 1 capital is exhausted${psr30 < 999 ? ` around month ${Math.round(psr30)}` : ''}. The difference between these paths is revenue timing and reliability, not the size of savings.`, y);
 
       ftr(doc, 10);
 
@@ -1180,46 +1193,49 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       ftr(doc, 12);
 
       // ════════════════════════════════════════════════════════════════════
-      // PAGE 13. RISK PROFILE SUMMARY
+      // PAGE 13. DECISION INTERPRETATION
       // ════════════════════════════════════════════════════════════════════
       doc.addPage(); hdr(doc, date); y = 42;
-      y = secHead(doc, 13, 'Risk Profile Summary',
-        `Structural Breakpoint Score: ${score}/100. ${scoreLabel}`, y);
+      y = secHead(doc, 13, 'Decision Interpretation',
+        `Structural Breakpoint Score: ${score}/100. ${scoreLabel}. A plain-language summary of what this analysis means.`, y);
 
       const riskBlocks = [
         {
-          num: 1, title: 'Structural Position',
+          num: 1, title: 'Structural Stability',
           body: score >= 70
-            ? `Your financial structure is defensible under expected conditions. Tier 1 Liquid Capital of ${fmtM(pasCap)} supports a runway of ${fmtRunway(psrBase)} at target revenue. The transition is viable as currently modeled.`
+            ? `Your financial structure is defensible under expected conditions. Tier 1 Liquid Capital of ${fmtM(pasCap)} supports ${fmtRunway(psrBase)} of Tier 1 Runway at target revenue. The transition is viable as currently modeled. The primary variable is execution speed.`
             : score >= 50
-            ? `Your financial structure is workable but tight. Tier 1 Liquid Capital of ${fmtM(pasCap)} provides ${fmtRunway(psrBase)} under expected conditions. but the margin narrows quickly under stress.`
-            : `Your financial structure carries meaningful pressure. Tier 1 Liquid Capital of ${fmtM(pasCap)} may not be sufficient to absorb revenue delays or shortfalls without entering Tier 2 asset territory early in the transition.`,
+            ? `Your financial structure is workable but the margin is limited. Tier 1 Liquid Capital of ${fmtM(pasCap)} provides ${fmtRunway(psrBase)} under expected conditions. Revenue underperformance or a delayed ramp would compress that window meaningfully.`
+            : `Your financial structure carries meaningful pressure. Tier 1 Liquid Capital of ${fmtM(pasCap)} may not be sufficient to absorb revenue delays or shortfalls without entering Tier 2 asset territory early in the transition. Strengthening the capital base before leaving would improve the position.`,
         },
         {
-          num: 2, title: 'Primary Risk Driver',
+          num: 2, title: 'Primary Risk Drivers',
           body: (() => {
             const fixedPct2 = grossOutflow > 0 ? Math.round(((sim.monthlyDebtPayments ?? 0) / grossOutflow) * 100) : 0;
             const hcPct = grossOutflow > 0 ? Math.round((hc / grossOutflow) * 100) : 0;
-            if (fixedPct2 > 25) return `Fixed debt payments (${fmtM(sim.monthlyDebtPayments)}/month, ${fixedPct2}% of gross outflow) are the primary structural risk. These cannot be reduced under stress and represent the hardest component to manage during a revenue shortfall.`;
-            if (hcPct > 18) return `Healthcare transition cost (${fmtM(hc)}/month, ${hcPct}% of gross outflow) is the primary structural risk. This is unusually high as a share of outflow and represents the largest controllable cost in the profile.`;
-            if (sim.rampDuration > 8) return `Ramp duration (${sim.rampDuration} months) is the primary structural risk. A long ramp extends the period where savings must cover the full gap, maximizing the capital needed before revenue is reliable.`;
-            return `Revenue volatility (${sim.volatilityPercent}% monthly variance assumption) is the primary structural risk. High income variance means the most favorable months cannot reliably offset the worst months.`;
+            if (fixedPct2 > 25) return `Fixed debt payments (${fmtM(sim.monthlyDebtPayments)}/month, ${fixedPct2}% of gross outflow) are the primary structural risk. These cannot be reduced under stress and remain constant even when revenue underperforms.`;
+            if (hcPct > 18) return `Healthcare transition cost (${fmtM(hc)}/month, ${hcPct}% of gross outflow) is the primary structural risk. This is unusually high as a share of total outflow. Partner coverage or income-based ACA subsidies could materially change the position.`;
+            if (sim.rampDuration > 8) return `Revenue ramp duration (${sim.rampDuration} months) is the primary structural risk. A long ramp extends the period where savings must cover the full gap. Entering with even one paying client shortens this window meaningfully.`;
+            return `Revenue reliability is the primary structural risk. Under a 30% shortfall, Tier 1 Runway drops to ${fmtRunway(psr30)}. Entering with pre-existing revenue or a confirmed client reduces dependence on the ramp timeline.`;
           })(),
         },
         {
-          num: 3, title: 'Pressure Timeline',
+          num: 3, title: 'Where Pressure Appears',
           body: pm30 >= 999
-            ? `No pressure timeline was identified under any modeled scenario. Your Tier 1 Liquid Capital appears sufficient to cover the transition without reaching a critical depletion point within the model range.`
-            : `Under severe income contraction (−30%), financial pressure is estimated to begin around ${fmtRunway(pm30)}. This is when Tier 1 Liquid Capital would drop within 6 months of exhaustion. the inflection point where each month carries meaningful urgency.`,
+            ? `No pressure point was identified within the model range. Tier 1 Liquid Capital remains solvent across all modeled scenarios. If revenue reaches target and ramp timing holds, this position does not encounter a critical depletion threshold.`
+            : t3Cap > 0 && psr30 < frBase
+            ? `Under severe revenue contraction (−30%), Tier 1 Liquid Capital would be exhausted in ${fmtRunway(psr30)}. At that point, the transition could only continue by accessing retirement accounts or home equity. Those assets extend the total theoretical runway to ${fmtRunway(fr30)}, but they represent emergency capital rather than primary transition funding.`
+            : `Under severe revenue contraction (−30%), Tier 1 Liquid Capital would be exhausted in ${fmtRunway(psr30)}. Pressure begins around ${fmtRunwayShort(pm30)}, when the depletion window narrows within 6 months of exhaustion.`,
         },
         {
-          num: 4, title: 'Execution Sensitivity',
-          body: (() => {
-            const rampDeltaMonths = rampLate3 < 999 && psrBase < 999 ? psrBase - rampLate3 : 0;
-            if (rampDeltaMonths > 6) return `This profile is highly sensitive to ramp timing. A 3-month late revenue ramp reduces Tier 1 Runway by approximately ${rampDeltaMonths} months. Entering with pre-existing revenue or signed clients materially reduces this sensitivity.`;
-            if (psr30 < 12) return `This profile is sensitive to revenue shortfalls in the first year. Under severe contraction, Tier 1 Runway drops to ${fmtRunway(psr30)}. leaving limited margin for extended underperformance. Early client acquisition or a confirmed anchor contract would substantially de-risk the first year.`;
-            return `This profile shows moderate execution sensitivity. Revenue arriving on time or slightly early provides comfortable positioning. The primary execution risk is a simultaneous revenue shortfall and unexpected household expense event.`;
-          })(),
+          num: 4, title: 'What Would Improve the Position',
+          body: [
+            'Reduce fixed monthly obligations before the transition date.',
+            'Enter with at least one signed client or confirmed revenue source.',
+            `Increase Tier 1 Liquid Capital (currently ${fmtM(pasCap)}) before leaving.`,
+            'Shorten the revenue ramp by building a client pipeline before quitting.',
+            'Ensure partner income remains stable through the ramp period.',
+          ].join(' '),
         },
       ];
 
@@ -1245,39 +1261,47 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       const glossaryTerms = [
         {
           term: 'Tier 1 Liquid Capital',
-          def: 'Cash, checking, savings, and taxable brokerage accounts. These are available without penalty, tax consequence, or meaningful delay. Cash is counted at 100%. Brokerage is counted at 80% to reflect potential capital gains exposure on sale.',
+          def: 'Cash, checking, savings, and taxable brokerage accounts (at 80% for capital gains). Available without penalties or delays. The primary runway source in any transition.',
         },
         {
           term: 'Tier 2 Contingent Capital',
-          def: 'Retirement accounts (Roth IRA, Traditional IRA, 401k) and home equity. These are accessible but carry tax obligations, early withdrawal penalties, or liquidity constraints. Roth contributions are counted at 100%. Traditional accounts are counted at 50% after estimated taxes and penalties. Home equity is counted at 30%.',
+          def: 'Retirement accounts and home equity. Accessible but carry penalties, taxes, or illiquidity. Counted conservatively. Treated as emergency capital, not planned transition funding.',
         },
         {
           term: 'Tier 3 Structural Capital',
-          def: 'A category not separately modeled in this report. Refers to highly illiquid assets such as business equity, closely held real estate, or deferred compensation that cannot be accessed without significant cost, time, or structural change.',
+          def: 'Highly illiquid assets not modeled here. Includes business equity, closely held real estate, or deferred compensation requiring significant cost or time to access.',
         },
         {
           term: 'Tier 1 Runway',
-          def: 'The number of months your Tier 1 Liquid Capital would last before being fully exhausted, given your net monthly gap and the modeled revenue ramp. This is the primary comfort window. When it ends, Tier 2 Contingent Capital would be required to continue.',
+          def: 'Months until Tier 1 Liquid Capital is fully exhausted, given the net monthly gap and revenue ramp. The primary comfort window before Tier 2 access is required.',
         },
         {
           term: 'Full Capital Depth',
-          def: 'The total runway available if all savings tiers (Tier 1 and Tier 2) are drawn down sequentially. This represents the deepest possible runway before all accessible capital is exhausted. It extends Tier 1 Runway only when Tier 2 assets are present.',
+          def: 'Total runway if all tiers are drawn sequentially. Extends beyond Tier 1 Runway when Tier 2 assets exist. Represents maximum runway before all accessible capital is exhausted.',
         },
         {
-          term: 'Net Gap',
-          def: 'The monthly shortfall that savings and new business revenue must cover after accounting for all expense components and any continuing partner income. Net gap equals gross outflow minus partner income. If revenue covers the full net gap, no savings are drawn.',
+          term: 'Net Savings Gap',
+          def: 'Monthly shortfall savings and new revenue must cover. Equals gross outflow minus partner income. When revenue covers the full gap, savings stop declining.',
+        },
+        {
+          term: 'Break-even Revenue',
+          def: 'The monthly revenue level at which savings stop declining. When revenue equals the net savings gap, capital drawdown ends.',
         },
         {
           term: 'Pressure Point',
-          def: 'The month at which Tier 1 Liquid Capital drops within 6 months of exhaustion under the modeled scenario. Before the pressure point, the drawdown exists but the timeline is manageable. After it, each month requires more deliberate action.',
+          def: 'The month Tier 1 Liquid Capital drops within 6 months of exhaustion. Before this, drawdown is manageable. After it, each remaining month requires deliberate action.',
         },
         {
-          term: 'Ramp Timing',
-          def: 'The period during which revenue is building toward its full target. This model assumes revenue reaches 50% of target at the midpoint of the ramp and 100% by the end. Earlier ramps reduce capital dependency. Later ramps increase it.',
+          term: 'Revenue Ramp',
+          def: 'The period revenue is building toward target. Model assumes 50% at midpoint and 100% by end. Shorter ramps reduce capital dependency. Longer ramps increase it.',
+        },
+        {
+          term: 'Structural Leverage',
+          def: 'Ratio of outstanding debt to total accessible capital. Higher leverage narrows recovery options under stress and reduces the buffer available during a transition.',
         },
         {
           term: 'Structural Breakpoint Score',
-          def: 'A composite 0-to-100 score that reflects the overall resilience of your financial position across capital depth, runway, outflow structure, and scenario stress. Scores above 70 indicate a structurally stable position. Scores below 50 indicate meaningful fragility.',
+          def: 'A 0-to-100 score reflecting position resilience across capital depth, runway, outflow structure, and stress scenarios. Above 70 is stable. Below 50 indicates meaningful fragility.',
         },
       ];
 

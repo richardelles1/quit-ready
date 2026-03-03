@@ -1,0 +1,274 @@
+Copy and paste directly into Replit.
+
+⸻
+
+QUITREADY REPORT REFINEMENT — NARRATIVE CLARITY + LABELING PASS
+
+SCOPE: REPORT VIEW + PDF EXPORT
+
+GOAL: IMPROVE CLARITY WITHOUT CHANGING MODEL MATH
+
+IMPORTANT: DO NOT REBUILD THE MODEL OR DATA STRUCTURE
+
+This iteration focuses only on narrative clarity, labeling, chart explanation, and interpretation text.
+
+Do NOT change:
+	•	financial calculations
+	•	simulation math
+	•	scenario logic
+	•	page count (keep report roughly same length)
+
+Only improve:
+	•	explanation
+	•	labels
+	•	interpretation
+	•	chart annotation
+	•	end-of-report clarity
+	•	glossary
+
+The report and PDF output must remain identical in structure and content.
+
+⸻
+
+GLOBAL LANGUAGE RULES
+	1.	Remove all em dashes. Use commas or periods instead.
+	2.	Write in plain English.
+	3.	Avoid technical finance phrasing.
+	4.	Avoid AI-sounding tone.
+	5.	Keep paragraphs short and readable.
+	6.	Never exaggerate certainty.
+	7.	Maintain professional advisory tone.
+
+⸻
+
+1. FIX “EARLIEST PRESSURE POINT” CONFUSION
+
+The current phrasing referencing 9 years is misleading because it refers to total capital depth rather than liquid runway.
+
+Rewrite the explanation to emphasize Tier 1 depletion first.
+
+Update the Risk Position section explanation to something structurally similar to:
+
+Pressure Window
+Under a severe revenue contraction (-30%), Tier 1 liquid capital would be exhausted in 1 year 8 months.
+
+At that point the transition could only continue by accessing retirement accounts or home equity.
+
+Those assets extend the total theoretical runway to 9 years 3 months, but they represent emergency capital rather than primary transition funding.
+
+This clarification should appear:
+
+• in the Risk Position explanation
+• anywhere “earliest pressure point” is referenced
+
+⸻
+
+2. IMPROVE THE GREEN RUNWAY BOX
+
+The green box currently states:
+
+Tier 1 runway under severe stress.
+
+Users do not know if that is good or bad.
+
+Add context explaining typical ranges.
+
+Example structure:
+
+Severe Stress Runway
+1 year 8 months
+
+Typical transition safety ranges:
+
+6 months or less — fragile
+12 months — workable
+18–24 months — strong buffer
+
+Your position sits above the minimum workable threshold, but below the strongest safety range.
+
+Do not change the number, only add interpretive context.
+
+⸻
+
+3. FIX THE “24+ YEARS” CONFUSION
+
+When the report shows 24+ years runway, users may assume their savings alone could last that long.
+
+Add a clarification note wherever this appears.
+
+Example structure:
+
+Because the model assumes revenue reaches the target quickly, savings are only needed during the early ramp period.
+
+Once revenue covers the monthly gap, savings stop declining.
+
+This produces a very long modeled runway.
+
+This does not mean savings alone could fund the transition for 24 years.
+
+Add this clarification directly beneath any 24+ year runway result.
+
+⸻
+
+4. CLARIFY “RESTRICTED ASSETS” COLUMN
+
+Rename the column.
+
+Current:
+
+Restricted Assets?
+
+Replace with:
+
+Would retirement or home equity be needed?
+
+Add a tooltip or explanatory sentence beneath the table:
+
+If “Yes” appears in this column, the modeled runway requires drawing from retirement accounts or home equity. These assets extend the total timeline but are typically considered emergency capital rather than planned transition funding.
+
+⸻
+
+5. IMPROVE THE REVENUE VS SAVINGS GRAPH
+
+Enhance the chart interpretation without changing the data.
+
+Add:
+
+Break-even revenue indicator
+
+Include a labeled horizontal line showing:
+
+Break-even revenue level
+
+Label example:
+
+Revenue required to fully cover the monthly gap.
+
+Pressure point label
+
+Ensure the red pressure point marker clearly states:
+
+Tier 1 depletion point under severe revenue contraction.
+
+Interpretation paragraph under the graph
+
+Explain what the chart actually shows.
+
+Example structure:
+
+This chart illustrates how quickly Tier 1 liquid capital declines during the early months of a transition.
+
+Under expected conditions revenue reaches the target quickly, which stabilizes savings.
+
+Under severe underperformance (-30%), savings continue declining until Tier 1 capital is exhausted around month 20.
+
+The difference between these paths is not savings size. It is revenue timing.
+
+⸻
+
+6. EXPAND “WHAT MOVES THE NEEDLE”
+
+The +$1000 sensitivity results are useful but abstract.
+
+Keep the math unchanged, but add real-world examples.
+
+Example expansion:
+
+Increasing stable revenue by $1,000/month
+
+Examples that could create this change:
+
+• one small consulting client
+• two freelance retainers
+• one recurring service contract
+
+Impact:
+
+Tier 1 runway increases from 1 year 8 months to 2 years 3 months under severe stress.
+
+Apply similar examples for expense reduction scenarios.
+
+⸻
+
+7. STRENGTHEN THE FINAL REPORT SECTION
+
+The report should end with a clear interpretation page.
+
+Add a final section titled:
+
+Decision Interpretation
+
+This section summarizes the entire report in plain language.
+
+Structure it as:
+
+Structural Stability
+
+Explain the overall position.
+
+Primary Risk Drivers
+
+Identify the variables that most affect the outcome.
+
+Where Pressure Appears
+
+Explain the Tier 1 depletion timeline clearly.
+
+What Would Improve the Position
+
+List practical structural improvements such as:
+
+• reducing fixed obligations
+• entering with one paying client
+• increasing Tier 1 liquidity
+
+Keep the tone analytical, not prescriptive.
+
+⸻
+
+8. ADD A FULL GLOSSARY PAGE
+
+If the report does not already contain a glossary page, add one as the final page.
+
+Title:
+
+Glossary of Key Terms
+
+Include definitions for:
+
+Tier 1 Liquid Capital
+Tier 2 Contingent Capital
+Tier 3 Structural Capital
+Tier 1 Runway
+Full Capital Depth
+Pressure Point
+Revenue Ramp
+Net Savings Gap
+Break-even Revenue
+Structural Leverage
+
+Definitions must be simple and short.
+
+Example:
+
+Tier 1 Liquid Capital
+Savings that can be used immediately without penalties or delays.
+
+Tier 2 Contingent Capital
+Assets that exist but require taxes, penalties, or borrowing to access.
+
+⸻
+
+FINAL CHECK BEFORE COMPLETION
+
+Ensure:
+
+• No financial calculations changed
+• Scenario math unchanged
+• Chart data unchanged
+• Labels clearer and more intuitive
+• Interpretation text added where users previously felt confusion
+• Glossary page included at the end if missing
+• Report and PDF remain identical
+
+Proceed with implementation.
