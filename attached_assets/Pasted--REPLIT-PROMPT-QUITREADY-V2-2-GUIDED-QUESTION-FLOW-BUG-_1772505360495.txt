@@ -1,0 +1,173 @@
+🚀 REPLIT PROMPT — QUITREADY V2.2 (GUIDED QUESTION FLOW + BUG FIX)
+
+You are iterating QuitReady (Structural Breakpoint Simulator) to feel like a calm decision companion.
+
+DO NOT change the core math engine unless required for bug fixes.
+This iteration is about:
+	•	Converting the intake from multi-panel forms into a guided, question-based flow
+	•	Restoring “thoroughness” via optional advanced toggles
+	•	Fixing the broken third step/panel load issue
+	•	Preserving the conservative tone while making it less sterile
+
+⸻
+
+1) FIX THE BROKEN THIRD PANEL (CRITICAL)
+
+Currently the 3rd panel/step fails to load for some users.
+	•	Identify root cause (routing/state/conditional render/scroll container)
+	•	Fix it so the full flow always loads reliably on mobile + desktop
+	•	Add basic error boundary messaging:
+“Something didn’t load. Refresh or restart your simulation.”
+
+No silent failures.
+
+⸻
+
+2) REPLACE THE 3-PANEL FORM WITH A GUIDED QUESTION FLOW
+
+Implement a step-by-step wizard with ONE primary question per screen (max 2 fields if needed).
+
+Requirements:
+	•	6–10 total steps
+	•	Progress indicator (e.g., “Step 3 of 8”)
+	•	Back button always works
+	•	Each step has a short calm framing line (1 sentence)
+	•	Avoid TurboTax form vibes (no huge stacks of inputs)
+
+Suggested Step Structure (use this)
+
+Step 1 — Foundation
+Header: “Let’s start with your foundation.”
+Q: “What does your life cost each month?” → monthly living expenses
+
+Step 2 — Household Support
+Header: “Now, your household baseline.”
+Q: “Do you have partner income supporting the household?” toggle
+If yes → partner monthly income input
+
+Step 3 — Debt Load
+Header: “Next: obligations that don’t disappear.”
+Q: “What total debt balance continues if you leave?” → total debt balance
+Follow-up on same step: “What are your monthly debt payments?” → monthly debt payments
+
+Step 4 — Healthcare
+Header: “Healthcare is usually the biggest delta.”
+Q: “What happens to your coverage when you quit?”
+Options:
+	•	Covered by partner
+	•	ACA marketplace
+	•	COBRA
+	•	Private plan
+	•	No coverage (not recommended)
+If ACA/COBRA/Private → ask monthly healthcare estimate
+If partner → set estimate to 0 but show note “Partner coverage reduces exposure.”
+
+Step 5 — Cash Cushion
+Header: “Now: the capital you can actually reach.”
+Q: “How much cash do you have?” → cash/HYSA
+
+Step 6 — Investments
+Header: “Let’s include what you could tap if needed.”
+Q: “How much in taxable brokerage?” → brokerage
+Optional “Advanced” toggle expands:
+	•	Roth contributions
+	•	Retirement accounts
+	•	Home equity
+
+Step 7 — Business Path
+Header: “Now let’s model what life after quitting could look like.”
+Q: “What best describes your work model?”
+Options:
+	•	Solo bootstrap
+	•	Lean agency/service
+	•	Product build
+	•	Custom
+
+Auto-populate baseline business cost.
+If custom → input monthly business cost.
+
+Step 8 — Revenue Expectation
+Header: “Let’s pressure test your revenue expectations.”
+Q: “What monthly revenue do you expect once stabilized?” → expected revenue
+
+Step 9 — Ramp
+Header: “Most transitions take longer than we want.”
+Q: “How many months until revenue stabilizes?” → ramp months
+
+Step 10 — Volatility
+Header: “How swingy is this income likely to be?”
+Q: “Expected volatility (%)” default 15, range 10–30
+
+Then show CTA: “Run Stress Test”
+
+⸻
+
+3) RESTORE “THOROUGH” FEELING WITHOUT EXPANDING SCOPE
+
+Add microcopy under key questions:
+	•	1–2 lines, calm and practical
+Example:
+“Most people underestimate transition costs. Conservative inputs help you trust the output.”
+
+Add optional “More detail” tooltips (no popups required) for:
+	•	Healthcare types
+	•	Liquidity haircuts
+	•	Ramp realism
+
+Depth through explanation, not extra inputs.
+
+⸻
+
+4) RESULTS PAGE — ADD A FRIENDLIER NARRATIVE SHELL
+
+Do NOT remove the structural outputs.
+Just improve tone and context:
+
+At top add:
+
+Title: “Here’s what would break first — and when.”
+
+Then a short paragraph using template language (deterministic, not AI):
+	•	TMIB
+	•	Accessible capital
+	•	Base runway
+	•	Worst-case runway (-30%)
+	•	Primary constraint (debt vs burn vs low liquidity)
+
+Replace sterile labels with calm framing:
+	•	“Primary constraint”
+	•	“Margin for error”
+	•	“Worst-case runway”
+
+Keep institutional vibe, but human.
+
+⸻
+
+5) KEEP THE EXISTING ENGINE + STRESS TABLE
+
+Ensure the stress table actually shows different outputs (no defaults to zero).
+If any required business inputs are missing, block running simulation.
+
+⸻
+
+6) PDF BUTTON (IF TIME)
+
+If PDF is currently unreliable:
+	•	Ensure it triggers from server route
+	•	If generation fails, show explicit error
+
+But do not expand PDF format in this iteration unless needed for stability.
+
+⸻
+
+7) ACCEPTANCE CHECKLIST
+
+After changes:
+	•	Flow works end-to-end on mobile
+	•	No missing third step
+	•	Wizard feels guided, not like a form
+	•	Required revenue/ramp/volatility enforced
+	•	Results feel calm and human, not sterile
+	•	No new features added
+
+Implement now.

@@ -2,29 +2,28 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { z } from "zod";
 
 export const simulationFormSchema = z.object({
-  // Section 1: Current Stability
-  currentSalary: z.coerce.number().min(0),
+  currentSalary: z.coerce.number().min(0).default(0),
   livingExpenses: z.coerce.number().min(1, "Required"),
-  totalDebt: z.coerce.number().min(0),
-  monthlyDebtPayments: z.coerce.number().min(0),
+  totalDebt: z.coerce.number().min(0).default(0),
+  monthlyDebtPayments: z.coerce.number().min(0).default(0),
   isDualIncome: z.boolean().default(false),
   partnerIncome: z.coerce.number().min(0).default(0),
-  healthcareType: z.enum(['employer', 'cobra', 'aca', 'partner', 'none']),
+  healthcareType: z.enum(['employer', 'cobra', 'aca', 'partner', 'none'], {
+    required_error: "Please select a healthcare option",
+  }),
 
-  // Section 2: Liquidity Position
-  cash: z.coerce.number().min(0),
-  brokerage: z.coerce.number().min(0),
-  roth: z.coerce.number().min(0),
-  traditional: z.coerce.number().min(0),
-  realEstate: z.coerce.number().min(0),
+  cash: z.coerce.number().min(0).default(0),
+  brokerage: z.coerce.number().min(0).default(0),
+  roth: z.coerce.number().min(0).default(0),
+  traditional: z.coerce.number().min(0).default(0),
+  realEstate: z.coerce.number().min(0).default(0),
 
-  // Section 3: Business Transition Model
   businessModelType: z.enum(['solo_bootstrap', 'contractor_heavy', 'agency_service', 'inventory_heavy', 'saas_product']),
   businessCostOverride: z.coerce.number().min(0).nullable().optional(),
-  expectedRevenue: z.coerce.number().min(0),
+  expectedRevenue: z.coerce.number().min(1, "Required"),
   volatilityPercent: z.coerce.number().min(10).max(40).default(15),
-  rampDuration: z.coerce.number().min(0),
-  breakevenMonths: z.coerce.number().min(0),
+  rampDuration: z.coerce.number().min(0, "Required"),
+  breakevenMonths: z.coerce.number().min(0).default(0),
 });
 
 export type SimulationFormValues = z.infer<typeof simulationFormSchema>;

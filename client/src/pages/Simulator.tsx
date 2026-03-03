@@ -4,377 +4,538 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { AnimatePresence, motion } from "framer-motion";
 import Layout from "../components/Layout";
+import ErrorBoundary from "../components/ErrorBoundary";
 import { Button } from "@/components/ui/button";
 import { simulationFormSchema, SimulationFormValues, useCreateSimulation } from "../hooks/use-simulations";
 import { useToast } from "@/hooks/use-toast";
-import { ChevronRight, ChevronLeft, Info } from "lucide-react";
+import { ChevronLeft, Info } from "lucide-react";
 
-const SECTIONS = [
-  { id: 1, title: "Current Stability", subtitle: "Employment income, living expenses, and debt obligations." },
-  { id: 2, title: "Liquidity Position", subtitle: "Accessible capital across all asset classes — before haircuts." },
-  { id: 3, title: "Business Transition Model", subtitle: "Revenue projections and ramp assumptions." },
-];
+// ─── Step definitions ──────────────────────────────────────────────────────
+const TOTAL_STEPS = 10;
+
+const STEP_META: Record<number, { header: string; framing: string }> = {
+  1:  { header: "Let's start with your foundation.",
+        framing: "Most people underestimate transition costs. Conservative inputs help you trust the output." },
+  2:  { header: "Now, your household baseline.",
+        framing: "A partner's stable income materially reduces your independence burn — include it if consistent and dependable." },
+  3:  { header: "Next: obligations that don't disappear.",
+        framing: "Mortgage, car loans, student debt — any payment that continues regardless of your employment status." },
+  4:  { header: "Healthcare is usually the biggest delta.",
+        framing: "For most people, leaving employment adds $500–$1,500/month in new costs. This is modeled automatically." },
+  5:  { header: "Now: the capital you can actually reach.",
+        framing: "This is your most defensible capital — liquid, no penalty, no tax event." },
+  6:  { header: "Let's include what you could tap if needed.",
+        framing: "These assets carry haircuts. Brokerage at 80%, retirement accounts at 50%, real estate at 30%." },
+  7:  { header: "Now let's model what comes next.",
+        framing: "Your business structure determines baseline operating costs. The model uses these to calculate true burn." },
+  8:  { header: "Let's pressure-test your revenue expectations.",
+        framing: "The simulator stress-tests this number at -15% and -30% scenarios automatically. Use a conservative estimate." },
+  9:  { header: "Most transitions take longer than planned.",
+        framing: "During ramp, the model applies a 50% revenue realization factor — accounting for slow starts and pipeline gaps." },
+  10: { header: "Last question: how reliable is this income?",
+        framing: "Project-based work typically swings 20–30%. Retainers or contracts: 10–15%." },
+};
 
 const HEALTHCARE_OPTIONS = [
-  { value: 'employer', label: 'Employer Coverage Retained', note: 'Staying on plan during notice period' },
-  { value: 'cobra', label: 'COBRA Continuation', note: 'Avg. $850/mo — time-limited to 18 months' },
-  { value: 'aca', label: 'ACA Marketplace', note: 'Avg. $600/mo — income-dependent subsidies' },
-  { value: 'partner', label: 'Covered by Partner Plan', note: 'No additional healthcare cost' },
-  { value: 'none', label: 'No Coverage', note: 'All medical costs out-of-pocket — extreme risk' },
+  { value: 'partner', label: 'Covered by partner plan', note: 'No additional cost to you', cost: null },
+  { value: 'aca',     label: 'ACA marketplace',         note: 'Income-dependent subsidies available', cost: '$600/mo estimated' },
+  { value: 'cobra',   label: 'COBRA continuation',      note: 'Time-limited to 18 months', cost: '$850/mo estimated' },
+  { value: 'employer',label: 'Employer plan retained',  note: 'During severance or notice period', cost: '$0' },
+  { value: 'none',    label: 'No coverage (self-pay)',  note: 'All medical costs fully out-of-pocket', cost: 'High risk' },
 ];
 
-const BUSINESS_MODELS = [
-  { value: 'solo_bootstrap', label: 'Solo Bootstrap', cost: '$500/mo baseline' },
-  { value: 'contractor_heavy', label: 'Contractor-Heavy', cost: '$2,000/mo baseline' },
-  { value: 'agency_service', label: 'Agency / Service Firm', cost: '$3,000/mo baseline' },
-  { value: 'inventory_heavy', label: 'Inventory-Heavy', cost: '$4,500/mo baseline' },
-  { value: 'saas_product', label: 'SaaS / Product Build', cost: '$2,500/mo baseline' },
+type BusinessChoice = 'solo' | 'agency' | 'product' | 'custom';
+const BUSINESS_CHOICES: { value: BusinessChoice; label: string; desc: string; cost: string; modelType: string }[] = [
+  { value: 'solo',    label: 'Solo bootstrap',       desc: 'Freelance, consulting, one-person operation', cost: '$500/mo',   modelType: 'solo_bootstrap' },
+  { value: 'agency',  label: 'Lean agency / service', desc: 'Small team, service delivery',               cost: '$3,000/mo', modelType: 'agency_service' },
+  { value: 'product', label: 'Product build',         desc: 'SaaS, software, recurring revenue model',    cost: '$2,500/mo', modelType: 'saas_product' },
+  { value: 'custom',  label: 'Custom',                desc: 'I know my monthly operating cost',           cost: 'Enter cost', modelType: 'solo_bootstrap' },
 ];
 
-function CurrencyInput({ label, description, name, register, error }: {
-  label: string;
-  description?: string;
-  name: string;
+// ─── Shared input primitives ───────────────────────────────────────────────
+function CurrencyInput({
+  label, placeholder = "0", name, register, error, autoFocus = false,
+}: {
+  label?: string; placeholder?: string; name: string;
   register: ReturnType<typeof useForm<SimulationFormValues>>['register'];
-  error?: string;
+  error?: string; autoFocus?: boolean;
 }) {
   return (
-    <div data-testid={`field-${name}`}>
-      <label className="block text-sm font-semibold text-foreground mb-1">{label}</label>
-      {description && <p className="text-xs text-muted-foreground mb-2">{description}</p>}
+    <div className="w-full max-w-sm">
+      {label && <label className="block text-sm font-medium text-muted-foreground mb-2">{label}</label>}
       <div className="relative">
-        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground font-medium">$</span>
+        <span className="absolute left-4 top-1/2 -translate-y-1/2 text-foreground/60 font-medium">$</span>
         <input
-          type="number"
-          min="0"
-          step="1"
-          className="w-full pl-7 pr-4 py-2.5 border border-input rounded-md bg-background text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-          placeholder="0"
+          type="number" min="0" step="1"
+          placeholder={placeholder}
+          autoFocus={autoFocus}
+          className="w-full pl-8 pr-4 py-3.5 border border-input rounded-md bg-background text-foreground text-lg font-medium focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent"
           data-testid={`input-${name}`}
           {...register(name as keyof SimulationFormValues)}
         />
       </div>
-      {error && <p className="text-xs text-destructive mt-1">{error}</p>}
+      {error && <p className="text-xs text-destructive mt-1.5">{error}</p>}
     </div>
   );
 }
 
-function NumInput({ label, description, name, suffix, min, max, register, error }: {
-  label: string;
-  description?: string;
-  name: string;
-  suffix?: string;
-  min?: number;
-  max?: number;
+function NumInput({
+  label, suffix, name, min, max, placeholder = "0", register, error, autoFocus = false,
+}: {
+  label?: string; suffix?: string; name: string; min?: number; max?: number; placeholder?: string;
   register: ReturnType<typeof useForm<SimulationFormValues>>['register'];
-  error?: string;
+  error?: string; autoFocus?: boolean;
 }) {
   return (
-    <div data-testid={`field-${name}`}>
-      <label className="block text-sm font-semibold text-foreground mb-1">{label}</label>
-      {description && <p className="text-xs text-muted-foreground mb-2">{description}</p>}
+    <div className="w-full max-w-sm">
+      {label && <label className="block text-sm font-medium text-muted-foreground mb-2">{label}</label>}
       <div className="relative">
         <input
-          type="number"
-          min={min}
-          max={max}
-          step="1"
-          className="w-full px-4 py-2.5 border border-input rounded-md bg-background text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-          placeholder="0"
+          type="number" min={min} max={max} step="1"
+          placeholder={placeholder}
+          autoFocus={autoFocus}
+          className="w-full px-4 py-3.5 border border-input rounded-md bg-background text-foreground text-lg font-medium focus:outline-none focus:ring-2 focus:ring-ring"
           data-testid={`input-${name}`}
           {...register(name as keyof SimulationFormValues)}
         />
-        {suffix && <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">{suffix}</span>}
+        {suffix && (
+          <span className="absolute right-4 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">{suffix}</span>
+        )}
       </div>
-      {error && <p className="text-xs text-destructive mt-1">{error}</p>}
+      {error && <p className="text-xs text-destructive mt-1.5">{error}</p>}
     </div>
   );
 }
 
+// ─── Main component ────────────────────────────────────────────────────────
 export default function Simulator() {
+  return (
+    <ErrorBoundary>
+      <SimulatorInner />
+    </ErrorBoundary>
+  );
+}
+
+function SimulatorInner() {
   const [, setLocation] = useLocation();
   const [step, setStep] = useState(1);
-  const [showOverride, setShowOverride] = useState(false);
+  const [businessChoice, setBusinessChoice] = useState<BusinessChoice | null>(null);
+  const [showAdvanced, setShowAdvanced] = useState(false);
   const { toast } = useToast();
   const createSimulation = useCreateSimulation();
 
   const form = useForm<SimulationFormValues>({
     resolver: zodResolver(simulationFormSchema),
     defaultValues: {
-      currentSalary: 0, livingExpenses: 0, totalDebt: 0, monthlyDebtPayments: 0,
-      isDualIncome: false, partnerIncome: 0, healthcareType: 'aca',
-      cash: 0, brokerage: 0, roth: 0, traditional: 0, realEstate: 0,
-      businessModelType: 'solo_bootstrap', businessCostOverride: null,
-      expectedRevenue: 0, volatilityPercent: 15, rampDuration: 6, breakevenMonths: 12,
+      currentSalary: 0,
+      livingExpenses: undefined as unknown as number,
+      totalDebt: 0,
+      monthlyDebtPayments: 0,
+      isDualIncome: false,
+      partnerIncome: 0,
+      healthcareType: undefined as unknown as 'employer',
+      cash: 0,
+      brokerage: 0,
+      roth: 0,
+      traditional: 0,
+      realEstate: 0,
+      businessModelType: 'solo_bootstrap',
+      businessCostOverride: null,
+      expectedRevenue: undefined as unknown as number,
+      volatilityPercent: 15,
+      rampDuration: undefined as unknown as number,
+      breakevenMonths: 0,
     },
     mode: "onChange",
   });
 
   const { register, handleSubmit, watch, setValue, formState: { errors }, trigger } = form;
   const isDualIncome = watch("isDualIncome");
-  const businessModelType = watch("businessModelType");
+  const healthcareType = watch("healthcareType");
 
-  const stepFields: Record<number, (keyof SimulationFormValues)[]> = {
-    1: ['livingExpenses', 'healthcareType'],
-    2: ['cash'],
-    3: ['expectedRevenue', 'rampDuration', 'breakevenMonths', 'volatilityPercent'],
+  // Per-step validation fields
+  const stepValidationFields: Record<number, (keyof SimulationFormValues)[]> = {
+    1:  ['livingExpenses'],
+    2:  isDualIncome ? ['partnerIncome'] : [],
+    3:  ['totalDebt', 'monthlyDebtPayments'],
+    4:  ['healthcareType'],
+    5:  ['cash'],
+    6:  ['brokerage'],
+    7:  ['businessModelType'],
+    8:  ['expectedRevenue'],
+    9:  ['rampDuration'],
+    10: ['volatilityPercent'],
   };
 
-  const nextStep = async () => {
-    const valid = await trigger(stepFields[step]);
-    if (valid) {
-      setStep(s => Math.min(s + 1, SECTIONS.length));
-      window.scrollTo({ top: 0 });
+  const next = async () => {
+    const fields = stepValidationFields[step] || [];
+    if (fields.length > 0) {
+      const valid = await trigger(fields);
+      if (!valid) return;
     }
+    setStep(s => Math.min(s + 1, TOTAL_STEPS));
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  const prevStep = () => {
+  const back = () => {
     setStep(s => Math.max(s - 1, 1));
-    window.scrollTo({ top: 0 });
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const onSubmit = (data: SimulationFormValues) => {
-    createSimulation.mutate(data, {
+    // Set breakevenMonths based on rampDuration if not set
+    const payload = {
+      ...data,
+      currentSalary: 0,
+      breakevenMonths: data.rampDuration ? data.rampDuration + 3 : 3,
+    };
+    createSimulation.mutate(payload, {
       onSuccess: (result) => setLocation(`/results/${result.id}`),
       onError: (err) => toast({ title: "Simulation failed", description: err.message, variant: "destructive" }),
     });
   };
 
+  const selectHealthcare = (value: string) => {
+    setValue("healthcareType", value as SimulationFormValues['healthcareType'], { shouldValidate: true });
+  };
+
+  const selectBusiness = (choice: BusinessChoice) => {
+    setBusinessChoice(choice);
+    const found = BUSINESS_CHOICES.find(b => b.value === choice);
+    if (found) {
+      setValue("businessModelType", found.modelType as SimulationFormValues['businessModelType']);
+      if (choice !== 'custom') setValue("businessCostOverride", null);
+    }
+  };
+
+  const { header, framing } = STEP_META[step];
+  const progress = Math.round((step / TOTAL_STEPS) * 100);
+
   return (
     <Layout>
-      <div className="flex-1 bg-background py-12">
-        <div className="max-w-3xl mx-auto px-4 sm:px-6">
+      <div className="flex-1 flex flex-col bg-background">
+        {/* Progress bar */}
+        <div className="w-full h-0.5 bg-border">
+          <div
+            className="h-full bg-foreground transition-all duration-500 ease-out"
+            style={{ width: `${progress}%` }}
+          />
+        </div>
 
-          {/* Progress */}
-          <div className="mb-10">
-            <div className="flex items-center gap-3 mb-2">
-              {SECTIONS.map((s, i) => (
-                <div key={s.id} className="flex items-center gap-3">
-                  <div className={`flex items-center justify-center w-7 h-7 rounded-full text-xs font-bold border transition-colors
-                    ${step === s.id ? 'bg-foreground text-background border-foreground' :
-                      step > s.id ? 'bg-foreground/20 text-foreground border-foreground/20' :
-                      'bg-transparent text-muted-foreground border-border'}`}>
-                    {s.id}
+        <div className="flex-1 flex flex-col items-center justify-center px-4 py-12">
+          <div className="w-full max-w-lg">
+
+            {/* Step counter */}
+            <p className="text-xs font-semibold tracking-widest uppercase text-muted-foreground mb-8" data-testid="text-step-counter">
+              Step {step} of {TOTAL_STEPS}
+            </p>
+
+            <AnimatePresence mode="wait">
+              <motion.div
+                key={step}
+                initial={{ opacity: 0, y: 14 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -14 }}
+                transition={{ duration: 0.22, ease: "easeOut" }}
+              >
+                {/* Header */}
+                <h1 className="text-2xl sm:text-3xl font-bold font-serif text-foreground mb-3 leading-tight">
+                  {header}
+                </h1>
+                <p className="text-sm text-muted-foreground mb-8 leading-relaxed max-w-md">
+                  {framing}
+                </p>
+
+                {/* ── Step content ──────────────────────────────────── */}
+
+                {/* Step 1 — Living expenses */}
+                {step === 1 && (
+                  <div className="space-y-4">
+                    <label className="block text-base font-semibold text-foreground mb-3">
+                      What does your life cost each month?
+                    </label>
+                    <CurrencyInput name="livingExpenses" register={register} error={errors.livingExpenses?.message} autoFocus placeholder="4,500" />
+                    <p className="text-xs text-muted-foreground">Include rent or mortgage, food, utilities, insurance, transportation, and subscriptions.</p>
                   </div>
-                  <span className={`text-sm hidden sm:block ${step === s.id ? 'font-semibold text-foreground' : 'text-muted-foreground'}`}>
-                    {s.title}
-                  </span>
-                  {i < SECTIONS.length - 1 && <div className="h-px w-8 bg-border hidden sm:block" />}
-                </div>
-              ))}
-            </div>
-            <p className="text-sm text-muted-foreground mt-3 sm:hidden">{SECTIONS[step - 1].title}</p>
-          </div>
+                )}
 
-          {/* Form Card */}
-          <div className="bg-card border border-border rounded-md">
-            <div className="px-8 py-6 border-b border-border">
-              <h2 className="text-xl font-bold font-serif text-foreground">{SECTIONS[step - 1].title}</h2>
-              <p className="text-sm text-muted-foreground mt-1">{SECTIONS[step - 1].subtitle}</p>
-            </div>
-
-            <form onSubmit={handleSubmit(onSubmit)}>
-              <AnimatePresence mode="wait">
-                <motion.div
-                  key={step}
-                  initial={{ opacity: 0, y: 8 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -8 }}
-                  transition={{ duration: 0.18 }}
-                  className="p-8 space-y-8"
-                >
-
-                  {/* SECTION 1 */}
-                  {step === 1 && (
-                    <div className="space-y-8">
-                      <div className="grid sm:grid-cols-2 gap-6">
-                        <CurrencyInput label="Current Net Monthly Salary" description="Your take-home pay, after tax." name="currentSalary" register={register} error={errors.currentSalary?.message} />
-                        <CurrencyInput label="Monthly Living Expenses" description="Rent/mortgage, food, utilities, subscriptions." name="livingExpenses" register={register} error={errors.livingExpenses?.message} />
-                      </div>
-
-                      <div className="grid sm:grid-cols-2 gap-6">
-                        <CurrencyInput label="Total Outstanding Debt" description="Mortgage balance + all other debt." name="totalDebt" register={register} error={errors.totalDebt?.message} />
-                        <CurrencyInput label="Total Monthly Debt Payments" description="All required monthly debt service." name="monthlyDebtPayments" register={register} error={errors.monthlyDebtPayments?.message} />
-                      </div>
-
-                      {/* Dual income toggle */}
-                      <div className="border border-border rounded-md p-5">
-                        <label className="flex items-center gap-3 cursor-pointer" data-testid="toggle-dual-income">
-                          <div
-                            onClick={() => setValue("isDualIncome", !isDualIncome)}
-                            className={`w-10 h-5 rounded-full relative transition-colors cursor-pointer ${isDualIncome ? 'bg-foreground' : 'bg-muted'}`}
-                          >
-                            <div className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform ${isDualIncome ? 'translate-x-5' : 'translate-x-0.5'}`} />
-                          </div>
-                          <input type="checkbox" className="sr-only" {...register("isDualIncome")} />
-                          <span className="text-sm font-semibold text-foreground">Partner has stable income</span>
-                        </label>
-                        {isDualIncome && (
-                          <div className="mt-5 pt-5 border-t border-border">
-                            <CurrencyInput label="Partner Net Monthly Income" description="Take-home, after tax. Reduces TMIB directly." name="partnerIncome" register={register} error={errors.partnerIncome?.message} />
-                          </div>
-                        )}
-                      </div>
-
-                      {/* Healthcare */}
-                      <div>
-                        <label className="block text-sm font-semibold text-foreground mb-1">Healthcare Coverage Strategy</label>
-                        <p className="text-xs text-muted-foreground mb-3">Monthly cost will be estimated based on your selection and added to TMIB.</p>
-                        <div className="space-y-2">
-                          {HEALTHCARE_OPTIONS.map(opt => {
-                            const selected = watch("healthcareType") === opt.value;
-                            return (
-                              <label
-                                key={opt.value}
-                                className={`flex items-center justify-between p-4 rounded-md border cursor-pointer transition-colors ${selected ? 'border-foreground bg-foreground/5' : 'border-border'}`}
-                                data-testid={`option-healthcare-${opt.value}`}
-                              >
-                                <div className="flex items-center gap-3">
-                                  <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center shrink-0 ${selected ? 'border-foreground' : 'border-muted-foreground'}`}>
-                                    {selected && <div className="w-2 h-2 rounded-full bg-foreground" />}
-                                  </div>
-                                  <div>
-                                    <span className="text-sm font-medium text-foreground">{opt.label}</span>
-                                    <p className="text-xs text-muted-foreground">{opt.note}</p>
-                                  </div>
-                                </div>
-                                <input type="radio" value={opt.value} className="sr-only" {...register("healthcareType")} />
-                              </label>
-                            );
-                          })}
-                        </div>
-                        {errors.healthcareType && <p className="text-xs text-destructive mt-1">{errors.healthcareType.message}</p>}
-                      </div>
+                {/* Step 2 — Partner income */}
+                {step === 2 && (
+                  <div className="space-y-6">
+                    <label className="block text-base font-semibold text-foreground mb-3">
+                      Does a partner contribute stable income to this household?
+                    </label>
+                    <div className="flex gap-3">
+                      <button
+                        type="button"
+                        onClick={() => setValue("isDualIncome", true)}
+                        className={`flex-1 py-3.5 rounded-md border text-sm font-semibold transition-colors ${isDualIncome ? 'bg-foreground text-background border-foreground' : 'border-border text-foreground'}`}
+                        data-testid="button-dual-income-yes"
+                      >
+                        Yes
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => { setValue("isDualIncome", false); setValue("partnerIncome", 0); }}
+                        className={`flex-1 py-3.5 rounded-md border text-sm font-semibold transition-colors ${!isDualIncome ? 'bg-foreground text-background border-foreground' : 'border-border text-foreground'}`}
+                        data-testid="button-dual-income-no"
+                      >
+                        No
+                      </button>
                     </div>
-                  )}
+                    {isDualIncome && (
+                      <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="pt-4">
+                        <label className="block text-sm font-semibold text-foreground mb-3">
+                          Partner net monthly income (after tax)
+                        </label>
+                        <CurrencyInput name="partnerIncome" register={register} error={errors.partnerIncome?.message} autoFocus placeholder="5,000" />
+                      </motion.div>
+                    )}
+                  </div>
+                )}
 
-                  {/* SECTION 2 */}
-                  {step === 2 && (
-                    <div className="space-y-6">
-                      <div className="flex items-start gap-2 p-4 bg-muted/50 rounded-md border border-border">
+                {/* Step 3 — Debt */}
+                {step === 3 && (
+                  <div className="space-y-8">
+                    <div>
+                      <label className="block text-base font-semibold text-foreground mb-3">
+                        What total debt balance would continue after you leave?
+                      </label>
+                      <CurrencyInput name="totalDebt" register={register} error={errors.totalDebt?.message} autoFocus placeholder="180,000" />
+                    </div>
+                    <div>
+                      <label className="block text-base font-semibold text-foreground mb-3">
+                        What are your required monthly debt payments?
+                      </label>
+                      <CurrencyInput name="monthlyDebtPayments" register={register} error={errors.monthlyDebtPayments?.message} placeholder="1,800" />
+                      <p className="text-xs text-muted-foreground mt-2">Combined total — mortgage, loans, credit cards, anything with a required minimum.</p>
+                    </div>
+                  </div>
+                )}
+
+                {/* Step 4 — Healthcare */}
+                {step === 4 && (
+                  <div>
+                    <label className="block text-base font-semibold text-foreground mb-4">
+                      What happens to your health coverage when you quit?
+                    </label>
+                    <div className="space-y-2">
+                      {HEALTHCARE_OPTIONS.map(opt => {
+                        const selected = healthcareType === opt.value;
+                        return (
+                          <button
+                            key={opt.value}
+                            type="button"
+                            onClick={() => selectHealthcare(opt.value)}
+                            className={`w-full text-left flex items-center justify-between px-5 py-4 rounded-md border transition-all ${selected ? 'border-foreground bg-foreground/5' : 'border-border'}`}
+                            data-testid={`option-healthcare-${opt.value}`}
+                          >
+                            <div>
+                              <p className="text-sm font-semibold text-foreground">{opt.label}</p>
+                              <p className="text-xs text-muted-foreground mt-0.5">{opt.note}</p>
+                            </div>
+                            {opt.cost && (
+                              <span className={`text-xs font-medium shrink-0 ml-3 ${selected ? 'text-foreground' : 'text-muted-foreground'}`}>
+                                {opt.cost}
+                              </span>
+                            )}
+                          </button>
+                        );
+                      })}
+                    </div>
+                    {errors.healthcareType && (
+                      <p className="text-xs text-destructive mt-2">Please select a healthcare option.</p>
+                    )}
+                    {healthcareType && !['partner', 'employer'].includes(healthcareType) && (
+                      <div className="mt-4 flex items-start gap-2 p-3.5 bg-muted/40 rounded-md border border-border">
                         <Info className="w-4 h-4 text-muted-foreground shrink-0 mt-0.5" />
                         <p className="text-xs text-muted-foreground leading-relaxed">
-                          Declare raw values. Conservative haircuts will be applied automatically: Brokerage ×0.80, Roth ×1.00, Retirement ×0.50, Real Estate ×0.30.
+                          The estimated cost for your selection will be added to your True Monthly Independence Burn (TMIB) automatically.
                         </p>
                       </div>
-                      <CurrencyInput label="Cash & HYSA" description="Checking, savings, high-yield savings — fully liquid." name="cash" register={register} error={errors.cash?.message} />
-                      <div className="grid sm:grid-cols-2 gap-6">
-                        <CurrencyInput label="Brokerage (Taxable)" description="Subject to capital gains tax." name="brokerage" register={register} error={errors.brokerage?.message} />
-                        <CurrencyInput label="Roth IRA (Contributions Only)" description="Contributions are penalty-free." name="roth" register={register} error={errors.roth?.message} />
-                      </div>
-                      <div className="grid sm:grid-cols-2 gap-6">
-                        <CurrencyInput label="Traditional IRA / 401(k)" description="Subject to tax + 10% early withdrawal penalty." name="traditional" register={register} error={errors.traditional?.message} />
-                        <CurrencyInput label="Real Estate Equity" description="Illiquid. Use conservatively." name="realEstate" register={register} error={errors.realEstate?.message} />
-                      </div>
-                    </div>
-                  )}
-
-                  {/* SECTION 3 */}
-                  {step === 3 && (
-                    <div className="space-y-8">
-                      {/* Business model */}
-                      <div>
-                        <label className="block text-sm font-semibold text-foreground mb-1">Business Model Type</label>
-                        <p className="text-xs text-muted-foreground mb-3">Sets baseline monthly operating cost. You can override this below.</p>
-                        <div className="space-y-2">
-                          {BUSINESS_MODELS.map(opt => {
-                            const selected = businessModelType === opt.value;
-                            return (
-                              <label
-                                key={opt.value}
-                                className={`flex items-center justify-between p-4 rounded-md border cursor-pointer transition-colors ${selected ? 'border-foreground bg-foreground/5' : 'border-border'}`}
-                                data-testid={`option-model-${opt.value}`}
-                              >
-                                <div className="flex items-center gap-3">
-                                  <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center shrink-0 ${selected ? 'border-foreground' : 'border-muted-foreground'}`}>
-                                    {selected && <div className="w-2 h-2 rounded-full bg-foreground" />}
-                                  </div>
-                                  <span className="text-sm font-medium text-foreground">{opt.label}</span>
-                                </div>
-                                <span className="text-xs text-muted-foreground">{opt.cost}</span>
-                                <input type="radio" value={opt.value} className="sr-only" {...register("businessModelType")} />
-                              </label>
-                            );
-                          })}
-                        </div>
-                      </div>
-
-                      {/* Advanced override */}
-                      <div>
-                        <button
-                          type="button"
-                          onClick={() => setShowOverride(v => !v)}
-                          className="text-xs text-muted-foreground underline underline-offset-2"
-                          data-testid="button-toggle-override"
-                        >
-                          {showOverride ? 'Remove advanced cost override' : 'Override business cost manually'}
-                        </button>
-                        {showOverride && (
-                          <div className="mt-4">
-                            <CurrencyInput label="Monthly Business Cost Override" description="Replaces model-type baseline if provided." name="businessCostOverride" register={register} error={errors.businessCostOverride?.message} />
-                          </div>
-                        )}
-                      </div>
-
-                      <div className="grid sm:grid-cols-2 gap-6">
-                        <CurrencyInput label="Expected Monthly Revenue (Steady State)" description="Conservative baseline at full ramp." name="expectedRevenue" register={register} error={errors.expectedRevenue?.message} />
-                        <NumInput label="Revenue Volatility %" description="Expected variance in monthly revenue (10–40%)." name="volatilityPercent" suffix="%" min={10} max={40} register={register} error={errors.volatilityPercent?.message} />
-                      </div>
-                      <div className="grid sm:grid-cols-2 gap-6">
-                        <NumInput label="Ramp Duration" description="Months until stable revenue is achieved." name="rampDuration" suffix="mo" min={0} register={register} error={errors.rampDuration?.message} />
-                        <NumInput label="Months to Break Even" description="Month when revenue is projected to cover TMIB." name="breakevenMonths" suffix="mo" min={0} register={register} error={errors.breakevenMonths?.message} />
-                      </div>
-
-                      {/* Stress parameters notice */}
-                      <div className="border border-border rounded-md p-5">
-                        <p className="text-xs font-semibold text-foreground uppercase tracking-wider mb-2">Built-in Stress Scenarios</p>
-                        <p className="text-xs text-muted-foreground leading-relaxed mb-3">The following are automatically applied — no additional input required.</p>
-                        <div className="space-y-1">
-                          {['-15% Revenue shock', '-30% Revenue shock', 'Ramp delayed +3 months'].map(s => (
-                            <div key={s} className="flex items-center gap-2 text-xs text-muted-foreground">
-                              <div className="w-1 h-1 bg-muted-foreground/40 rounded-full" />
-                              {s}
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-
-                      <div className="border border-border rounded-md p-5 bg-muted/30">
-                        <p className="text-xs text-muted-foreground leading-relaxed">
-                          By proceeding, you acknowledge this is a deterministic financial simulation based on your inputs and estimated U.S. averages. It is not financial, tax, or legal advice.
-                        </p>
-                      </div>
-                    </div>
-                  )}
-
-                </motion.div>
-              </AnimatePresence>
-
-              {/* Navigation */}
-              <div className="px-8 py-6 border-t border-border flex items-center justify-between">
-                {step > 1 ? (
-                  <Button type="button" variant="ghost" onClick={prevStep} className="gap-1" data-testid="button-prev">
-                    <ChevronLeft className="w-4 h-4" />
-                    Back
-                  </Button>
-                ) : <div />}
-
-                {step < SECTIONS.length ? (
-                  <Button type="button" onClick={nextStep} className="gap-1" data-testid="button-next">
-                    {SECTIONS[step].title}
-                    <ChevronRight className="w-4 h-4" />
-                  </Button>
-                ) : (
-                  <Button
-                    type="submit"
-                    disabled={createSimulation.isPending}
-                    data-testid="button-submit"
-                  >
-                    {createSimulation.isPending ? 'Running simulation...' : 'Generate Breakpoint Report'}
-                  </Button>
+                    )}
+                  </div>
                 )}
-              </div>
-            </form>
+
+                {/* Step 5 — Cash */}
+                {step === 5 && (
+                  <div>
+                    <label className="block text-base font-semibold text-foreground mb-3">
+                      How much cash and HYSA do you have right now?
+                    </label>
+                    <CurrencyInput name="cash" register={register} error={errors.cash?.message} autoFocus placeholder="50,000" />
+                    <p className="text-xs text-muted-foreground mt-2">Checking, savings, money market, high-yield savings — fully liquid with no penalty.</p>
+                  </div>
+                )}
+
+                {/* Step 6 — Investments */}
+                {step === 6 && (
+                  <div className="space-y-8">
+                    <div>
+                      <label className="block text-base font-semibold text-foreground mb-3">
+                        Taxable brokerage account balance?
+                      </label>
+                      <CurrencyInput name="brokerage" register={register} error={errors.brokerage?.message} autoFocus placeholder="0" />
+                      <p className="text-xs text-muted-foreground mt-2">Counted at 80% — capital gains and market timing risk applied.</p>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => setShowAdvanced(v => !v)}
+                      className="text-sm text-foreground underline underline-offset-2 opacity-60"
+                      data-testid="button-toggle-advanced"
+                    >
+                      {showAdvanced ? 'Hide additional accounts' : '+ Include retirement accounts and home equity'}
+                    </button>
+
+                    {showAdvanced && (
+                      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-6">
+                        <div>
+                          <label className="block text-sm font-semibold text-foreground mb-2">Roth IRA contributions (withdrawable portion)</label>
+                          <CurrencyInput name="roth" register={register} placeholder="0" />
+                          <p className="text-xs text-muted-foreground mt-1">Counted at 100% — contributions only, penalty-free.</p>
+                        </div>
+                        <div>
+                          <label className="block text-sm font-semibold text-foreground mb-2">Traditional IRA / 401(k) balance</label>
+                          <CurrencyInput name="traditional" register={register} placeholder="0" />
+                          <p className="text-xs text-muted-foreground mt-1">Counted at 50% — tax liability and 10% early withdrawal penalty applied.</p>
+                        </div>
+                        <div>
+                          <label className="block text-sm font-semibold text-foreground mb-2">Home equity (estimated)</label>
+                          <CurrencyInput name="realEstate" register={register} placeholder="0" />
+                          <p className="text-xs text-muted-foreground mt-1">Counted at 30% — illiquid, transaction costs, and market timing risk.</p>
+                        </div>
+                      </motion.div>
+                    )}
+                  </div>
+                )}
+
+                {/* Step 7 — Business model */}
+                {step === 7 && (
+                  <div>
+                    <label className="block text-base font-semibold text-foreground mb-4">
+                      What best describes your planned work structure?
+                    </label>
+                    <div className="space-y-2 mb-6">
+                      {BUSINESS_CHOICES.map(opt => {
+                        const selected = businessChoice === opt.value;
+                        return (
+                          <button
+                            key={opt.value}
+                            type="button"
+                            onClick={() => selectBusiness(opt.value)}
+                            className={`w-full text-left flex items-center justify-between px-5 py-4 rounded-md border transition-all ${selected ? 'border-foreground bg-foreground/5' : 'border-border'}`}
+                            data-testid={`option-model-${opt.value}`}
+                          >
+                            <div>
+                              <p className="text-sm font-semibold text-foreground">{opt.label}</p>
+                              <p className="text-xs text-muted-foreground mt-0.5">{opt.desc}</p>
+                            </div>
+                            <span className="text-xs font-medium text-muted-foreground ml-3 shrink-0">{opt.cost}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                    {businessChoice === 'custom' && (
+                      <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}>
+                        <label className="block text-sm font-semibold text-foreground mb-2">Monthly business operating cost</label>
+                        <CurrencyInput name="businessCostOverride" register={register} placeholder="2,000" />
+                      </motion.div>
+                    )}
+                  </div>
+                )}
+
+                {/* Step 8 — Expected revenue */}
+                {step === 8 && (
+                  <div>
+                    <label className="block text-base font-semibold text-foreground mb-3">
+                      What monthly revenue do you expect once you're stable?
+                    </label>
+                    <CurrencyInput name="expectedRevenue" register={register} error={errors.expectedRevenue?.message} autoFocus placeholder="8,000" />
+                    <p className="text-xs text-muted-foreground mt-2">
+                      This is your steady-state target — not your launch number. The stress test will run this at -15% and -30%.
+                    </p>
+                  </div>
+                )}
+
+                {/* Step 9 — Ramp */}
+                {step === 9 && (
+                  <div>
+                    <label className="block text-base font-semibold text-foreground mb-3">
+                      How many months until revenue reaches that level?
+                    </label>
+                    <NumInput name="rampDuration" suffix="months" register={register} error={errors.rampDuration?.message} autoFocus placeholder="6" min={0} />
+                    <p className="text-xs text-muted-foreground mt-2">
+                      Add buffer. If you think 3 months, model 6. During ramp, the engine applies a 50% revenue realization factor.
+                    </p>
+                  </div>
+                )}
+
+                {/* Step 10 — Volatility */}
+                {step === 10 && (
+                  <div>
+                    <label className="block text-base font-semibold text-foreground mb-3">
+                      What level of monthly revenue variance do you expect?
+                    </label>
+                    <NumInput name="volatilityPercent" suffix="%" register={register} error={errors.volatilityPercent?.message} autoFocus placeholder="15" min={10} max={30} />
+                    <div className="mt-4 grid grid-cols-2 gap-3">
+                      {[
+                        { label: 'Stable contracts / retainers', val: '10%' },
+                        { label: 'Mixed client work', val: '15%' },
+                        { label: 'Project-based billing', val: '20%' },
+                        { label: 'Unpredictable / early stage', val: '30%' },
+                      ].map(h => (
+                        <button
+                          key={h.val}
+                          type="button"
+                          onClick={() => setValue("volatilityPercent", parseInt(h.val), { shouldValidate: true })}
+                          className="text-left p-3 rounded-md border border-border text-xs"
+                          data-testid={`preset-vol-${h.val}`}
+                        >
+                          <span className="block font-semibold text-foreground">{h.val}</span>
+                          <span className="text-muted-foreground">{h.label}</span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+              </motion.div>
+            </AnimatePresence>
+
+            {/* Navigation */}
+            <div className="mt-10 flex items-center justify-between">
+              <button
+                type="button"
+                onClick={back}
+                className={`flex items-center gap-1.5 text-sm text-muted-foreground transition-opacity ${step === 1 ? 'invisible' : ''}`}
+                data-testid="button-back"
+              >
+                <ChevronLeft className="w-4 h-4" />
+                Back
+              </button>
+
+              {step < TOTAL_STEPS ? (
+                <Button
+                  type="button"
+                  onClick={next}
+                  disabled={step === 7 && businessChoice === null}
+                  data-testid="button-next"
+                >
+                  Continue
+                </Button>
+              ) : (
+                <Button
+                  type="button"
+                  disabled={createSimulation.isPending}
+                  onClick={handleSubmit(onSubmit)}
+                  data-testid="button-submit"
+                >
+                  {createSimulation.isPending ? 'Running stress test...' : 'Run Stress Test'}
+                </Button>
+              )}
+            </div>
+
           </div>
         </div>
       </div>
