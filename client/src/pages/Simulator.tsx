@@ -2,319 +2,346 @@ import { useState } from "react";
 import { useLocation } from "wouter";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { motion, AnimatePresence } from "framer-motion";
-import { ShieldAlert, Activity, DollarSign, BriefcaseMedical } from "lucide-react";
-
+import { AnimatePresence, motion } from "framer-motion";
 import Layout from "../components/Layout";
-import { Button } from "../components/Button";
-import { FormField, SelectField } from "../components/FormField";
+import { Button } from "@/components/ui/button";
 import { simulationFormSchema, SimulationFormValues, useCreateSimulation } from "../hooks/use-simulations";
+import { useToast } from "@/hooks/use-toast";
+import { ChevronRight, ChevronLeft, Info } from "lucide-react";
 
-const STEPS = [
-  { id: 1, title: "Capital Liquidity", icon: DollarSign, description: "Map your available runway." },
-  { id: 2, title: "Fixed Liabilities", icon: Activity, description: "Calculate structural burn." },
-  { id: 3, title: "Revenue Model", icon: ShieldAlert, description: "Stress-test income projections." },
-  { id: 4, title: "Risk Exposure", icon: BriefcaseMedical, description: "Healthcare and structural risks." }
+const SECTIONS = [
+  { id: 1, title: "Current Stability", subtitle: "Employment income, living expenses, and debt obligations." },
+  { id: 2, title: "Liquidity Position", subtitle: "Accessible capital across all asset classes — before haircuts." },
+  { id: 3, title: "Business Transition Model", subtitle: "Revenue projections and ramp assumptions." },
 ];
+
+const HEALTHCARE_OPTIONS = [
+  { value: 'employer', label: 'Employer Coverage Retained', note: 'Staying on plan during notice period' },
+  { value: 'cobra', label: 'COBRA Continuation', note: 'Avg. $850/mo — time-limited to 18 months' },
+  { value: 'aca', label: 'ACA Marketplace', note: 'Avg. $600/mo — income-dependent subsidies' },
+  { value: 'partner', label: 'Covered by Partner Plan', note: 'No additional healthcare cost' },
+  { value: 'none', label: 'No Coverage', note: 'All medical costs out-of-pocket — extreme risk' },
+];
+
+const BUSINESS_MODELS = [
+  { value: 'solo_bootstrap', label: 'Solo Bootstrap', cost: '$500/mo baseline' },
+  { value: 'contractor_heavy', label: 'Contractor-Heavy', cost: '$2,000/mo baseline' },
+  { value: 'agency_service', label: 'Agency / Service Firm', cost: '$3,000/mo baseline' },
+  { value: 'inventory_heavy', label: 'Inventory-Heavy', cost: '$4,500/mo baseline' },
+  { value: 'saas_product', label: 'SaaS / Product Build', cost: '$2,500/mo baseline' },
+];
+
+function CurrencyInput({ label, description, name, register, error }: {
+  label: string;
+  description?: string;
+  name: string;
+  register: ReturnType<typeof useForm<SimulationFormValues>>['register'];
+  error?: string;
+}) {
+  return (
+    <div data-testid={`field-${name}`}>
+      <label className="block text-sm font-semibold text-foreground mb-1">{label}</label>
+      {description && <p className="text-xs text-muted-foreground mb-2">{description}</p>}
+      <div className="relative">
+        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground font-medium">$</span>
+        <input
+          type="number"
+          min="0"
+          step="1"
+          className="w-full pl-7 pr-4 py-2.5 border border-input rounded-md bg-background text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+          placeholder="0"
+          data-testid={`input-${name}`}
+          {...register(name as keyof SimulationFormValues)}
+        />
+      </div>
+      {error && <p className="text-xs text-destructive mt-1">{error}</p>}
+    </div>
+  );
+}
+
+function NumInput({ label, description, name, suffix, min, max, register, error }: {
+  label: string;
+  description?: string;
+  name: string;
+  suffix?: string;
+  min?: number;
+  max?: number;
+  register: ReturnType<typeof useForm<SimulationFormValues>>['register'];
+  error?: string;
+}) {
+  return (
+    <div data-testid={`field-${name}`}>
+      <label className="block text-sm font-semibold text-foreground mb-1">{label}</label>
+      {description && <p className="text-xs text-muted-foreground mb-2">{description}</p>}
+      <div className="relative">
+        <input
+          type="number"
+          min={min}
+          max={max}
+          step="1"
+          className="w-full px-4 py-2.5 border border-input rounded-md bg-background text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+          placeholder="0"
+          data-testid={`input-${name}`}
+          {...register(name as keyof SimulationFormValues)}
+        />
+        {suffix && <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">{suffix}</span>}
+      </div>
+      {error && <p className="text-xs text-destructive mt-1">{error}</p>}
+    </div>
+  );
+}
 
 export default function Simulator() {
   const [, setLocation] = useLocation();
-  const [currentStep, setCurrentStep] = useState(1);
+  const [step, setStep] = useState(1);
+  const [showOverride, setShowOverride] = useState(false);
+  const { toast } = useToast();
   const createSimulation = useCreateSimulation();
 
   const form = useForm<SimulationFormValues>({
     resolver: zodResolver(simulationFormSchema),
     defaultValues: {
-      cash: 0,
-      brokerage: 0,
-      roth: 0,
-      traditional: 0,
-      realEstate: 0,
-      livingExpenses: 0,
-      healthcareCost: 0,
-      businessCosts: 0,
-      taxReserve: 0,
-      isDualIncome: false,
-      partnerIncome: 0,
-      expectedRevenue: 0,
-      rampDuration: 0,
-      revenueType: 'recurring',
-      volatilityPercent: 15,
-      healthcareType: 'none',
+      currentSalary: 0, livingExpenses: 0, totalDebt: 0, monthlyDebtPayments: 0,
+      isDualIncome: false, partnerIncome: 0, healthcareType: 'aca',
+      cash: 0, brokerage: 0, roth: 0, traditional: 0, realEstate: 0,
+      businessModelType: 'solo_bootstrap', businessCostOverride: null,
+      expectedRevenue: 0, volatilityPercent: 15, rampDuration: 6, breakevenMonths: 12,
     },
-    mode: "onChange"
+    mode: "onChange",
   });
 
-  const { register, handleSubmit, formState: { errors, isValid }, trigger, watch, setValue } = form;
+  const { register, handleSubmit, watch, setValue, formState: { errors }, trigger } = form;
   const isDualIncome = watch("isDualIncome");
+  const businessModelType = watch("businessModelType");
+
+  const stepFields: Record<number, (keyof SimulationFormValues)[]> = {
+    1: ['livingExpenses', 'healthcareType'],
+    2: ['cash'],
+    3: ['expectedRevenue', 'rampDuration', 'breakevenMonths', 'volatilityPercent'],
+  };
 
   const nextStep = async () => {
-    // Validate current step fields before advancing
-    let fieldsToValidate: (keyof SimulationFormValues)[] = [];
-    if (currentStep === 1) fieldsToValidate = ['cash', 'brokerage', 'roth', 'traditional', 'realEstate'];
-    if (currentStep === 2) fieldsToValidate = ['livingExpenses', 'healthcareCost', 'businessCosts', 'taxReserve', 'partnerIncome'];
-    if (currentStep === 3) fieldsToValidate = ['expectedRevenue', 'rampDuration', 'revenueType', 'volatilityPercent'];
-    
-    const isStepValid = await trigger(fieldsToValidate);
-    if (isStepValid) {
-      setCurrentStep(prev => Math.min(prev + 1, STEPS.length));
-      window.scrollTo(0, 0);
+    const valid = await trigger(stepFields[step]);
+    if (valid) {
+      setStep(s => Math.min(s + 1, SECTIONS.length));
+      window.scrollTo({ top: 0 });
     }
   };
 
   const prevStep = () => {
-    setCurrentStep(prev => Math.max(prev - 1, 1));
-    window.scrollTo(0, 0);
+    setStep(s => Math.max(s - 1, 1));
+    window.scrollTo({ top: 0 });
   };
 
   const onSubmit = (data: SimulationFormValues) => {
     createSimulation.mutate(data, {
-      onSuccess: (result) => {
-        setLocation(`/results/${result.id}`);
-      }
+      onSuccess: (result) => setLocation(`/results/${result.id}`),
+      onError: (err) => toast({ title: "Simulation failed", description: err.message, variant: "destructive" }),
     });
   };
 
   return (
     <Layout>
-      <div className="flex-1 bg-slate-50 py-12">
-        <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
-          
-          {/* Progress Indicator */}
+      <div className="flex-1 bg-background py-12">
+        <div className="max-w-3xl mx-auto px-4 sm:px-6">
+
+          {/* Progress */}
           <div className="mb-10">
-            <div className="flex justify-between items-center mb-4">
-              {STEPS.map((step) => {
-                const Icon = step.icon;
-                const isActive = step.id === currentStep;
-                const isPast = step.id < currentStep;
-                return (
-                  <div key={step.id} className="flex flex-col items-center relative z-10">
-                    <div className={`w-10 h-10 rounded-full flex items-center justify-center border-2 transition-colors duration-300 ${
-                      isActive ? 'bg-primary border-primary text-primary-foreground' : 
-                      isPast ? 'bg-primary/10 border-primary text-primary' : 
-                      'bg-card border-border text-muted-foreground'
-                    }`}>
-                      <Icon className="w-4 h-4" />
-                    </div>
-                    <span className="text-xs font-semibold mt-2 hidden sm:block text-slate-600">
-                      {step.title}
-                    </span>
+            <div className="flex items-center gap-3 mb-2">
+              {SECTIONS.map((s, i) => (
+                <div key={s.id} className="flex items-center gap-3">
+                  <div className={`flex items-center justify-center w-7 h-7 rounded-full text-xs font-bold border transition-colors
+                    ${step === s.id ? 'bg-foreground text-background border-foreground' :
+                      step > s.id ? 'bg-foreground/20 text-foreground border-foreground/20' :
+                      'bg-transparent text-muted-foreground border-border'}`}>
+                    {s.id}
                   </div>
-                );
-              })}
-              {/* Connecting line */}
-              <div className="absolute top-5 left-[10%] right-[10%] h-0.5 bg-border -z-0 hidden sm:block">
-                <div 
-                  className="h-full bg-primary transition-all duration-500 ease-in-out" 
-                  style={{ width: `${((currentStep - 1) / (STEPS.length - 1)) * 100}%` }}
-                />
-              </div>
+                  <span className={`text-sm hidden sm:block ${step === s.id ? 'font-semibold text-foreground' : 'text-muted-foreground'}`}>
+                    {s.title}
+                  </span>
+                  {i < SECTIONS.length - 1 && <div className="h-px w-8 bg-border hidden sm:block" />}
+                </div>
+              ))}
             </div>
-            <div className="text-center sm:hidden mt-4">
-              <h2 className="text-xl font-bold font-serif">{STEPS[currentStep - 1].title}</h2>
-              <p className="text-sm text-muted-foreground">{STEPS[currentStep - 1].description}</p>
-            </div>
+            <p className="text-sm text-muted-foreground mt-3 sm:hidden">{SECTIONS[step - 1].title}</p>
           </div>
 
-          {/* Form Container */}
-          <div className="bg-card rounded-xl border border-border structural-shadow overflow-hidden">
-            <div className="hidden sm:block p-8 border-b border-border bg-slate-50/50">
-              <h2 className="text-2xl font-bold font-serif text-foreground">{STEPS[currentStep - 1].title}</h2>
-              <p className="text-muted-foreground">{STEPS[currentStep - 1].description}</p>
+          {/* Form Card */}
+          <div className="bg-card border border-border rounded-md">
+            <div className="px-8 py-6 border-b border-border">
+              <h2 className="text-xl font-bold font-serif text-foreground">{SECTIONS[step - 1].title}</h2>
+              <p className="text-sm text-muted-foreground mt-1">{SECTIONS[step - 1].subtitle}</p>
             </div>
 
-            <form onSubmit={handleSubmit(onSubmit)} className="p-6 sm:p-8">
+            <form onSubmit={handleSubmit(onSubmit)}>
               <AnimatePresence mode="wait">
                 <motion.div
-                  key={currentStep}
-                  initial={{ opacity: 0, x: 20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  exit={{ opacity: 0, x: -20 }}
-                  transition={{ duration: 0.2 }}
-                  className="space-y-6"
+                  key={step}
+                  initial={{ opacity: 0, y: 8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -8 }}
+                  transition={{ duration: 0.18 }}
+                  className="p-8 space-y-8"
                 >
-                  
-                  {/* STEP 1: Assets */}
-                  {currentStep === 1 && (
-                    <div className="space-y-6">
-                      <FormField
-                        label="Cash & HYSA"
-                        description="Fully liquid, penalty-free cash."
-                        type="number"
-                        prefix="$"
-                        registration={register("cash")}
-                        error={errors.cash?.message}
-                      />
+
+                  {/* SECTION 1 */}
+                  {step === 1 && (
+                    <div className="space-y-8">
                       <div className="grid sm:grid-cols-2 gap-6">
-                        <FormField
-                          label="Brokerage (Taxable)"
-                          description="Liquid, subject to capital gains."
-                          type="number"
-                          prefix="$"
-                          registration={register("brokerage")}
-                          error={errors.brokerage?.message}
-                        />
-                        <FormField
-                          label="Roth IRA (Contributions)"
-                          description="Contributions can be withdrawn penalty-free."
-                          type="number"
-                          prefix="$"
-                          registration={register("roth")}
-                          error={errors.roth?.message}
-                        />
+                        <CurrencyInput label="Current Net Monthly Salary" description="Your take-home pay, after tax." name="currentSalary" register={register} error={errors.currentSalary?.message} />
+                        <CurrencyInput label="Monthly Living Expenses" description="Rent/mortgage, food, utilities, subscriptions." name="livingExpenses" register={register} error={errors.livingExpenses?.message} />
                       </div>
+
                       <div className="grid sm:grid-cols-2 gap-6">
-                        <FormField
-                          label="Traditional IRA/401k"
-                          description="Subject to tax and 10% penalty if early."
-                          type="number"
-                          prefix="$"
-                          registration={register("traditional")}
-                          error={errors.traditional?.message}
-                        />
-                        <FormField
-                          label="Real Estate Equity"
-                          description="Highly illiquid. Use conservatively."
-                          type="number"
-                          prefix="$"
-                          registration={register("realEstate")}
-                          error={errors.realEstate?.message}
-                        />
+                        <CurrencyInput label="Total Outstanding Debt" description="Mortgage balance + all other debt." name="totalDebt" register={register} error={errors.totalDebt?.message} />
+                        <CurrencyInput label="Total Monthly Debt Payments" description="All required monthly debt service." name="monthlyDebtPayments" register={register} error={errors.monthlyDebtPayments?.message} />
+                      </div>
+
+                      {/* Dual income toggle */}
+                      <div className="border border-border rounded-md p-5">
+                        <label className="flex items-center gap-3 cursor-pointer" data-testid="toggle-dual-income">
+                          <div
+                            onClick={() => setValue("isDualIncome", !isDualIncome)}
+                            className={`w-10 h-5 rounded-full relative transition-colors cursor-pointer ${isDualIncome ? 'bg-foreground' : 'bg-muted'}`}
+                          >
+                            <div className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform ${isDualIncome ? 'translate-x-5' : 'translate-x-0.5'}`} />
+                          </div>
+                          <input type="checkbox" className="sr-only" {...register("isDualIncome")} />
+                          <span className="text-sm font-semibold text-foreground">Partner has stable income</span>
+                        </label>
+                        {isDualIncome && (
+                          <div className="mt-5 pt-5 border-t border-border">
+                            <CurrencyInput label="Partner Net Monthly Income" description="Take-home, after tax. Reduces TMIB directly." name="partnerIncome" register={register} error={errors.partnerIncome?.message} />
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Healthcare */}
+                      <div>
+                        <label className="block text-sm font-semibold text-foreground mb-1">Healthcare Coverage Strategy</label>
+                        <p className="text-xs text-muted-foreground mb-3">Monthly cost will be estimated based on your selection and added to TMIB.</p>
+                        <div className="space-y-2">
+                          {HEALTHCARE_OPTIONS.map(opt => {
+                            const selected = watch("healthcareType") === opt.value;
+                            return (
+                              <label
+                                key={opt.value}
+                                className={`flex items-center justify-between p-4 rounded-md border cursor-pointer transition-colors ${selected ? 'border-foreground bg-foreground/5' : 'border-border'}`}
+                                data-testid={`option-healthcare-${opt.value}`}
+                              >
+                                <div className="flex items-center gap-3">
+                                  <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center shrink-0 ${selected ? 'border-foreground' : 'border-muted-foreground'}`}>
+                                    {selected && <div className="w-2 h-2 rounded-full bg-foreground" />}
+                                  </div>
+                                  <div>
+                                    <span className="text-sm font-medium text-foreground">{opt.label}</span>
+                                    <p className="text-xs text-muted-foreground">{opt.note}</p>
+                                  </div>
+                                </div>
+                                <input type="radio" value={opt.value} className="sr-only" {...register("healthcareType")} />
+                              </label>
+                            );
+                          })}
+                        </div>
+                        {errors.healthcareType && <p className="text-xs text-destructive mt-1">{errors.healthcareType.message}</p>}
                       </div>
                     </div>
                   )}
 
-                  {/* STEP 2: Burn */}
-                  {currentStep === 2 && (
+                  {/* SECTION 2 */}
+                  {step === 2 && (
                     <div className="space-y-6">
-                      <div className="bg-slate-50 p-4 rounded-lg border border-slate-200 mb-6">
-                        <label className="flex items-center space-x-3 cursor-pointer">
-                          <input 
-                            type="checkbox" 
-                            className="w-5 h-5 rounded border-slate-300 text-primary focus:ring-primary"
-                            {...register("isDualIncome")}
-                          />
-                          <span className="font-semibold text-slate-800">I have a partner with stable income</span>
-                        </label>
-                        {isDualIncome && (
-                          <div className="mt-4 pt-4 border-t border-slate-200">
-                            <FormField
-                              label="Partner's Net Monthly Income"
-                              type="number"
-                              prefix="$"
-                              registration={register("partnerIncome")}
-                              error={errors.partnerIncome?.message}
-                            />
+                      <div className="flex items-start gap-2 p-4 bg-muted/50 rounded-md border border-border">
+                        <Info className="w-4 h-4 text-muted-foreground shrink-0 mt-0.5" />
+                        <p className="text-xs text-muted-foreground leading-relaxed">
+                          Declare raw values. Conservative haircuts will be applied automatically: Brokerage ×0.80, Roth ×1.00, Retirement ×0.50, Real Estate ×0.30.
+                        </p>
+                      </div>
+                      <CurrencyInput label="Cash & HYSA" description="Checking, savings, high-yield savings — fully liquid." name="cash" register={register} error={errors.cash?.message} />
+                      <div className="grid sm:grid-cols-2 gap-6">
+                        <CurrencyInput label="Brokerage (Taxable)" description="Subject to capital gains tax." name="brokerage" register={register} error={errors.brokerage?.message} />
+                        <CurrencyInput label="Roth IRA (Contributions Only)" description="Contributions are penalty-free." name="roth" register={register} error={errors.roth?.message} />
+                      </div>
+                      <div className="grid sm:grid-cols-2 gap-6">
+                        <CurrencyInput label="Traditional IRA / 401(k)" description="Subject to tax + 10% early withdrawal penalty." name="traditional" register={register} error={errors.traditional?.message} />
+                        <CurrencyInput label="Real Estate Equity" description="Illiquid. Use conservatively." name="realEstate" register={register} error={errors.realEstate?.message} />
+                      </div>
+                    </div>
+                  )}
+
+                  {/* SECTION 3 */}
+                  {step === 3 && (
+                    <div className="space-y-8">
+                      {/* Business model */}
+                      <div>
+                        <label className="block text-sm font-semibold text-foreground mb-1">Business Model Type</label>
+                        <p className="text-xs text-muted-foreground mb-3">Sets baseline monthly operating cost. You can override this below.</p>
+                        <div className="space-y-2">
+                          {BUSINESS_MODELS.map(opt => {
+                            const selected = businessModelType === opt.value;
+                            return (
+                              <label
+                                key={opt.value}
+                                className={`flex items-center justify-between p-4 rounded-md border cursor-pointer transition-colors ${selected ? 'border-foreground bg-foreground/5' : 'border-border'}`}
+                                data-testid={`option-model-${opt.value}`}
+                              >
+                                <div className="flex items-center gap-3">
+                                  <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center shrink-0 ${selected ? 'border-foreground' : 'border-muted-foreground'}`}>
+                                    {selected && <div className="w-2 h-2 rounded-full bg-foreground" />}
+                                  </div>
+                                  <span className="text-sm font-medium text-foreground">{opt.label}</span>
+                                </div>
+                                <span className="text-xs text-muted-foreground">{opt.cost}</span>
+                                <input type="radio" value={opt.value} className="sr-only" {...register("businessModelType")} />
+                              </label>
+                            );
+                          })}
+                        </div>
+                      </div>
+
+                      {/* Advanced override */}
+                      <div>
+                        <button
+                          type="button"
+                          onClick={() => setShowOverride(v => !v)}
+                          className="text-xs text-muted-foreground underline underline-offset-2"
+                          data-testid="button-toggle-override"
+                        >
+                          {showOverride ? 'Remove advanced cost override' : 'Override business cost manually'}
+                        </button>
+                        {showOverride && (
+                          <div className="mt-4">
+                            <CurrencyInput label="Monthly Business Cost Override" description="Replaces model-type baseline if provided." name="businessCostOverride" register={register} error={errors.businessCostOverride?.message} />
                           </div>
                         )}
                       </div>
 
                       <div className="grid sm:grid-cols-2 gap-6">
-                        <FormField
-                          label="Monthly Living Expenses"
-                          description="Rent/mortgage, food, utilities."
-                          type="number"
-                          prefix="$"
-                          registration={register("livingExpenses")}
-                          error={errors.livingExpenses?.message}
-                        />
-                        <FormField
-                          label="Monthly Healthcare Cost"
-                          description="Premiums + expected out-of-pocket."
-                          type="number"
-                          prefix="$"
-                          registration={register("healthcareCost")}
-                          error={errors.healthcareCost?.message}
-                        />
+                        <CurrencyInput label="Expected Monthly Revenue (Steady State)" description="Conservative baseline at full ramp." name="expectedRevenue" register={register} error={errors.expectedRevenue?.message} />
+                        <NumInput label="Revenue Volatility %" description="Expected variance in monthly revenue (10–40%)." name="volatilityPercent" suffix="%" min={10} max={40} register={register} error={errors.volatilityPercent?.message} />
                       </div>
                       <div className="grid sm:grid-cols-2 gap-6">
-                        <FormField
-                          label="Monthly Business Costs"
-                          description="Software, services, contractors."
-                          type="number"
-                          prefix="$"
-                          registration={register("businessCosts")}
-                          error={errors.businessCosts?.message}
-                        />
-                        <FormField
-                          label="Monthly Tax Reserve"
-                          description="Estimated self-employment taxes."
-                          type="number"
-                          prefix="$"
-                          registration={register("taxReserve")}
-                          error={errors.taxReserve?.message}
-                        />
+                        <NumInput label="Ramp Duration" description="Months until stable revenue is achieved." name="rampDuration" suffix="mo" min={0} register={register} error={errors.rampDuration?.message} />
+                        <NumInput label="Months to Break Even" description="Month when revenue is projected to cover TMIB." name="breakevenMonths" suffix="mo" min={0} register={register} error={errors.breakevenMonths?.message} />
                       </div>
-                    </div>
-                  )}
 
-                  {/* STEP 3: Revenue */}
-                  {currentStep === 3 && (
-                    <div className="space-y-6">
-                      <div className="grid sm:grid-cols-2 gap-6">
-                        <FormField
-                          label="Expected Monthly Revenue"
-                          description="Conservative baseline projection."
-                          type="number"
-                          prefix="$"
-                          registration={register("expectedRevenue")}
-                          error={errors.expectedRevenue?.message}
-                        />
-                        <FormField
-                          label="Ramp Duration (Months)"
-                          description="Time until reaching expected revenue."
-                          type="number"
-                          suffix="mo"
-                          registration={register("rampDuration")}
-                          error={errors.rampDuration?.message}
-                        />
+                      {/* Stress parameters notice */}
+                      <div className="border border-border rounded-md p-5">
+                        <p className="text-xs font-semibold text-foreground uppercase tracking-wider mb-2">Built-in Stress Scenarios</p>
+                        <p className="text-xs text-muted-foreground leading-relaxed mb-3">The following are automatically applied — no additional input required.</p>
+                        <div className="space-y-1">
+                          {['-15% Revenue shock', '-30% Revenue shock', 'Ramp delayed +3 months'].map(s => (
+                            <div key={s} className="flex items-center gap-2 text-xs text-muted-foreground">
+                              <div className="w-1 h-1 bg-muted-foreground/40 rounded-full" />
+                              {s}
+                            </div>
+                          ))}
+                        </div>
                       </div>
-                      
-                      <div className="grid sm:grid-cols-2 gap-6">
-                        <SelectField
-                          label="Revenue Structure"
-                          description="Nature of your cash flow."
-                          options={[
-                            { label: "Recurring (Retainers, Subscriptions)", value: "recurring" },
-                            { label: "One-Time (Projects, Hourly)", value: "one-time" }
-                          ]}
-                          registration={register("revenueType")}
-                          error={errors.revenueType?.message}
-                        />
-                        <FormField
-                          label="Volatility Buffer (%)"
-                          description="Expected variance (10-20%)."
-                          type="number"
-                          suffix="%"
-                          min="10"
-                          max="20"
-                          registration={register("volatilityPercent")}
-                          error={errors.volatilityPercent?.message}
-                        />
-                      </div>
-                    </div>
-                  )}
 
-                  {/* STEP 4: Risk */}
-                  {currentStep === 4 && (
-                    <div className="space-y-6">
-                      <SelectField
-                        label="Healthcare Coverage Strategy"
-                        description="How you plan to manage medical risk."
-                        options={[
-                          { label: "Partner's Corporate Plan (Safest)", value: "partner" },
-                          { label: "ACA Marketplace (Subsidized/Standard)", value: "aca" },
-                          { label: "Private/Non-ACA Plan (Higher Risk)", value: "private" },
-                          { label: "None / Out of Pocket (Extreme Risk)", value: "none" }
-                        ]}
-                        registration={register("healthcareType")}
-                        error={errors.healthcareType?.message}
-                      />
-                      
-                      <div className="mt-8 p-6 bg-slate-100 rounded-lg border border-slate-200">
-                        <h4 className="font-semibold text-slate-800 mb-2">Ready to generate your report?</h4>
-                        <p className="text-sm text-slate-600">
-                          By proceeding, you acknowledge that this is a simulation based on estimates and standard formulas. It does not constitute formal advice.
+                      <div className="border border-border rounded-md p-5 bg-muted/30">
+                        <p className="text-xs text-muted-foreground leading-relaxed">
+                          By proceeding, you acknowledge this is a deterministic financial simulation based on your inputs and estimated U.S. averages. It is not financial, tax, or legal advice.
                         </p>
                       </div>
                     </div>
@@ -323,34 +350,32 @@ export default function Simulator() {
                 </motion.div>
               </AnimatePresence>
 
-              {/* Navigation Controls */}
-              <div className="mt-10 pt-6 border-t border-border flex items-center justify-between">
-                <Button 
-                  type="button" 
-                  variant="ghost" 
-                  onClick={prevStep}
-                  className={currentStep === 1 ? 'invisible' : ''}
-                >
-                  Back
-                </Button>
-                
-                {currentStep < STEPS.length ? (
-                  <Button type="button" onClick={nextStep}>
-                    Continue to {STEPS[currentStep].title}
+              {/* Navigation */}
+              <div className="px-8 py-6 border-t border-border flex items-center justify-between">
+                {step > 1 ? (
+                  <Button type="button" variant="ghost" onClick={prevStep} className="gap-1" data-testid="button-prev">
+                    <ChevronLeft className="w-4 h-4" />
+                    Back
+                  </Button>
+                ) : <div />}
+
+                {step < SECTIONS.length ? (
+                  <Button type="button" onClick={nextStep} className="gap-1" data-testid="button-next">
+                    {SECTIONS[step].title}
+                    <ChevronRight className="w-4 h-4" />
                   </Button>
                 ) : (
-                  <Button 
-                    type="submit" 
-                    isLoading={createSimulation.isPending}
-                    className="bg-slate-900 text-white"
+                  <Button
+                    type="submit"
+                    disabled={createSimulation.isPending}
+                    data-testid="button-submit"
                   >
-                    Generate Report
+                    {createSimulation.isPending ? 'Running simulation...' : 'Generate Breakpoint Report'}
                   </Button>
                 )}
               </div>
             </form>
           </div>
-
         </div>
       </div>
     </Layout>

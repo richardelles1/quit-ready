@@ -1,180 +1,308 @@
 import { useParams, Link } from "wouter";
-import { Download, AlertCircle, ShieldCheck, TrendingUp, Info } from "lucide-react";
-import { Radar, RadarChart, PolarGrid, PolarAngleAxis, ResponsiveContainer, Tooltip as RechartsTooltip, PolarRadiusAxis } from "recharts";
-
+import { Download, AlertTriangle, AlertCircle, ChevronRight } from "lucide-react";
 import Layout from "../components/Layout";
-import { Button } from "../components/Button";
+import { Button } from "@/components/ui/button";
 import { useSimulation, useDownloadSimulationPdf } from "../hooks/use-simulations";
+import { useToast } from "@/hooks/use-toast";
+
+const fmt = (n: number) => `$${Math.round(n).toLocaleString('en-US')}`;
+const fmtRunway = (n: number) => n >= 999 ? '24+ months' : `${n} months`;
+const fmtPct = (n: number) => `${(n * 100).toFixed(1)}%`;
+
+function StatBlock({ label, value, note, accent }: { label: string; value: string; note?: string; accent?: 'red' | 'amber' | 'green' }) {
+  const colorClass = accent === 'red' ? 'text-red-700' : accent === 'amber' ? 'text-amber-700' : accent === 'green' ? 'text-green-700' : 'text-foreground';
+  return (
+    <div className="py-4 border-b border-border last:border-0" data-testid="stat-block">
+      <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-1">{label}</p>
+      <p className={`text-xl font-bold font-serif ${colorClass}`}>{value}</p>
+      {note && <p className="text-xs text-muted-foreground mt-0.5">{note}</p>}
+    </div>
+  );
+}
+
+function SectionTitle({ children }: { children: React.ReactNode }) {
+  return (
+    <h2 className="text-xs font-semibold uppercase tracking-[0.15em] text-muted-foreground mb-4">{children}</h2>
+  );
+}
 
 export default function Results() {
   const params = useParams();
   const id = params.id ? parseInt(params.id, 10) : null;
-  
-  const { data: simulation, isLoading, isError } = useSimulation(id);
+  const { data: sim, isLoading, isError } = useSimulation(id);
   const downloadPdf = useDownloadSimulationPdf();
+  const { toast } = useToast();
+
+  const handleDownload = () => {
+    if (!id) return;
+    downloadPdf.mutate(id, {
+      onError: (err) => toast({ title: "PDF failed", description: err.message, variant: "destructive" }),
+    });
+  };
 
   if (isLoading) {
     return (
       <Layout>
-        <div className="flex-1 flex flex-col items-center justify-center py-20">
-          <div className="w-16 h-16 border-4 border-slate-200 border-t-slate-800 rounded-full animate-spin mb-6"></div>
-          <h2 className="text-2xl font-serif font-bold text-slate-800">Processing Models...</h2>
-          <p className="text-slate-500 mt-2">Calculating liquidity weights and stress-testing revenue.</p>
+        <div className="flex-1 flex flex-col items-center justify-center py-24">
+          <div className="w-8 h-8 border-2 border-muted border-t-foreground rounded-full animate-spin mb-6" />
+          <p className="text-sm text-muted-foreground">Running structural models...</p>
         </div>
       </Layout>
     );
   }
 
-  if (isError || !simulation) {
+  if (isError || !sim) {
     return (
       <Layout>
-        <div className="flex-1 flex flex-col items-center justify-center py-20 px-4 text-center">
-          <AlertCircle className="w-16 h-16 text-destructive mb-6" />
-          <h2 className="text-2xl font-serif font-bold text-slate-800">Simulation Not Found</h2>
-          <p className="text-slate-500 mt-2 mb-8">We couldn't locate this specific report. It may have expired or been removed.</p>
-          <Link href="/simulator">
-            <Button>Start New Simulation</Button>
-          </Link>
+        <div className="flex-1 flex flex-col items-center justify-center py-24 px-4 text-center">
+          <AlertCircle className="w-10 h-10 text-muted-foreground mb-4" />
+          <h2 className="text-xl font-bold font-serif text-foreground mb-2">Report not found</h2>
+          <p className="text-sm text-muted-foreground mb-8">This simulation may have expired or been removed.</p>
+          <Link href="/simulator"><Button>Start new simulation</Button></Link>
         </div>
       </Layout>
     );
   }
 
-  const chartData = [
-    { subject: 'Liquidity', A: simulation.liquidityScore, fullMark: 100 },
-    { subject: 'Revenue', A: simulation.revenueScore, fullMark: 100 },
-    { subject: 'Fixed Costs', A: simulation.fixedCostScore, fullMark: 100 },
-    { subject: 'Healthcare', A: simulation.healthcareScore, fullMark: 100 },
-    { subject: 'Tax/Buffer', A: simulation.bufferScore, fullMark: 100 },
+  const score = sim.structuralBreakpointScore;
+  const scoreLabel = score >= 66 ? 'Structurally Stable' : score >= 41 ? 'Elevated Caution' : 'High Structural Risk';
+  const scoreColor = score >= 66 ? 'text-green-700 border-green-200 bg-green-50' : score >= 41 ? 'text-amber-700 border-amber-200 bg-amber-50' : 'text-red-700 border-red-200 bg-red-50';
+  const worstRunway = Math.min(sim.runway15Down, sim.runway30Down, sim.runwayRampDelay);
+  const debtFlagged = sim.debtExposureRatio > 0.70;
+  const reportDate = new Date(sim.createdAt).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+
+  // Narrative
+  let narrative = '';
+  if (sim.breakpointMonth >= 999) {
+    narrative = 'Based on your selected assumptions, your capital position sustains the transition through all modeled stress scenarios. No structural breakpoint identified within the 24-month modeling horizon.';
+  } else {
+    let failureCause = 'capital depletion';
+    if (debtFlagged) failureCause = 'debt stress compounded by capital depletion';
+    else if (sim.tmib > sim.accessibleCapital * 0.12) failureCause = 'burn rate exceeding accessible capital reserves';
+    narrative = `Based on your selected assumptions, your plan reaches a structural breakpoint in Month ${sim.breakpointMonth} under the ${sim.breakpointScenario} scenario. The primary failure mechanism is ${failureCause}. Base-case runway extends to ${fmtRunway(sim.baseRunway)}.`;
+  }
+
+  const ASSET_ROWS = [
+    { label: 'Cash & HYSA', raw: sim.cash, haircut: 1.00, note: '×1.00' },
+    { label: 'Brokerage (Taxable)', raw: sim.brokerage, haircut: 0.80, note: '×0.80' },
+    { label: 'Roth IRA (Contributions)', raw: sim.roth, haircut: 1.00, note: '×1.00' },
+    { label: 'Traditional IRA / 401(k)', raw: sim.traditional, haircut: 0.50, note: '×0.50' },
+    { label: 'Real Estate Equity', raw: sim.realEstate, haircut: 0.30, note: '×0.30' },
   ];
 
-  const handleDownload = () => {
-    if (id) downloadPdf.mutate(id);
-  };
-
-  const getReadinessColor = (score: number) => {
-    if (score >= 80) return "text-emerald-700 bg-emerald-50 border-emerald-200";
-    if (score >= 50) return "text-amber-700 bg-amber-50 border-amber-200";
-    return "text-rose-700 bg-rose-50 border-rose-200";
-  };
+  const SCENARIOS = [
+    { label: 'Base Case', runway: sim.baseRunway },
+    { label: '-15% Revenue', runway: sim.runway15Down },
+    { label: '-30% Revenue', runway: sim.runway30Down },
+    { label: 'Ramp Delay (+3 months)', runway: sim.runwayRampDelay },
+  ];
 
   return (
     <Layout>
-      <div className="flex-1 bg-slate-50 py-8 md:py-12">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
-          
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-8">
+      <div className="flex-1 bg-background py-12">
+        <div className="max-w-5xl mx-auto px-4 sm:px-6">
+
+          {/* Header */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-10">
             <div>
-              <h1 className="text-3xl font-bold font-serif text-slate-900">Simulation Report</h1>
-              <p className="text-slate-500 mt-1">Generated on {new Date(simulation.createdAt).toLocaleDateString()}</p>
+              <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground mb-1">Structural Breakpoint Report</p>
+              <h1 className="text-2xl font-bold font-serif text-foreground">Simulation #{sim.id}</h1>
+              <p className="text-sm text-muted-foreground">{reportDate}</p>
             </div>
-            <div className="flex gap-4">
-              <Button 
-                onClick={handleDownload} 
-                isLoading={downloadPdf.isPending}
-                className="gap-2"
-              >
-                <Download className="w-4 h-4" />
-                Download PDF
-              </Button>
+            <Button onClick={handleDownload} disabled={downloadPdf.isPending} className="gap-2 shrink-0" data-testid="button-download-pdf">
+              <Download className="w-4 h-4" />
+              {downloadPdf.isPending ? 'Generating PDF...' : 'Download Full Report'}
+            </Button>
+          </div>
+
+          {/* Executive Summary */}
+          <div className="border border-border rounded-md mb-6">
+            <div className="px-6 py-4 border-b border-border">
+              <SectionTitle>Executive Summary</SectionTitle>
+            </div>
+            <div className="p-6">
+              <div className="grid sm:grid-cols-3 gap-6 mb-6">
+                {/* Score */}
+                <div className={`rounded-md border p-5 text-center ${scoreColor}`}>
+                  <p className="text-xs font-semibold uppercase tracking-wider mb-2 opacity-70">Structural Breakpoint Score</p>
+                  <p className="text-4xl font-bold font-serif mb-1" data-testid="text-score">{score}</p>
+                  <p className="text-xs font-semibold">{scoreLabel}</p>
+                </div>
+
+                {/* Breakpoint */}
+                <div className="sm:col-span-2 flex flex-col justify-between gap-4">
+                  <div className={`rounded-md border p-4 ${sim.breakpointMonth >= 999 ? 'border-green-200 bg-green-50' : 'border-red-200 bg-red-50'}`}>
+                    <p className="text-xs font-semibold uppercase tracking-wider mb-1 text-muted-foreground">Structural Breakpoint</p>
+                    {sim.breakpointMonth >= 999 ? (
+                      <p className="text-sm font-semibold text-green-700">No breakpoint identified — 24+ month horizon is stable</p>
+                    ) : (
+                      <p className="text-sm font-semibold text-red-700" data-testid="text-breakpoint">Month {sim.breakpointMonth} — {sim.breakpointScenario}</p>
+                    )}
+                  </div>
+                  <p className="text-sm text-muted-foreground leading-relaxed" data-testid="text-narrative">{narrative}</p>
+                </div>
+              </div>
+
+              {/* Key metrics */}
+              <div className="grid sm:grid-cols-4 gap-4">
+                <div className="bg-muted/30 rounded-md p-4" data-testid="metric-tmib">
+                  <p className="text-xs text-muted-foreground uppercase tracking-wider mb-1">True Monthly Burn</p>
+                  <p className="text-lg font-bold font-serif text-foreground">{fmt(sim.tmib)}</p>
+                </div>
+                <div className="bg-muted/30 rounded-md p-4" data-testid="metric-capital">
+                  <p className="text-xs text-muted-foreground uppercase tracking-wider mb-1">Accessible Capital</p>
+                  <p className="text-lg font-bold font-serif text-foreground">{fmt(sim.accessibleCapital)}</p>
+                </div>
+                <div className="bg-muted/30 rounded-md p-4" data-testid="metric-base-runway">
+                  <p className="text-xs text-muted-foreground uppercase tracking-wider mb-1">Base-Case Runway</p>
+                  <p className="text-lg font-bold font-serif text-foreground">{fmtRunway(sim.baseRunway)}</p>
+                </div>
+                <div className="bg-muted/30 rounded-md p-4" data-testid="metric-worst-runway">
+                  <p className="text-xs text-muted-foreground uppercase tracking-wider mb-1">Worst-Case Runway</p>
+                  <p className="text-lg font-bold font-serif text-foreground">{fmtRunway(worstRunway)}</p>
+                </div>
+              </div>
             </div>
           </div>
 
-          <div className="grid lg:grid-cols-3 gap-8">
-            
-            {/* Primary Score Column */}
-            <div className="lg:col-span-1 space-y-8">
-              {/* Overall Index */}
-              <div className="bg-white rounded-xl border border-slate-200 p-8 structural-shadow text-center">
-                <h3 className="text-sm font-semibold text-slate-500 uppercase tracking-wider mb-2">Readiness Index</h3>
-                <div className="flex items-center justify-center mb-4">
-                  <span className={`text-6xl font-bold font-serif px-6 py-4 rounded-xl border ${getReadinessColor(simulation.readinessIndex)}`}>
-                    {simulation.readinessIndex}
-                  </span>
-                </div>
-                <p className="text-sm text-slate-600 mt-4 leading-relaxed">
-                  A composite score based on liquidity runway, revenue predictability, and fixed structural costs.
-                </p>
-              </div>
+          <div className="grid lg:grid-cols-2 gap-6 mb-6">
 
-              {/* Execution Stability */}
-              <div className="bg-slate-900 rounded-xl border border-slate-800 p-8 text-white structural-shadow">
-                <div className="flex items-center gap-3 mb-4">
-                  <ShieldCheck className="text-slate-300 w-6 h-6" />
-                  <h3 className="text-lg font-semibold font-serif">Execution Stability</h3>
+            {/* Structural Exposure */}
+            <div className="border border-border rounded-md">
+              <div className="px-6 py-4 border-b border-border">
+                <SectionTitle>Structural Exposure</SectionTitle>
+              </div>
+              <div className="px-6 py-2">
+                <StatBlock label="Total Outstanding Debt" value={fmt(sim.totalDebt)} />
+                <StatBlock label="Monthly Debt Service" value={fmt(sim.monthlyDebtPayments)} />
+                <StatBlock
+                  label="Debt-to-Capital Ratio"
+                  value={fmtPct(sim.debtExposureRatio)}
+                  note={debtFlagged ? 'Elevated structural risk — exceeds 70% threshold' : 'Within manageable parameters'}
+                  accent={debtFlagged ? 'red' : 'green'}
+                />
+                <StatBlock
+                  label="Healthcare Coverage"
+                  value={sim.healthcareMonthlyCost === 0 ? 'No additional cost' : `${fmt(sim.healthcareMonthlyCost)}/month`}
+                  note={sim.healthcareRisk}
+                />
+              </div>
+              {debtFlagged && (
+                <div className="mx-6 mb-4 flex items-start gap-2 p-3 bg-red-50 border border-red-200 rounded-md">
+                  <AlertTriangle className="w-4 h-4 text-red-600 shrink-0 mt-0.5" />
+                  <p className="text-xs text-red-700">Debt exceeds 70% of accessible capital. This represents an elevated structural risk.</p>
                 </div>
-                <p className="text-slate-300 text-sm leading-relaxed mb-6">
-                  {simulation.executionStability}
-                </p>
-                <div className="bg-slate-800 rounded-md p-4 flex items-start gap-3">
-                  <Info className="w-5 h-5 text-slate-400 shrink-0 mt-0.5" />
-                  <p className="text-xs text-slate-400">
-                    Recommendations are generated purely algorithmically based on strict financial heuristics. Not professional advice.
-                  </p>
+              )}
+            </div>
+
+            {/* TMIB Breakdown */}
+            <div className="border border-border rounded-md">
+              <div className="px-6 py-4 border-b border-border">
+                <SectionTitle>True Monthly Independence Burn</SectionTitle>
+              </div>
+              <div className="px-6 py-2">
+                {[
+                  { label: 'Living Expenses', val: sim.livingExpenses },
+                  { label: 'Healthcare (Estimated)', val: sim.healthcareMonthlyCost },
+                  { label: 'Monthly Debt Payments', val: sim.monthlyDebtPayments },
+                  { label: 'Self-Employment Tax (28%)', val: sim.selfEmploymentTax },
+                  { label: 'Business Operating Cost', val: sim.businessCostBaseline },
+                  { label: 'Less: Partner Income', val: -sim.partnerIncome, subtract: true },
+                ].filter(r => r.val !== 0).map(row => (
+                  <div key={row.label} className="flex items-center justify-between py-3 border-b border-border last:border-0">
+                    <span className="text-sm text-muted-foreground">{row.label}</span>
+                    <span className={`text-sm font-semibold ${row.subtract ? 'text-green-700' : 'text-foreground'}`}>
+                      {row.subtract ? `(${fmt(Math.abs(row.val))})` : fmt(row.val)}
+                    </span>
+                  </div>
+                ))}
+                <div className="flex items-center justify-between py-3 pt-4">
+                  <span className="text-sm font-bold text-foreground uppercase tracking-wider">Total TMIB</span>
+                  <span className="text-lg font-bold font-serif text-foreground" data-testid="text-tmib-total">{fmt(sim.tmib)}</span>
                 </div>
               </div>
             </div>
-
-            {/* Radar Chart & Details Column */}
-            <div className="lg:col-span-2 space-y-8">
-              
-              <div className="bg-white rounded-xl border border-slate-200 p-8 structural-shadow h-[400px] flex flex-col">
-                <h3 className="text-lg font-semibold font-serif text-slate-900 mb-6">Risk Vector Breakdown</h3>
-                <div className="flex-1 w-full relative">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <RadarChart cx="50%" cy="50%" outerRadius="70%" data={chartData}>
-                      <PolarGrid stroke="#e2e8f0" />
-                      <PolarAngleAxis dataKey="subject" tick={{ fill: '#475569', fontSize: 12, fontWeight: 600 }} />
-                      <PolarRadiusAxis angle={30} domain={[0, 100]} tick={false} axisLine={false} />
-                      <RechartsTooltip 
-                        contentStyle={{ backgroundColor: '#1e293b', border: 'none', borderRadius: '8px', color: '#f8fafc' }}
-                        itemStyle={{ color: '#f8fafc' }}
-                      />
-                      <Radar name="Score" dataKey="A" stroke="#0f172a" fill="#0f172a" fillOpacity={0.15} />
-                    </RadarChart>
-                  </ResponsiveContainer>
-                </div>
-              </div>
-
-              {/* Score Detailed Breakdown */}
-              <div className="bg-white rounded-xl border border-slate-200 p-8 structural-shadow">
-                <h3 className="text-lg font-semibold font-serif text-slate-900 mb-6">Component Analysis</h3>
-                <div className="space-y-6">
-                  
-                  <ScoreBar label="Liquidity Runway" score={simulation.liquidityScore} desc="Cash & accessible brokerage buffers against burn." />
-                  <ScoreBar label="Revenue Resilience" score={simulation.revenueScore} desc="Predictability of income vs. ramp duration." />
-                  <ScoreBar label="Fixed Cost Density" score={simulation.fixedCostScore} desc="Living & business expenses mapped to potential income." />
-                  <ScoreBar label="Healthcare Risk" score={simulation.healthcareScore} desc="Exposure based on selected coverage strategy." />
-                  <ScoreBar label="Tax & Buffer Discipline" score={simulation.bufferScore} desc="Adequacy of set-aside funds for tax obligations." />
-
-                </div>
-              </div>
-
-            </div>
-
           </div>
+
+          {/* Revenue Shock Simulation */}
+          <div className="border border-border rounded-md mb-6">
+            <div className="px-6 py-4 border-b border-border">
+              <SectionTitle>Revenue Shock Simulation</SectionTitle>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full" data-testid="table-scenarios">
+                <thead>
+                  <tr className="bg-muted/40">
+                    <th className="text-left px-6 py-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Scenario</th>
+                    <th className="text-left px-6 py-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Runway</th>
+                    <th className="text-left px-6 py-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Breakpoint</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {SCENARIOS.map((s, i) => {
+                    const bp = s.runway >= 999 ? 'None identified' : `Month ${s.runway}`;
+                    const color = s.runway >= 999 ? 'text-green-700' : s.runway < 12 ? 'text-red-700' : 'text-amber-700';
+                    return (
+                      <tr key={s.label} className={`border-t border-border ${i % 2 === 0 ? '' : 'bg-muted/20'}`}>
+                        <td className="px-6 py-4 text-sm text-foreground font-medium">{s.label}</td>
+                        <td className="px-6 py-4 text-sm text-muted-foreground">{fmtRunway(s.runway)}</td>
+                        <td className={`px-6 py-4 text-sm font-semibold ${color}`}>{bp}</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          {/* Liquidity Defense Map */}
+          <div className="border border-border rounded-md mb-6">
+            <div className="px-6 py-4 border-b border-border">
+              <SectionTitle>Liquidity Defense Map</SectionTitle>
+            </div>
+            <div className="px-6 py-2">
+              {ASSET_ROWS.map(row => {
+                const counted = Math.round(row.raw * row.haircut);
+                const pct = (row.haircut * 100).toFixed(0);
+                return (
+                  <div key={row.label} className="flex items-center justify-between py-3 border-b border-border last:border-0">
+                    <div>
+                      <span className="text-sm font-medium text-foreground">{row.label}</span>
+                      <span className="ml-2 text-xs text-muted-foreground">{row.note} — counted at {pct}%</span>
+                    </div>
+                    <div className="text-right">
+                      <div className="text-xs text-muted-foreground">{fmt(row.raw)} declared</div>
+                      <div className="text-sm font-bold text-foreground">{fmt(counted)} counted</div>
+                    </div>
+                  </div>
+                );
+              })}
+              <div className="flex items-center justify-between py-4 mt-1 bg-muted/30 px-3 rounded-md">
+                <span className="text-sm font-bold uppercase tracking-wider text-foreground">Total Accessible Capital</span>
+                <span className="text-lg font-bold font-serif text-foreground" data-testid="text-accessible-capital">{fmt(sim.accessibleCapital)}</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Download */}
+          <div className="border border-border rounded-md p-6 flex flex-col sm:flex-row items-center justify-between gap-4">
+            <div>
+              <p className="text-sm font-semibold text-foreground">Full PDF Report Available</p>
+              <p className="text-xs text-muted-foreground">5-page structured memo including controlled exit conditions and deterministic recommendations.</p>
+            </div>
+            <Button onClick={handleDownload} disabled={downloadPdf.isPending} className="gap-2 shrink-0" variant="outline" data-testid="button-download-pdf-bottom">
+              <Download className="w-4 h-4" />
+              {downloadPdf.isPending ? 'Generating...' : 'Download PDF Report'}
+            </Button>
+          </div>
+
+          {/* Disclaimer */}
+          <p className="text-xs text-muted-foreground text-center mt-8 leading-relaxed max-w-2xl mx-auto">
+            This report is an educational financial simulation based on user-provided inputs and estimated U.S. averages. It is not financial, tax, or legal advice. Consult a qualified professional before making any major financial decisions.
+          </p>
+
         </div>
       </div>
     </Layout>
-  );
-}
-
-function ScoreBar({ label, score, desc }: { label: string, score: number, desc: string }) {
-  return (
-    <div>
-      <div className="flex justify-between items-end mb-2">
-        <div>
-          <h4 className="text-sm font-bold text-slate-800">{label}</h4>
-          <p className="text-xs text-slate-500 mt-0.5">{desc}</p>
-        </div>
-        <span className="text-sm font-semibold text-slate-900">{score}/100</span>
-      </div>
-      <div className="h-2 w-full bg-slate-100 rounded-full overflow-hidden">
-        <div 
-          className="h-full bg-slate-800 transition-all duration-1000 ease-out"
-          style={{ width: `${score}%` }}
-        />
-      </div>
-    </div>
   );
 }

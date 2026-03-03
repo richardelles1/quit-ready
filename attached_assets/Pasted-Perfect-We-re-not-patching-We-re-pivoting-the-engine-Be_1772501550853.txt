@@ -1,0 +1,349 @@
+Perfect.
+
+We’re not patching.
+We’re pivoting the engine.
+
+Below is a clean, copy-paste Replit prompt to rebuild the product as a Structural Breakpoint Simulator.
+
+This includes:
+	•	Product philosophy
+	•	Intake restructuring
+	•	Deterministic math spec
+	•	Report architecture
+	•	Styling rules
+	•	PDF reliability requirement
+
+Copy everything below into a new Replit prompt.
+
+⸻
+
+🚀 REPLIT BUILD PROMPT — QUITREADY V2 (STRUCTURAL BREAKPOINT ENGINE)
+
+You are building Version 2 of QuitReady.
+
+This is no longer a readiness score calculator.
+
+It is a Structural Breakpoint Simulator.
+
+The core question the product answers:
+
+If I quit my job, what breaks first — and when?
+
+This must feel like a conservative risk engine, not a TurboTax form.
+
+⸻
+
+PRODUCT PHILOSOPHY
+	•	Conservative bias in all calculations
+	•	Deterministic math only (no LLM narrative generation)
+	•	Nonlinear stress modeling
+	•	Transparent internal logic
+	•	Institutional tone (private bank, not startup energy)
+
+⸻
+
+INTAKE FLOW RESTRUCTURE
+
+Organize inputs into 4 clear sections.
+
+⸻
+
+SECTION 1: CURRENT STABILITY
+
+Collect:
+	•	Current net monthly salary
+	•	Partner net monthly income (optional toggle)
+	•	Monthly living expenses
+	•	Total outstanding debt (mortgage + other)
+	•	Total monthly debt payments
+
+Healthcare (replace dollar input with type selection):
+	•	Employer coverage retained
+	•	COBRA
+	•	ACA marketplace estimate
+	•	Covered by partner
+	•	No coverage
+
+Do NOT ask for tax reserve or business costs directly.
+
+⸻
+
+SECTION 2: LIQUIDITY POSITION
+
+Collect:
+	•	Cash & HYSA
+	•	Brokerage (taxable)
+	•	Roth contributions (withdrawable portion only)
+	•	Retirement accounts (401k / IRA)
+	•	Real estate equity
+
+These are raw values only.
+
+⸻
+
+SECTION 3: BUSINESS TRANSITION MODEL
+
+User selects:
+
+Business model type:
+	•	Solo bootstrap (low overhead)
+	•	Contractor-heavy
+	•	Agency/service firm
+	•	Inventory-heavy
+	•	SaaS / product build
+
+Auto-generate baseline monthly business cost from model type.
+Allow advanced override toggle.
+
+Collect:
+	•	Expected monthly revenue (steady-state)
+	•	Revenue volatility %
+	•	Ramp duration (months until stable revenue)
+	•	Months to break even
+
+⸻
+
+SECTION 4: STRESS PARAMETERS
+
+Automatically simulate:
+	•	Revenue -15%
+	•	Revenue -30%
+	•	Ramp delayed +3 months
+
+User does not input these — they are built-in.
+
+⸻
+
+CORE CALCULATION ENGINE
+
+Implement deterministic formulas:
+
+⸻
+
+1️⃣ True Monthly Independence Burn (TMIB)
+
+TMIB =
+Living Expenses
+	•	Healthcare Estimate (based on selected type)
+	•	Monthly Debt Payments
+	•	Estimated Self-Employment Tax (calculate from revenue assumption, 25–30% conservative)
+	•	Business Cost Baseline
+− Partner Income
+
+This is the primary structural metric.
+
+⸻
+
+2️⃣ Liquidity Haircuts
+
+Apply conservative haircuts:
+
+Cash: 100%
+Brokerage: 80%
+Roth contributions: 100%
+Retirement accounts: 50%
+Real estate equity: 30%
+
+Accessible Capital =
+Sum of (asset × haircut)
+
+⸻
+
+3️⃣ Runway Calculation
+
+Runway Months =
+Accessible Capital ÷ TMIB
+
+If revenue is expected during ramp:
+Discount revenue by volatility %
+During ramp months, apply 50% realization factor.
+
+Recalculate runway under:
+	•	Base case
+	•	-15% revenue
+	•	-30% revenue
+	•	Ramp delay
+
+⸻
+
+4️⃣ Debt Exposure Ratio
+
+Debt Exposure =
+Total Debt ÷ Accessible Capital
+
+Flag:
+
+If debt > 70% of accessible capital → Elevated structural risk
+
+⸻
+
+5️⃣ Structural Breakpoint Score (0–100)
+
+Composite weighted score:
+
+40% Runway strength
+25% Revenue fragility
+20% Debt exposure
+10% Healthcare risk
+5% Business cost density
+
+Use nonlinear scoring curves:
+	•	<6 months runway → severe penalty
+	•	6–12 → moderate
+	•	12–24 → stable
+	•	24+ → strong
+
+⸻
+
+REPORT ARCHITECTURE (THIS IS CRITICAL)
+
+The report must NOT be just a dashboard.
+
+It must include structured narrative sections.
+
+⸻
+
+PAGE 1 — Executive Summary
+
+Include:
+	•	True Monthly Independence Burn
+	•	Accessible Capital
+	•	Base Runway (months)
+	•	Worst-case Runway
+	•	Structural Breakpoint Month
+	•	Structural Breakpoint Score
+
+Example language:
+
+“Under conservative assumptions, your plan structurally fails in Month 9 under a -30% revenue scenario. Liquidity exhaustion precedes debt stress.”
+
+Deterministic templated narrative only.
+
+⸻
+
+PAGE 2 — Structural Exposure
+
+Display:
+	•	Total debt
+	•	Monthly debt service
+	•	Debt-to-accessible-capital ratio
+	•	Healthcare risk classification
+
+⸻
+
+PAGE 3 — Liquidity Defense Map
+
+Show haircuts explicitly.
+
+Example:
+
+Cash counted at 100%
+Brokerage counted at 80%
+Retirement counted at 50%
+
+Make this visible.
+
+⸻
+
+PAGE 4 — Revenue Shock Simulation
+
+Table format:
+
+Scenario | Runway Months | Breakpoint
+
+Base
+-15%
+-30%
+Ramp Delay
+
+⸻
+
+PAGE 5 — Controlled Exit Conditions
+
+Generate deterministic recommendations:
+
+“If you increase accessible capital by $X, runway extends to 18 months.”
+
+“If business costs exceed $Y, breakpoint advances to Month Z.”
+
+⸻
+
+REMOVE FROM V1
+	•	Remove 100/100 component bars
+	•	Remove generic radar chart
+	•	Remove static “Fragile” labels without explanation
+	•	Remove manual tax reserve input
+	•	Remove standalone business cost input
+
+⸻
+
+PDF REQUIREMENTS
+
+PDF generation must:
+	•	Use server-side rendering
+	•	Generate complete 5–8 page document
+	•	Never fail silently
+	•	Return file with proper headers
+	•	Include page numbers and date
+	•	Use same typography as web
+
+If generation fails, show explicit error.
+
+⸻
+
+STYLING INSTRUCTIONS
+
+Visual direction:
+	•	Institutional minimalism
+	•	Navy / charcoal primary
+	•	Soft gray backgrounds
+	•	Serif headings
+	•	Sans-serif body
+	•	No bright colors
+	•	No gamification feel
+	•	No startup gradients
+
+Use spacing generously.
+Large section titles.
+Readable financial formatting.
+
+Score color logic:
+Red: severe
+Amber: caution
+Green: stable
+
+But subtle.
+
+This should feel like a private wealth memo.
+
+⸻
+
+FINAL REQUIREMENTS
+	•	Deterministic math only
+	•	Transparent calculations
+	•	No arbitrary 0–100 bars
+	•	Conservative bias everywhere
+	•	Professional tone
+
+The product must feel like:
+
+“A stress-tested transition memo.”
+
+Not a quiz.
+
+Build this cleanly.
+
+Do not patch V1.
+Refactor structure and calculation logic fully.
+
+⸻
+
+End of prompt.
+
+⸻
+
+Now breathe.
+
+This is a real product spec.
+
+This is now worth building.

@@ -37,7 +37,7 @@ export const api = {
       method: 'GET' as const,
       path: '/api/simulations/:id/pdf' as const,
       responses: {
-        200: z.custom<Blob>(), // It will return application/pdf
+        200: z.custom<Blob>(),
         404: errorSchemas.notFound,
       }
     }
