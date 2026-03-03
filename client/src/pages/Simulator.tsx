@@ -11,28 +11,25 @@ import { useToast } from "@/hooks/use-toast";
 import { ChevronLeft, Info, Check, AlertTriangle } from "lucide-react";
 
 // ─── Screen definitions ────────────────────────────────────────────────────
-
 type ScreenMeta =
   | { kind: 'input';   phase: 1|2|3; phaseStep: number; phaseTotal: number; header: string; subtext: string }
   | { kind: 'summary'; phase: 1|2|3; header: string };
 
+// 15 screens (0–14)
 const SCREENS: ScreenMeta[] = [
-  // ── Phase 1 — Structural Burn (5 input + 1 summary) ──────────────────
-  { kind: 'input', phase: 1, phaseStep: 1, phaseTotal: 5,
+  // ── Phase 1 — Structural Burn (4 input + 1 summary) ────────────────────
+  { kind: 'input', phase: 1, phaseStep: 1, phaseTotal: 4,
     header: "Income Overview",
-    subtext: "Your current income gives us context for the transition. It doesn't change the model — it helps frame how large a gap you're closing." },
-  { kind: 'input', phase: 1, phaseStep: 2, phaseTotal: 5,
-    header: "Required Loan Payments",
-    subtext: "These are contractual minimums. Missing them causes credit damage or default. They cannot be skipped." },
-  { kind: 'input', phase: 1, phaseStep: 3, phaseTotal: 5,
+    subtext: "Used for context — it does not change your burn math. It frames the income gap you'd be closing." },
+  { kind: 'input', phase: 1, phaseStep: 2, phaseTotal: 4,
     header: "Household Living Costs",
-    subtext: "What it costs your household to function each month — separate from loans and healthcare. Be honest, not optimistic." },
-  { kind: 'input', phase: 1, phaseStep: 4, phaseTotal: 5,
+    subtext: "What it costs your household to function each month — not counting loan payments or healthcare. Be honest, not optimistic." },
+  { kind: 'input', phase: 1, phaseStep: 3, phaseTotal: 4,
+    header: "Debt Payments — Required Minimums",
+    subtext: "Contractual minimum payments. Missing them damages credit or triggers default. They cannot be skipped or deferred." },
+  { kind: 'input', phase: 1, phaseStep: 4, phaseTotal: 4,
     header: "Healthcare Transition",
-    subtext: "Losing employer coverage usually adds $500–$1,500 per month. We estimate this based on your household size and your expected income." },
-  { kind: 'input', phase: 1, phaseStep: 5, phaseTotal: 5,
-    header: "Household Structure",
-    subtext: "A partner's reliable income directly reduces how much your savings need to cover each month." },
+    subtext: "Losing employer coverage usually adds $500–$1,500 per month. We estimate based on household size and your projected post-quit income." },
   { kind: 'summary', phase: 1, header: "Your Structural Burn" },
 
   // ── Phase 2 — Liquidity Layers (4 input + 1 summary) ─────────────────
@@ -41,14 +38,14 @@ const SCREENS: ScreenMeta[] = [
     subtext: "Cash you can access today with no penalties, no taxes, and no delay. This is your first line of defense." },
   { kind: 'input', phase: 2, phaseStep: 2, phaseTotal: 4,
     header: "Tier 2 — Semi-Liquid Capital",
-    subtext: "Investments you can sell, but selling may trigger capital gains taxes and depends on market timing. Counted at 80% to reflect this." },
+    subtext: "Investments you can sell — but selling may trigger capital gains taxes and depends on market timing. Counted at 80%." },
   { kind: 'input', phase: 2, phaseStep: 3, phaseTotal: 4,
     header: "Tier 3 — Retirement Accounts",
-    subtext: "Accessible under hardship, but early withdrawal typically costs you income taxes plus a 10% penalty. These are a last resort — not primary runway." },
+    subtext: "Accessible under hardship, but accessing retirement assets early typically triggers income taxes plus a 10% penalty. Last resort — not primary runway." },
   { kind: 'input', phase: 2, phaseStep: 4, phaseTotal: 4,
     header: "Tier 3 — Illiquid Assets",
-    subtext: "Home equity can be tapped through a sale or HELOC, but it's slow, costly, and uncertain. Counted at 30% to reflect the real friction." },
-  { kind: 'summary', phase: 2, header: "Your Accessible Capital" },
+    subtext: "Home equity can be tapped — but it is slow, costly, and uncertain. Counted at 30% to reflect real friction." },
+  { kind: 'summary', phase: 2, header: "Your Liquidity Position" },
 
   // ── Phase 3 — Income Plan (4 input + 1 review) ────────────────────────
   { kind: 'input', phase: 3, phaseStep: 1, phaseTotal: 4,
@@ -56,13 +53,13 @@ const SCREENS: ScreenMeta[] = [
     subtext: "Your operating model determines baseline monthly costs — these get added to your burn whether revenue comes in or not." },
   { kind: 'input', phase: 3, phaseStep: 2, phaseTotal: 4,
     header: "Expected Steady Revenue",
-    subtext: "Your conservative stable-state target. Not what you hope for in month one — what you'd realistically sustain once things settle." },
+    subtext: "Your conservative stable-state target once things settle — not a best-case. The model stress-tests at −15% and −30% of this figure." },
   { kind: 'input', phase: 3, phaseStep: 3, phaseTotal: 4,
     header: "Ramp Timeline",
-    subtext: "Most people underestimate how long revenue takes to stabilize. The model assumes 50% realization during ramp. Build in buffer." },
+    subtext: "Most people underestimate ramp time. The model assumes 50% realization during ramp. The report shows the impact of arriving early or late by up to 3 months." },
   { kind: 'input', phase: 3, phaseStep: 4, phaseTotal: 4,
     header: "Income Reliability",
-    subtext: "Month-to-month income swings determine how quickly things can go wrong. Choose honestly." },
+    subtext: "Month-to-month income swings determine how quickly things go wrong. Choose honestly — conservative here protects you." },
   { kind: 'summary', phase: 3, header: "Review Before Running" },
 ];
 
@@ -72,35 +69,31 @@ const PHASE_LABELS: Record<number, string> = {
   3: "Phase 3 — Income Plan",
 };
 
-// ─── Healthcare options ────────────────────────────────────────────────────
 const HEALTHCARE_OPTIONS = [
   { value: 'partner', label: 'Covered by partner plan',  note: 'No additional cost' },
-  { value: 'aca',     label: 'ACA marketplace',          note: 'Subsidized based on your post-quit income' },
+  { value: 'aca',     label: 'ACA marketplace',          note: 'Subsidy depends on post-quit income' },
   { value: 'cobra',   label: 'COBRA continuation',       note: 'Time-limited to 18 months, typically expensive' },
   { value: 'employer',label: 'Employer plan retained',   note: 'During severance or notice period' },
   { value: 'none',    label: 'Self-pay, no coverage',    note: 'All medical costs are fully out-of-pocket' },
 ];
 
-// ─── Business model options ────────────────────────────────────────────────
 type BusinessChoice = 'solo' | 'agency' | 'product' | 'custom';
 const BUSINESS_CHOICES: {
   value: BusinessChoice; label: string; desc: string; cost: string; modelType: string; monthlyCost: number;
 }[] = [
-  { value: 'solo',    label: 'Solo bootstrap',          desc: 'Freelance, consulting, one-person',         cost: '$500/mo',   modelType: 'solo_bootstrap',  monthlyCost: 500 },
-  { value: 'agency',  label: 'Lean agency / service',   desc: 'Small team, service delivery',             cost: '$3,000/mo', modelType: 'agency_service',  monthlyCost: 3000 },
-  { value: 'product', label: 'Product / SaaS',          desc: 'Software, recurring revenue model',        cost: '$2,500/mo', modelType: 'saas_product',    monthlyCost: 2500 },
-  { value: 'custom',  label: 'Custom',                  desc: 'I know my actual monthly operating cost',  cost: 'Enter below', modelType: 'solo_bootstrap', monthlyCost: 0 },
+  { value: 'solo',    label: 'Solo bootstrap',        desc: 'Freelance, consulting, one-person',     cost: '$500/mo',   modelType: 'solo_bootstrap', monthlyCost: 500 },
+  { value: 'agency',  label: 'Lean agency / service', desc: 'Small team, service delivery',          cost: '$3,000/mo', modelType: 'agency_service', monthlyCost: 3000 },
+  { value: 'product', label: 'Product / SaaS',        desc: 'Software, recurring revenue model',     cost: '$2,500/mo', modelType: 'saas_product',   monthlyCost: 2500 },
+  { value: 'custom',  label: 'Custom',                desc: 'I know my actual monthly operating cost', cost: 'Enter below', modelType: 'solo_bootstrap', monthlyCost: 0 },
 ];
 
-// ─── Income reliability presets ────────────────────────────────────────────
 const RELIABILITY_PRESETS = [
-  { val: 10, label: 'Stable retainers',        sub: 'Long-term contracts, predictable clients' },
-  { val: 15, label: 'Mixed client work',        sub: 'Some recurring, some project-based' },
-  { val: 20, label: 'Project-based billing',   sub: 'Milestone payments, variable contracts' },
-  { val: 30, label: 'Early-stage / volatile',  sub: 'Unproven model, high uncertainty' },
+  { val: 10, label: 'Stable retainers',      sub: 'Long-term contracts, predictable clients' },
+  { val: 15, label: 'Mixed client work',     sub: 'Some recurring, some project-based' },
+  { val: 20, label: 'Project-based billing', sub: 'Milestone payments, variable contracts' },
+  { val: 30, label: 'Early-stage / volatile', sub: 'Unproven model, high uncertainty' },
 ];
 
-// ─── Healthcare plan estimate (client-side, unsubsidized) ─────────────────
 function estimatePlan(adults: number, children: number): number {
   let base: number;
   if (adults === 2 && children >= 1) base = 1500 + children * 300;
@@ -113,7 +106,7 @@ function estimatePlan(adults: number, children: number): number {
 const SE_TAX_RATE = 0.28;
 const fmt = (n: number) => `$${Math.round(n).toLocaleString('en-US')}`;
 
-// ─── Formatted money input ─────────────────────────────────────────────────
+// ─── Money input ───────────────────────────────────────────────────────────
 function MoneyInput({
   name, control, label, placeholder = "", note, autoFocus = false, optional = false,
 }: {
@@ -182,7 +175,7 @@ function BurnRow({ label, value, subtract = false, total = false, group = false 
   );
 }
 
-// ─── Main export ───────────────────────────────────────────────────────────
+// ─── Main ──────────────────────────────────────────────────────────────────
 export default function Simulator() {
   return <ErrorBoundary><SimulatorInner /></ErrorBoundary>;
 }
@@ -263,14 +256,14 @@ function SimulatorInner() {
   const tier1 = values.cash ?? 0;
   const tier2 = Math.round((values.brokerage ?? 0) * 0.80);
   const tier3 = Math.round((values.roth ?? 0) + (values.traditional ?? 0) * 0.50 + (values.realEstate ?? 0) * 0.30);
-  const tier1And2 = tier1 + tier2;
+  const liquidityLineCapital = tier1 + tier2;
 
   // Per-screen validation
   const screenValidation: Partial<Record<number, (keyof SimulationFormValues)[]>> = {
-    2: ['livingExpenses'],
+    1: ['livingExpenses'],
     3: ['healthcareType'],
-    12: ['expectedRevenue'],
-    13: ['rampDuration'],
+    11: ['expectedRevenue'],
+    12: ['rampDuration'],
   };
 
   const next = async () => {
@@ -279,7 +272,7 @@ function SimulatorInner() {
       const valid = await trigger(fields);
       if (!valid) return;
     }
-    if (screenIndex === 11 && businessChoice === null) return;
+    if (screenIndex === 10 && businessChoice === null) return;
     setScreenIndex(i => Math.min(i + 1, SCREENS.length - 1));
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
@@ -305,7 +298,7 @@ function SimulatorInner() {
   const isSummary = screen.kind === 'summary';
 
   const continueLabel = isSummary
-    ? (screenIndex === 5 ? 'Continue to Liquidity' : screenIndex === 10 ? 'Continue to Income Plan' : 'Continue')
+    ? (screenIndex === 4 ? 'Continue to Liquidity' : screenIndex === 9 ? 'Continue to Income Plan' : 'Continue')
     : 'Continue';
 
   return (
@@ -334,56 +327,59 @@ function SimulatorInner() {
                 initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -14 }} transition={{ duration: 0.22 }}>
 
-                {/* ── Screen 0: Income Overview ───────────────────── */}
+                {/* ── Screen 0: Income Overview (dual income here) ─────── */}
                 {screenIndex === 0 && (
                   <div>
                     <h1 className="text-2xl sm:text-3xl font-bold font-serif text-foreground mb-3">{screen.header}</h1>
                     <p className="text-sm text-muted-foreground mb-8 leading-relaxed">{(screen as {subtext:string}).subtext}</p>
-                    <MoneyInput name="currentSalary" control={control}
-                      label="Current monthly take-home income"
-                      placeholder="8,500" autoFocus optional
-                      note="After-tax. Used only for context — it does not affect your burn calculations." />
-                  </div>
-                )}
-
-                {/* ── Screen 1: Required Loan Payments ────────────── */}
-                {screenIndex === 1 && (
-                  <div>
-                    <h1 className="text-2xl sm:text-3xl font-bold font-serif text-foreground mb-3">{screen.header}</h1>
-                    <p className="text-sm text-muted-foreground mb-8 leading-relaxed">{(screen as {subtext:string}).subtext}</p>
-                    <div className="space-y-8">
-                      <div>
-                        <MoneyInput name="monthlyDebtPayments" control={control}
-                          label="Total monthly required loan payments"
-                          placeholder="1,800" autoFocus
-                          note="Mortgage or rent-to-own, car loans, student loans, credit card minimums — required payments only." />
-                        <div className="mt-3 flex items-start gap-2 p-3 bg-amber-50 border border-amber-200 rounded-md max-w-sm">
-                          <Info className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
-                          <p className="text-xs text-amber-700">
-                            If you pay a mortgage, enter it here. Do not include it in Living Costs on the next screen.
-                          </p>
-                        </div>
+                    <div className="space-y-6">
+                      <div className="flex gap-3">
+                        <button type="button"
+                          onClick={() => { setValue("isDualIncome", false); setValue("partnerIncome", 0); }}
+                          className={`flex-1 py-3 rounded-md border text-sm font-semibold transition-colors ${!values.isDualIncome ? 'bg-foreground text-background border-foreground' : 'border-border text-foreground'}`}
+                          data-testid="button-single-income">Single income</button>
+                        <button type="button"
+                          onClick={() => setValue("isDualIncome", true)}
+                          className={`flex-1 py-3 rounded-md border text-sm font-semibold transition-colors ${values.isDualIncome ? 'bg-foreground text-background border-foreground' : 'border-border text-foreground'}`}
+                          data-testid="button-dual-income">Dual income</button>
                       </div>
-                      <div>
-                        <MoneyInput name="totalDebt" control={control}
-                          label="Total remaining loan balances" placeholder="0" optional />
-                        <p className="text-xs text-muted-foreground mt-2 max-w-sm">This does not change your monthly burn. It informs leverage risk commentary only.</p>
-                      </div>
+                      <MoneyInput name="currentSalary" control={control}
+                        label={values.isDualIncome ? "Your monthly take-home income (after-tax)" : "Your monthly take-home income (after-tax)"}
+                        placeholder="8,500" autoFocus optional />
+                      {values.isDualIncome && (
+                        <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}>
+                          <MoneyInput name="partnerIncome" control={control}
+                            label="Partner monthly take-home income (after-tax)"
+                            placeholder="5,000"
+                            note="Only what reliably flows toward shared household expenses." />
+                          {((values.currentSalary ?? 0) + (values.partnerIncome ?? 0)) > 0 && (
+                            <div className="mt-3 p-3 bg-muted/30 rounded-md border border-border max-w-sm">
+                              <p className="text-xs text-muted-foreground">Total household take-home</p>
+                              <p className="text-base font-bold font-serif text-foreground" data-testid="text-household-income">
+                                {fmt((values.currentSalary ?? 0) + (values.partnerIncome ?? 0))}/mo
+                              </p>
+                            </div>
+                          )}
+                        </motion.div>
+                      )}
                     </div>
                   </div>
                 )}
 
-                {/* ── Screen 2: Household Living Costs ────────────── */}
-                {screenIndex === 2 && (
+                {/* ── Screen 1: Household Living Costs (BEFORE debt) ──── */}
+                {screenIndex === 1 && (
                   <div>
                     <h1 className="text-2xl sm:text-3xl font-bold font-serif text-foreground mb-3">{screen.header}</h1>
                     <p className="text-sm text-muted-foreground mb-6 leading-relaxed">{(screen as {subtext:string}).subtext}</p>
-                    <div className="mb-6 flex items-start gap-2 p-3.5 bg-muted/30 border border-border rounded-md">
-                      <Info className="w-4 h-4 text-muted-foreground shrink-0 mt-0.5" />
+                    <div className="mb-6 p-4 bg-muted/20 border border-border rounded-md">
+                      <p className="text-xs font-semibold text-foreground mb-2">Include in this field:</p>
                       <p className="text-xs text-muted-foreground leading-relaxed">
-                        Include: food, utilities, insurance, childcare, transportation, subscriptions, entertainment, discretionary spending.
-                        <strong className="text-foreground"> Do not include loan payments</strong> (those are on the previous screen)
-                        <strong className="text-foreground"> or healthcare</strong> (that comes next).
+                        Food, utilities, insurance, childcare, transportation, subscriptions, entertainment, discretionary spending.
+                      </p>
+                      <p className="text-xs font-semibold text-foreground mt-3 mb-1">Do not include here:</p>
+                      <p className="text-xs text-muted-foreground leading-relaxed">
+                        Loan payments or credit card minimums — those go on the next screen.
+                        If you pay living expenses using a credit card, they still belong here — the card is just the payment method; the minimum payment is the debt obligation.
                       </p>
                     </div>
                     <MoneyInput name="livingExpenses" control={control}
@@ -392,7 +388,38 @@ function SimulatorInner() {
                   </div>
                 )}
 
-                {/* ── Screen 3: Healthcare Transition ─────────────── */}
+                {/* ── Screen 2: Debt Payments — Required Minimums ─────── */}
+                {screenIndex === 2 && (
+                  <div>
+                    <h1 className="text-2xl sm:text-3xl font-bold font-serif text-foreground mb-3">{screen.header}</h1>
+                    <p className="text-sm text-muted-foreground mb-6 leading-relaxed">{(screen as {subtext:string}).subtext}</p>
+                    <div className="mb-5 flex items-start gap-2.5 p-3.5 bg-amber-50 border border-amber-200 rounded-md">
+                      <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+                      <p className="text-xs text-amber-700 leading-relaxed">
+                        These are contractual minimums — missing them damages credit or triggers default. They cannot be skipped.
+                      </p>
+                    </div>
+                    <div className="space-y-7">
+                      <div>
+                        <MoneyInput name="monthlyDebtPayments" control={control}
+                          label="Total monthly debt payments (required minimums)"
+                          placeholder="1,800" autoFocus
+                          note="Mortgage or rent-to-own, car loan minimums, student loan minimums, credit card minimum payments. If you pay business debt, include it here too." />
+                        <div className="mt-3 flex items-start gap-2 p-3 bg-blue-50 border border-blue-200 rounded-md max-w-sm">
+                          <Info className="w-4 h-4 text-blue-600 shrink-0 mt-0.5" />
+                          <p className="text-xs text-blue-700">If you pay a mortgage, enter it here — not in Living Costs.</p>
+                        </div>
+                      </div>
+                      <div>
+                        <MoneyInput name="totalDebt" control={control}
+                          label="Total remaining loan balances" placeholder="0" optional />
+                        <p className="text-xs text-muted-foreground mt-2 max-w-sm">Context only — does not change your burn calculation. Used for leverage risk commentary.</p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* ── Screen 3: Healthcare Transition ─────────────────── */}
                 {screenIndex === 3 && (
                   <div>
                     <h1 className="text-2xl sm:text-3xl font-bold font-serif text-foreground mb-3">{screen.header}</h1>
@@ -424,17 +451,15 @@ function SimulatorInner() {
                           <MoneyInput name="currentPayrollHealthcare" control={control}
                             label="Current monthly payroll deduction"
                             placeholder="0"
-                            note="What you pay per paycheck — not the employer's total premium." />
+                            note="What you pay per paycheck — not the employer's full premium." />
                           <div className="p-4 rounded-md border border-border bg-muted/20">
                             <div className="flex justify-between mb-1.5">
-                              <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                                {values.healthcareType === 'aca' ? 'Estimated independent plan cost' : 'Estimated plan cost'}
-                              </p>
+                              <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Estimated independent plan cost</p>
                               <p className="text-base font-bold font-serif text-foreground" data-testid="text-estimated-plan">{fmt(estimatedPlan)}/mo</p>
                             </div>
                             <p className="text-xs text-muted-foreground mb-3">
                               Based on {adultsOnPlan} adult{adultsOnPlan > 1 ? 's' : ''}{dependentChildren > 0 ? ` + ${dependentChildren} child${dependentChildren > 1 ? 'ren' : ''}` : ''}.
-                              {values.healthcareType === 'aca' && ' ACA subsidy is calculated on the server using your expected revenue.'}
+                              {values.healthcareType === 'aca' && ' ACA subsidy calculated using your expected revenue.'}
                             </p>
                             <div className="flex justify-between pt-3 border-t border-border">
                               <p className="text-xs text-muted-foreground">Additional monthly cost vs. today</p>
@@ -445,13 +470,12 @@ function SimulatorInner() {
                             onClick={() => { setShowHealthcareOverride(v => !v); if (showHealthcareOverride) setValue("healthcareCostOverride", null); }}
                             className="text-sm text-foreground underline underline-offset-2 opacity-60"
                             data-testid="button-healthcare-override">
-                            {showHealthcareOverride ? 'Use estimated cost' : 'Override with your actual plan cost'}
+                            {showHealthcareOverride ? 'Use estimated cost' : 'Override with actual plan cost'}
                           </button>
                           {showHealthcareOverride && (
                             <motion.div initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }}>
                               <MoneyInput name="healthcareCostOverride" control={control}
-                                label="Your actual independent plan cost (monthly)"
-                                placeholder="600" note="Enter the actual monthly premium from your research or enrollment." />
+                                label="Your actual monthly premium" placeholder="600" />
                             </motion.div>
                           )}
                         </motion.div>
@@ -459,44 +483,16 @@ function SimulatorInner() {
 
                       {values.healthcareType === 'partner' && (
                         <div className="p-4 rounded-md border border-green-200 bg-green-50">
-                          <p className="text-sm font-semibold text-green-700">Partner coverage eliminates healthcare cost change.</p>
-                          <p className="text-xs text-green-700 mt-1">No additional healthcare cost will be added to your monthly burn.</p>
+                          <p className="text-sm font-semibold text-green-700">Partner coverage — no healthcare cost change.</p>
+                          <p className="text-xs text-green-700 mt-1">No additional healthcare cost added to burn.</p>
                         </div>
                       )}
                     </div>
                   </div>
                 )}
 
-                {/* ── Screen 4: Household Structure ──────────────── */}
+                {/* ── Screen 4: Burn Summary ─────────────────────────── */}
                 {screenIndex === 4 && (
-                  <div>
-                    <h1 className="text-2xl sm:text-3xl font-bold font-serif text-foreground mb-3">{screen.header}</h1>
-                    <p className="text-sm text-muted-foreground mb-8 leading-relaxed">{(screen as {subtext:string}).subtext}</p>
-                    <div className="space-y-6">
-                      <div className="flex gap-3">
-                        <button type="button"
-                          onClick={() => { setValue("isDualIncome", false); setValue("partnerIncome", 0); }}
-                          className={`flex-1 py-3.5 rounded-md border text-sm font-semibold transition-colors ${!values.isDualIncome ? 'bg-foreground text-background border-foreground' : 'border-border text-foreground'}`}
-                          data-testid="button-single-income">Single income</button>
-                        <button type="button"
-                          onClick={() => setValue("isDualIncome", true)}
-                          className={`flex-1 py-3.5 rounded-md border text-sm font-semibold transition-colors ${values.isDualIncome ? 'bg-foreground text-background border-foreground' : 'border-border text-foreground'}`}
-                          data-testid="button-dual-income-yes">Dual income</button>
-                      </div>
-                      {values.isDualIncome && (
-                        <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}>
-                          <MoneyInput name="partnerIncome" control={control}
-                            label="Partner monthly take-home income"
-                            placeholder="5,000" autoFocus
-                            note="After-tax. Only what reliably flows toward shared household expenses." />
-                        </motion.div>
-                      )}
-                    </div>
-                  </div>
-                )}
-
-                {/* ── Screen 5: Burn Summary ─────────────────────── */}
-                {screenIndex === 5 && (
                   <div>
                     <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground mb-3">Phase 1 Complete</p>
                     <h1 className="text-2xl sm:text-3xl font-bold font-serif text-foreground mb-3">{screen.header}</h1>
@@ -505,7 +501,7 @@ function SimulatorInner() {
                     </p>
                     <div className="border border-border rounded-md overflow-hidden mb-4">
                       <BurnRow label="Required Fixed Obligations" value={0} group />
-                      <BurnRow label="Required loan payments" value={values.monthlyDebtPayments ?? 0} />
+                      <BurnRow label="Debt payments (required minimums)" value={values.monthlyDebtPayments ?? 0} />
                       <BurnRow label="Household living costs" value={values.livingExpenses ?? 0} />
                       <BurnRow label="Fixed subtotal" value={fixedObligations} group />
                       <BurnRow label="Transition Adjustments" value={0} group />
@@ -514,13 +510,13 @@ function SimulatorInner() {
                       <BurnRow label="Monthly Structural Burn" value={structuralBurn} total />
                     </div>
                     <p className="text-xs text-muted-foreground leading-relaxed">
-                      Business costs and a tax reserve for self-employment will be added in Phase 3, based on your income plan.
+                      Business operating costs and a self-employment tax reserve will be added in Phase 3, based on your income plan.
                     </p>
                   </div>
                 )}
 
-                {/* ── Screen 6: Tier 1 — Cash ────────────────────── */}
-                {screenIndex === 6 && (
+                {/* ── Screen 5: Tier 1 — Cash ─────────────────────────── */}
+                {screenIndex === 5 && (
                   <div>
                     <h1 className="text-2xl sm:text-3xl font-bold font-serif text-foreground mb-3">{screen.header}</h1>
                     <p className="text-sm text-muted-foreground mb-8 leading-relaxed">{(screen as {subtext:string}).subtext}</p>
@@ -530,115 +526,104 @@ function SimulatorInner() {
                   </div>
                 )}
 
-                {/* ── Screen 7: Tier 2 — Brokerage ─────────────── */}
-                {screenIndex === 7 && (
+                {/* ── Screen 6: Tier 2 — Brokerage ────────────────────── */}
+                {screenIndex === 6 && (
                   <div>
                     <h1 className="text-2xl sm:text-3xl font-bold font-serif text-foreground mb-3">{screen.header}</h1>
                     <p className="text-sm text-muted-foreground mb-8 leading-relaxed">{(screen as {subtext:string}).subtext}</p>
                     <MoneyInput name="brokerage" control={control}
                       label="Taxable brokerage and investment accounts"
-                      placeholder="0" autoFocus note="Counted at 80% — capital gains taxes and market timing risk applied." />
+                      placeholder="0" autoFocus note="Counted at 80% — capital gains taxes and market timing risk." />
                   </div>
                 )}
 
-                {/* ── Screen 8: Tier 3 — Retirement ─────────────── */}
-                {screenIndex === 8 && (
+                {/* ── Screen 7: Tier 3 — Retirement ───────────────────── */}
+                {screenIndex === 7 && (
                   <div>
                     <h1 className="text-2xl sm:text-3xl font-bold font-serif text-foreground mb-3">{screen.header}</h1>
                     <p className="text-sm text-muted-foreground mb-6 leading-relaxed">{(screen as {subtext:string}).subtext}</p>
                     <div className="mb-6 flex items-start gap-2 p-3.5 bg-amber-50 border border-amber-200 rounded-md">
                       <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
                       <p className="text-xs text-amber-700 leading-relaxed">
-                        These are not considered primary runway. Accessing them early typically triggers income tax plus a 10% early withdrawal penalty. The model uses them only as emergency extension capital.
+                        Tier 3 is not primary runway. Accessing these early typically costs income taxes plus a 10% penalty — and permanently reduces long-term compounding.
                       </p>
                     </div>
                     <div className="space-y-7">
                       <MoneyInput name="roth" control={control}
-                        label="Roth IRA — principal contributions only"
-                        placeholder="0" autoFocus note="Counted at 100% — contributions (not earnings) can be withdrawn penalty-free." />
+                        label="Roth IRA — contributions only (not earnings)"
+                        placeholder="0" autoFocus note="Accessible but still retirement — treat as emergency. Counted at 100%." />
                       <MoneyInput name="traditional" control={control}
                         label="Traditional IRA / 401(k) balance"
-                        placeholder="0" note="Counted at 50% — income tax and 10% early withdrawal penalty applied." />
+                        placeholder="0" note="Restricted / Last Resort — taxes + possible penalties, long-term compounding loss. Counted at 50%." />
                     </div>
                   </div>
                 )}
 
-                {/* ── Screen 9: Tier 3 — Home Equity ───────────── */}
-                {screenIndex === 9 && (
+                {/* ── Screen 8: Tier 3 — Home Equity ──────────────────── */}
+                {screenIndex === 8 && (
                   <div>
                     <h1 className="text-2xl sm:text-3xl font-bold font-serif text-foreground mb-3">{screen.header}</h1>
                     <p className="text-sm text-muted-foreground mb-8 leading-relaxed">{(screen as {subtext:string}).subtext}</p>
                     <MoneyInput name="realEstate" control={control}
                       label="Estimated home equity" placeholder="0" autoFocus optional
-                      note="Counted at 30% — illiquid, 6–10% transaction costs, market-dependent timing." />
+                      note="Illiquid + costly to access — 6–10% transaction costs, market-dependent. Counted at 30%." />
                   </div>
                 )}
 
-                {/* ── Screen 10: Capital Summary ──────────────────── */}
-                {screenIndex === 10 && (
+                {/* ── Screen 9: Capital + Liquidity Summary ───────────── */}
+                {screenIndex === 9 && (
                   <div>
                     <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground mb-3">Phase 2 Complete</p>
                     <h1 className="text-2xl sm:text-3xl font-bold font-serif text-foreground mb-3">{screen.header}</h1>
                     <p className="text-sm text-muted-foreground mb-6 leading-relaxed">
-                      Your capital is organized by how quickly and cheaply you can access it. Depletion follows this order under stress.
+                      Your Liquidity Line — Tier 1 + Tier 2 — is the primary safety measure. Depletion follows this order under stress.
                     </p>
                     <div className="border border-border rounded-md overflow-hidden mb-4">
-                      {/* Tier 1 */}
                       <div className="px-5 py-2.5 bg-muted/20 border-b border-border">
-                        <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Tier 1 — Fully Liquid (Primary Runway)</p>
+                        <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Tier 1 — Fully Liquid (Primary)</p>
                       </div>
                       <div className="flex items-center justify-between px-5 py-3 border-b border-border">
                         <span className="text-sm text-muted-foreground">Cash & HYSA (100%)</span>
                         <span className="text-sm font-semibold text-foreground">{fmt(tier1)}</span>
                       </div>
-                      {/* Tier 2 */}
                       <div className="px-5 py-2.5 bg-muted/20 border-b border-border">
-                        <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Tier 2 — Semi-Liquid (Access with Trade-offs)</p>
+                        <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Tier 2 — Semi-Liquid</p>
                       </div>
                       <div className="flex items-center justify-between px-5 py-3 border-b border-border">
                         <span className="text-sm text-muted-foreground">Brokerage (80%)</span>
                         <span className="text-sm font-semibold text-foreground">{fmt(tier2)}</span>
                       </div>
-                      {/* Tier 3 */}
-                      <div className="px-5 py-2.5 bg-muted/20 border-b border-border">
-                        <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Tier 3 — Restricted / Last Resort</p>
+                      <div className="flex items-center justify-between px-5 py-4 border-b border-border">
+                        <span className="text-sm font-bold text-foreground">Liquidity Line (Tier 1+2)</span>
+                        <span className="text-base font-bold font-serif text-foreground" data-testid="text-liquidity-line">{fmt(liquidityLineCapital)}</span>
                       </div>
-                      {(values.roth ?? 0) > 0 && (
+                      <div className="px-5 py-2.5 bg-amber-50/50 border-b border-amber-200">
+                        <p className="text-xs font-semibold uppercase tracking-wider text-amber-700">Tier 3 — Restricted / Last Resort</p>
+                      </div>
+                      {tier3 > 0 && (
                         <div className="flex items-center justify-between px-5 py-3 border-b border-border">
-                          <span className="text-sm text-muted-foreground">Roth contributions (100%)</span>
-                          <span className="text-sm font-semibold text-foreground">{fmt(Math.round((values.roth ?? 0) * 1.00))}</span>
+                          <span className="text-sm text-muted-foreground">Retirement + Illiquid (blended haircuts)</span>
+                          <span className="text-sm font-semibold text-foreground">{fmt(tier3)}</span>
                         </div>
                       )}
-                      {(values.traditional ?? 0) > 0 && (
-                        <div className="flex items-center justify-between px-5 py-3 border-b border-border">
-                          <span className="text-sm text-muted-foreground">Traditional IRA/401(k) (50%)</span>
-                          <span className="text-sm font-semibold text-foreground">{fmt(Math.round((values.traditional ?? 0) * 0.50))}</span>
-                        </div>
-                      )}
-                      {(values.realEstate ?? 0) > 0 && (
-                        <div className="flex items-center justify-between px-5 py-3 border-b border-border">
-                          <span className="text-sm text-muted-foreground">Home equity (30%)</span>
-                          <span className="text-sm font-semibold text-foreground">{fmt(Math.round((values.realEstate ?? 0) * 0.30))}</span>
-                        </div>
-                      )}
-                      <div className="flex items-center justify-between px-5 py-4 bg-foreground/[0.05] border-t border-border">
+                      <div className="flex items-center justify-between px-5 py-4 bg-foreground/[0.05]">
                         <span className="text-sm font-bold text-foreground">Total accessible capital</span>
                         <span className="text-xl font-bold font-serif text-foreground" data-testid="text-capital-preview">{fmt(accessibleCapital)}</span>
                       </div>
                     </div>
-                    {tier3 > 0 && tier1And2 < totalBurn * 12 && (
+                    {tier3 > 0 && (
                       <div className="flex items-start gap-2 p-3.5 bg-amber-50 border border-amber-200 rounded-md">
                         <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
                         <p className="text-xs text-amber-700 leading-relaxed">
-                          Your Tier 1 and Tier 2 capital may not cover 12 months of burn on its own. The model will show how much you'd rely on retirement assets.
+                          Tier 3 is not considered primary runway. Accessing it may cause penalties, taxes, and long-term retirement damage. The full report shows exactly when — and whether — Tier 3 would be needed.
                         </p>
                       </div>
                     )}
                   </div>
                 )}
 
-                {/* ── Screen 11: Business Structure ───────────────── */}
-                {screenIndex === 11 && (
+                {/* ── Screen 10: Business Structure ───────────────────── */}
+                {screenIndex === 10 && (
                   <div>
                     <h1 className="text-2xl sm:text-3xl font-bold font-serif text-foreground mb-3">{screen.header}</h1>
                     <p className="text-sm text-muted-foreground mb-6 leading-relaxed">{(screen as {subtext:string}).subtext}</p>
@@ -665,26 +650,26 @@ function SimulatorInner() {
                         <MoneyInput name="businessCostOverride" control={control}
                           label="Monthly business operating cost"
                           placeholder="2,000"
-                          note="Tools, software, contractors, workspace, marketing — recurring expenses." />
+                          note="Tools, software, contractors, hosting, services — recurring monthly costs only. Do not include debt payments." />
                       </motion.div>
                     )}
                   </div>
                 )}
 
-                {/* ── Screen 12: Expected Revenue ─────────────────── */}
-                {screenIndex === 12 && (
+                {/* ── Screen 11: Expected Revenue ──────────────────────── */}
+                {screenIndex === 11 && (
                   <div>
                     <h1 className="text-2xl sm:text-3xl font-bold font-serif text-foreground mb-3">{screen.header}</h1>
                     <p className="text-sm text-muted-foreground mb-8 leading-relaxed">{(screen as {subtext:string}).subtext}</p>
                     <MoneyInput name="expectedRevenue" control={control}
                       label="Expected monthly revenue once stable"
                       placeholder="8,000" autoFocus
-                      note="The model runs stress tests at −15% and −30% of this figure automatically." />
+                      note="The report runs stress tests at −15% and −30% of this figure automatically." />
                   </div>
                 )}
 
-                {/* ── Screen 13: Ramp Timeline ─────────────────────── */}
-                {screenIndex === 13 && (
+                {/* ── Screen 12: Ramp Timeline ─────────────────────────── */}
+                {screenIndex === 12 && (
                   <div>
                     <h1 className="text-2xl sm:text-3xl font-bold font-serif text-foreground mb-3">{screen.header}</h1>
                     <p className="text-sm text-muted-foreground mb-8 leading-relaxed">{(screen as {subtext:string}).subtext}</p>
@@ -698,13 +683,13 @@ function SimulatorInner() {
                           data-testid="input-rampDuration" />
                         <span className="absolute right-4 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">months</span>
                       </div>
-                      <p className="text-xs text-muted-foreground mt-2">During ramp, the model uses 50% revenue realization. Overestimating is safe — underestimating is not.</p>
+                      <p className="text-xs text-muted-foreground mt-2">The report shows how ±1, ±2, ±3 month ramp shifts change your Liquidity Line exposure.</p>
                     </div>
                   </div>
                 )}
 
-                {/* ── Screen 14: Income Reliability ──────────────── */}
-                {screenIndex === 14 && (
+                {/* ── Screen 13: Income Reliability ────────────────────── */}
+                {screenIndex === 13 && (
                   <div>
                     <h1 className="text-2xl sm:text-3xl font-bold font-serif text-foreground mb-3">{screen.header}</h1>
                     <p className="text-sm text-muted-foreground mb-6 leading-relaxed">{(screen as {subtext:string}).subtext}</p>
@@ -725,34 +710,47 @@ function SimulatorInner() {
                   </div>
                 )}
 
-                {/* ── Screen 15: Review + Submit ──────────────────── */}
-                {screenIndex === 15 && (
+                {/* ── Screen 14: Review + Submit ───────────────────────── */}
+                {screenIndex === 14 && (
                   <div>
                     <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground mb-3">Phase 3 Complete</p>
                     <h1 className="text-2xl sm:text-3xl font-bold font-serif text-foreground mb-3">{screen.header}</h1>
                     <p className="text-sm text-muted-foreground mb-6 leading-relaxed">
-                      Confirm your numbers before running the stress model. Your capital will be tested against this burn across four scenarios.
+                      Confirm your numbers before running the stress model.
                     </p>
-                    <div className="border border-border rounded-md overflow-hidden mb-5">
+                    <div className="border border-border rounded-md overflow-hidden mb-4">
                       <div className="px-5 py-3 bg-muted/20 border-b border-border">
                         <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">Complete Monthly Burn</p>
                       </div>
-                      <BurnRow label="Required loan payments" value={values.monthlyDebtPayments ?? 0} />
+                      <div className="px-5 py-2 bg-muted/10 border-b border-border">
+                        <p className="text-xs text-muted-foreground font-medium">Required fixed obligations</p>
+                      </div>
+                      <BurnRow label="Debt payments (required minimums)" value={values.monthlyDebtPayments ?? 0} />
                       <BurnRow label="Household living costs" value={values.livingExpenses ?? 0} />
+                      <div className="px-5 py-2 bg-muted/10 border-b border-border">
+                        <p className="text-xs text-muted-foreground font-medium">Transition adjustments</p>
+                      </div>
                       <BurnRow label="Healthcare cost change" value={healthcareDelta} />
-                      <BurnRow label="Self-employment tax reserve (28%)" value={seTax} />
-                      <BurnRow label="Business operating cost" value={bizCost} />
                       {partnerOffset > 0 && <BurnRow label="Partner income offset" value={partnerOffset} subtract />}
+                      <div className="px-5 py-2 bg-muted/10 border-b border-border">
+                        <p className="text-xs text-muted-foreground font-medium">Business + taxes</p>
+                      </div>
+                      <BurnRow label="Business operating cost" value={bizCost} />
+                      <BurnRow label="Self-employment tax reserve (28%)" value={seTax} />
                       <BurnRow label="True Monthly Burn" value={totalBurn} total />
                     </div>
-                    <div className="grid grid-cols-2 gap-3 mb-5">
-                      <div className="p-3.5 bg-muted/30 rounded-md border border-border">
-                        <p className="text-xs text-muted-foreground mb-1">Accessible capital</p>
-                        <p className="text-base font-bold font-serif text-foreground">{fmt(accessibleCapital)}</p>
+                    <div className="grid grid-cols-3 gap-3 mb-5">
+                      <div className="p-3 bg-muted/30 rounded-md border border-border">
+                        <p className="text-xs text-muted-foreground mb-1">Total capital</p>
+                        <p className="text-sm font-bold font-serif text-foreground">{fmt(accessibleCapital)}</p>
                       </div>
-                      <div className="p-3.5 bg-muted/30 rounded-md border border-border">
-                        <p className="text-xs text-muted-foreground mb-1">Ramp timeline</p>
-                        <p className="text-base font-bold font-serif text-foreground">{values.rampDuration ?? 0} months</p>
+                      <div className="p-3 bg-muted/30 rounded-md border border-border">
+                        <p className="text-xs text-muted-foreground mb-1">Liquidity line</p>
+                        <p className="text-sm font-bold font-serif text-foreground">{fmt(liquidityLineCapital)}</p>
+                      </div>
+                      <div className="p-3 bg-muted/30 rounded-md border border-border">
+                        <p className="text-xs text-muted-foreground mb-1">Ramp</p>
+                        <p className="text-sm font-bold font-serif text-foreground">{values.rampDuration ?? 0} mo</p>
                       </div>
                     </div>
                   </div>
@@ -769,7 +767,7 @@ function SimulatorInner() {
               </button>
               {!isLastScreen ? (
                 <Button type="button" onClick={next}
-                  disabled={screenIndex === 11 && businessChoice === null}
+                  disabled={screenIndex === 10 && businessChoice === null}
                   data-testid="button-next">{continueLabel}</Button>
               ) : (
                 <Button type="button" disabled={createSimulation.isPending} onClick={onSubmit} data-testid="button-submit">

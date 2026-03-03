@@ -209,6 +209,24 @@ export default function Results() {
   const tier1And2 = tier1 + tier2;
   const reliesOnRetirement = tier3Total > 0 && tier1And2 < sim.tmib * 12;
 
+  // Liquidity Line calculation (when does T1+T2 run out?)
+  function calcLiquidityLine(revMult: number, rampMonths: number): number {
+    if (sim.tmib <= 0) return 999;
+    let cap = tier1And2;
+    const vol = 1 - sim.volatilityPercent / 100;
+    for (let m = 1; m <= 300; m++) {
+      const rf = rampMonths > 0 && m <= rampMonths ? 0.50 * (m / rampMonths) : 1.0;
+      cap -= (sim.tmib - sim.expectedRevenue * revMult * rf * vol);
+      if (cap <= 0) return m;
+    }
+    return 999;
+  }
+  const llBase = calcLiquidityLine(1.00, sim.rampDuration);
+  const ll30   = calcLiquidityLine(0.70, sim.rampDuration);
+  const llStatusColor = ll30 < 6 ? 'text-red-700' : ll30 < 12 ? 'text-amber-700' : 'text-green-700';
+  const llStatusBg    = ll30 < 6 ? 'bg-red-50 border-red-200' : ll30 < 12 ? 'bg-amber-50 border-amber-200' : 'bg-green-50 border-green-200';
+  const llStatusLabel = ll30 < 6 ? 'Critical' : ll30 < 12 ? 'Caution' : 'Adequate';
+
   // Runway chart scale
   const runways = [sim.baseRunway, sim.runway15Down, sim.runway30Down, sim.runwayRampDelay].filter(r => r < 999);
   const maxScale = Math.max(Math.min(Math.max(...runways, 36) * 1.2, 288), 36);
@@ -276,6 +294,18 @@ export default function Results() {
                   <p className="text-sm text-muted-foreground leading-relaxed" data-testid="text-narrative">{b}</p>
                 </div>
               ))}
+            </div>
+            {/* Liquidity Line callout — primary metric */}
+            <div className={`mx-6 mb-4 flex items-center justify-between px-4 py-3 rounded-md border ${llStatusBg}`}>
+              <div>
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-0.5">Liquidity Line — Tier 1+2 Capital</p>
+                <p className="text-sm text-muted-foreground">
+                  {fmt(tier1And2)} total · exhausted in <span className="font-bold text-foreground">{ll30 >= 999 ? '24+ yrs' : `${ll30} months`}</span> under severe stress (−30%)
+                </p>
+              </div>
+              <div className={`text-xs font-bold uppercase tracking-wider px-2 py-1 rounded ${llStatusColor}`} data-testid="text-ll-status">
+                {llStatusLabel}
+              </div>
             </div>
             <div className="grid grid-cols-2 sm:grid-cols-4 border-t border-border">
               {[

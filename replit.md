@@ -20,29 +20,30 @@ A deterministic, conservative financial stress engine for U.S. professionals mod
 - `client/src/pages/Results.tsx` — 7-section advisor-voice results report
 - `client/src/hooks/use-simulations.ts` — API hooks + SimulationResult type
 
-## Wizard Flow (16 screens, 0–15)
+## Wizard Flow (15 screens, 0–14)
 
-### Phase 1 — Structural Burn (screens 0–5)
-- Screen 0: Income Overview (currentSalary — context only)
-- Screen 1: Required Loan Payments (monthlyDebtPayments, totalDebt)
-- Screen 2: Household Living Costs (livingExpenses — non-debt, non-healthcare)
-- Screen 3: Healthcare Transition (type, household size, payroll deduction, override)
-- Screen 4: Household Structure (isDualIncome, partnerIncome)
-- Screen 5: Burn Summary — shows "Required Fixed Obligations" + "Transition Adjustments"
+### Phase 1 — Structural Burn (4 input + 1 summary = screens 0–4)
+- Screen 0: Income Overview — dual income toggle HERE (isDualIncome, currentSalary, partnerIncome)
+- Screen 1: Household Living Costs — EXPENSES BEFORE DEBT (livingExpenses, non-debt, non-healthcare)
+  - Explicit callout: credit card payment for living expenses goes HERE, minimum payment goes in debt
+- Screen 2: Debt Payments — Required Minimums (monthlyDebtPayments, totalDebt)
+  - Amber contractual warning + blue mortgage note
+- Screen 3: Healthcare Transition (type, household size, payroll deduction, ACA income-aware subsidy)
+- Screen 4: Burn Summary — "Required Fixed Obligations" + "Transition Adjustments" groups
 
-### Phase 2 — Liquidity Layers (screens 6–10)
-- Screen 6: Tier 1 — Fully Liquid (cash)
-- Screen 7: Tier 2 — Semi-Liquid (brokerage, 80% haircut)
-- Screen 8: Tier 3 — Retirement Accounts (roth, traditional)
-- Screen 9: Tier 3 — Illiquid Assets (realEstate)
-- Screen 10: Capital Summary — tier breakdown + retirement dependency warning
+### Phase 2 — Liquidity Layers (4 input + 1 summary = screens 5–9)
+- Screen 5: Tier 1 — Fully Liquid (cash, 100%)
+- Screen 6: Tier 2 — Semi-Liquid (brokerage, 80% haircut)
+- Screen 7: Tier 3 — Retirement Accounts (roth, traditional) with penalty warning
+- Screen 8: Tier 3 — Illiquid Assets (realEstate, 30%)
+- Screen 9: Capital Summary — Liquidity Line (T1+T2) as primary metric, T3 emergency warning
 
-### Phase 3 — Income Plan (screens 11–15)
-- Screen 11: Business Structure (4 model choices)
-- Screen 12: Expected Steady Revenue (expectedRevenue)
-- Screen 13: Ramp Timeline (rampDuration)
-- Screen 14: Income Reliability (volatilityPercent — 4 presets)
-- Screen 15: Review + Submit
+### Phase 3 — Income Plan (4 input + 1 review = screens 10–14)
+- Screen 10: Business Structure (4 model choices)
+- Screen 11: Expected Steady Revenue (expectedRevenue)
+- Screen 12: Ramp Timeline (rampDuration) — note: report shows ±1/2/3 month sensitivity
+- Screen 13: Income Reliability (volatilityPercent — 4 presets)
+- Screen 14: Review + Submit — Complete Monthly Burn with 3 groups + 3 summary tiles
 
 ## Calculation Engine
 
@@ -75,13 +76,27 @@ A deterministic, conservative financial stress engine for U.S. professionals mod
 6. What Moves the Needle — sensitivity cards (burn, revenue, healthcare, debt)
 7. What This Means For You — advisor summary + best single move
 
-## PDF Report (6 pages)
-1. Cover — branded, navy, score callout + stat row
-2. Executive Summary + Breakpoint Score — 4 bullets + metric boxes + score card + 4-band legend
-3. Runway Comparison — bar chart + scenario table
-4. Burn Breakdown — grouped rows + composition bar + interpretation text
-5. Liquidity Defense Map — Tier 1/2/3 + retirement warning
-6. What Moves the Needle + Advisor Commentary — insight cards + summary + disclaimer
+## Extended Scenario Engine (PDF only, server-computed)
+- Ramp timing: ±1/2/3 months (7 variants) — shows LL shift for each
+- Partner job loss: 3/6/12 month duration (only if isDualIncome) — burn + partnerIncome for N months
+- New child: $3,000 one-time + $1,500/month delta
+- Levers: burn -$500/-$1K/-$2K, revenue +$500/+$1K — all show LL delta
+- Stability thresholds: min T1+T2 / min revenue / max burn for 12-month T1+T2 under -30% stress
+- Cash coverage ladder: milestone months (1, 3, 6, 12, 18, 24) — Revenue/Burn/Gap/Remaining-T1+T2/Status
+
+## PDF Report (12 pages)
+1. Cover — navy, QuitReady wordmark, 6 stat tiles, LL status pill
+2. Plain English Explainer — burn, runway, liquidity, tier system, why retirement ≠ runway, debt vs expenses
+3. Burn Breakdown — 3 groups, composition bar, fixed% callout, SE tax note
+4. Liquidity Defense Map — tier table with haircuts, LL subtotal row, T3 emergency warning
+5. Liquidity Line headline — 4-scenario bars + table, LL warning callout
+6. Revenue Stress — 3-scenario table + cash coverage ladder (milestone months)
+7. Ramp Timing — ±1/2/3 month delta table + interpretation block
+8. Household Shocks — partner job loss table (if dual income) + new child impact
+9. What Moves the Needle — burn/revenue lever tables + sensitivity note
+10. Stability Thresholds — 3 threshold cards (T1+T2 required, min revenue, max burn)
+11. Advisor Commentary — score card, overall assessment, retirement dependency, best single move
+12. Appendix — all inputs listed by group
 
 ## Design Principles
 - Institutional minimalism — navy/charcoal/slate palette, Inter + Times-Bold

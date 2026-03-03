@@ -1,0 +1,350 @@
+You are building QuitReady’s “Structural Breakpoint” engine + report. Implement the full revision below end-to-end with clean, production-grade UX, precise labels (DEBT vs EXPENSES), and a 12-page PDF report that reads like a calm co-pilot sitting next to the user. No cold robotic output. The report must be tight, skimmable, premium, and scenario-rich without ever encouraging retirement/401(k) access as a normal plan.
+
+⸻
+
+0) NON-NEGOTIABLE PRINCIPLES (READ FIRST)
+
+A) DEBT VS EXPENSES MUST BE IMPOSSIBLE TO CONFUSE
+
+Users often pay expenses with a credit card. That does not make those expenses “debt.” They are still living/business expenses; the credit card minimum payment is the debt obligation. The UI must make this distinction unavoidable.
+
+B) LIQUIDITY IS THE MAIN STORY — NOT TOTAL NET WORTH
+
+The headline should be “Liquidity Line”: how long Tier 1 + Tier 2 capital covers the gap before the user enters Tier 3 (restricted) territory.
+Tier 3 is emergency / last resort, never framed as “runway.”
+
+C) DO NOT ENCOURAGE 401(k) OR RETIREMENT WITHDRAWALS
+
+Retirement assets (401k/Traditional IRA) must be labeled “Restricted / Last Resort.”
+No “great news you can use your 401k” vibe. The tone must be: “This is not liquid enough to leap without long-term damage.”
+
+D) REPORT TONE = CO-PILOT / ADVISOR, CONVERSATIONAL, LAYMAN LANGUAGE
+
+Every section explains what the numbers mean and why the section exists. Use warm, confident, practical language. No shaming, no hype, no recommendation like “do it / don’t do it.” It’s a mirror and a flashlight.
+
+E) SCENARIO MATH MUST EXPAND
+
+Report must show: revenue stress (-15%, -30%), ramp timing early/late (+/- 1/2/3 months), household shocks (partner job loss, new child), and cost levers.
+
+⸻
+
+1) APP FLOW REVISION (INPUTS)
+
+Step 1 — Income (SAME CARD, DUAL INCOME OPTION)
+
+Screen: “Income Overview”
+	•	Add toggle: Single income / Dual income household
+	•	If Dual income:
+	•	“Your take-home income (monthly)” (after-tax)
+	•	“Partner take-home income (monthly)” (after-tax)
+	•	Show computed “Total household take-home” prominently.
+	•	Copy must say: “Used for context; it does not change your burn math directly. It frames the gap you’re covering.”
+
+Step 2 — Monthly Expenses (COME BEFORE DEBT)
+
+Rename and restructure. This is critical.
+
+2A) Household Expenses (NON-DEBT, NON-HEALTHCARE)
+Screen: “Household Living Costs”
+	•	Input: “Total monthly household expenses (not debt, not healthcare)”
+	•	Helper text MUST explicitly say:
+	•	Include: food, utilities, insurance, childcare, transportation, subscriptions, discretionary spending.
+	•	Do not include loan payments or credit card minimums (those are debt payments).
+	•	If you pay these using a credit card, still count them here. The card is just the payment method.
+
+2B) Business Operating Costs (NON-DEBT)
+Screen: “Business Operating Costs”
+	•	Input: “Monthly business operating costs”
+	•	Helper:
+	•	Tools, software, contractors, hosting, coworking, services.
+	•	Do not include debt payments.
+	•	If you put business expenses on a credit card, they still go here.
+
+Step 3 — Debt Obligations (REQUIRED PAYMENTS)
+
+Rename “Required Loan Payments” to “Debt Payments (Required Minimums)”
+	•	Input: “Total monthly debt payments (required minimums)”
+	•	Examples: mortgage/rent-to-own payments, car loan minimums, student loan minimums, credit card minimum payments.
+	•	Add a bright warning callout:
+	•	“These are contractual minimums. Missing them damages credit or triggers default. They cannot be skipped.”
+	•	Optional: “Total remaining loan balances” stays optional for commentary only.
+
+Step 4 — Healthcare Change (as you already do)
+
+Keep “Self-pay / no coverage” scenario UI, dependents, etc.
+	•	Output: “Healthcare cost change vs today” (monthly delta)
+	•	Must read clearly as transition adjustment.
+
+Step 5 — Taxes + Partner Offset (as you already do, but clarify)
+	•	Self-employment tax reserve input/assumption must be clearly labeled as a reserve percentage and monthly dollar.
+	•	Partner income offset remains separate and clearly negative in burn math.
+
+Review Screen — “Review Before Running”
+
+Show a final table called COMPLETE MONTHLY BURN with clear grouping:
+	•	Required fixed obligations:
+	•	Debt payments (required minimums)
+	•	Household living costs
+	•	Transition adjustments:
+	•	Healthcare cost change
+	•	Partner income offset (negative)
+	•	Business + taxes:
+	•	Business operating cost
+	•	Self-employment tax reserve
+	•	Compute and display True Monthly Burn.
+
+Add cards under this:
+	•	Accessible capital (total)
+	•	Liquidity line capital (Tier 1 + Tier 2 total)
+	•	Ramp timeline (months)
+
+⸻
+
+2) CAPITAL / LIQUIDITY INPUTS (TIERED)
+
+Screen: “Your Accessible Capital” (Phase 2)
+Keep the tier model but revise labels and emphasis:
+
+Tier 1 — Fully Liquid (Primary Runway)
+	•	Cash & HYSA (100%)
+
+Tier 2 — Semi-Liquid (Access with trade-offs)
+	•	Brokerage accounts (haircut default 80%)
+	•	Must note: “Selling may trigger capital gains taxes.”
+
+Tier 3 — Restricted / Last Resort (NOT Primary Runway)
+	•	Roth IRA contributions (100%) labeled “Accessible but still retirement—treat as emergency”
+	•	Traditional IRA / 401(k) (50%) labeled “Restricted / Last Resort — taxes + possible penalties, long-term compounding loss”
+	•	Home equity (30%) labeled “Illiquid + costly to access”
+Add a paragraph under Tier 3:
+	•	“Tier 3 is not considered primary runway. Accessing it may cause penalties, taxes, and long-term retirement damage. Treat this as emergency capital, not a plan.”
+
+Liquidity Line Warning Logic (must be stronger + smarter)
+
+Compute:
+	•	Tier12 = Tier1 + Tier2
+	•	LiquidityLineMonths = Tier12 / TrueMonthlyBurn (under stress scenario too)
+Add callout rules:
+	•	If Tier12 < 6 months of burn under severe (-30%) scenario → strong warning
+	•	If Tier12 < 12 months under severe → warning
+	•	If Tier12 >= 12 months under severe → neutral/positive but still cautious
+
+The warning copy must NEVER suggest using Tier 3. It must say:
+	•	“You are not liquid enough to sustain this transition without entering Tier 3 territory under stress.”
+	•	“That doesn’t mean ‘don’t do it’ — it means the risk profile changes sharply once Tier 1+2 is gone.”
+
+⸻
+
+3) SCENARIO ENGINE (FORECAST / TIMELINE)
+
+Implement a month-by-month projection engine (at least 24 months, ideally 60 months; if longer, summarize after 60 with milestone months).
+
+Core inputs
+	•	TrueMonthlyBurn (from review)
+	•	Revenue plan (expected revenue target + ramp timeline)
+	•	Partner income offset (if any)
+	•	Tax reserve logic
+	•	Healthcare delta
+	•	Debt payments
+
+Baseline scenarios (must exist)
+	1.	Expected conditions (revenue at target)
+	2.	Moderate income contraction: revenue -15%
+	3.	Severe income contraction: revenue -30%
+	4.	Ramp delayed +3 months (revenue arrives later)
+Also add:
+	5.	Ramp early -1 month
+	6.	Ramp early -2 months
+	7.	Ramp early -3 months
+	8.	Ramp late +1 month
+	9.	Ramp late +2 months
+	10.	Ramp late +3 months
+
+Household shock scenarios (must exist)
+	11.	Partner job loss (0 partner offset) for 3 months
+	12.	Partner job loss for 6 months
+	13.	Partner job loss for 12 months
+	14.	New child: add one-time cost + monthly delta (use defaults but allow user overrides later; for now, use reasonable defaults with clear “assumption” label)
+
+Output metrics per scenario
+
+For each scenario compute:
+	•	Monthly net gap (burn - revenue)
+	•	Cumulative drawdown of capital
+	•	Liquidity Line month (when Tier 1+2 is exhausted)
+	•	Tier 3 entry (if/when restricted capital would be needed)
+	•	“Recovery” flag (if scenario returns to positive cashflow before exhausting Tier12)
+	•	“Worst month” and “max drawdown”
+
+Two required visual representations inside PDF
+	1.	Cash Coverage Ladder (month-by-month table)
+Columns:
+
+	•	Month #
+	•	Revenue (scenario)
+	•	Burn
+	•	Net gap
+	•	Remaining Tier1+2 (liquidity line capital remaining)
+	•	Status badge: “Safe (Tier1/2)” vs “Restricted (Tier3 zone)”
+
+	2.	Tier Exposure Timeline
+A single bar showing months covered by:
+
+	•	Tier 1
+	•	Tier 2
+	•	Tier 3 (highlighted “Emergency / Last Resort Zone”)
+
+⸻
+
+4) STRUCTURAL BREAKPOINT SCORE
+
+Keep score concept but make it explicitly tied to Liquidity Line resilience, not “total capital.”
+
+Score bands:
+	•	0–49 Structurally fragile
+	•	50–69 Moderately exposed
+	•	70–85 Structurally stable
+	•	86–100 Strong buffer position
+
+Score should be based on:
+	•	Months of Tier1+2 coverage under severe scenario
+	•	% fixed obligations (debt + healthcare) in burn
+	•	Ramp sensitivity (delta months to Liquidity Line for +3/-3 ramp)
+Explain score in plain language.
+
+⸻
+
+5) REPORT EXPANSION: 12-PAGE PDF (PREMIUM, TIGHT, NOT RAMBLY)
+
+Generate a clean 12-page PDF (10–15 acceptable, but target 12). It must be visually consistent with current QuitReady style. It must feel like a premium brief.
+
+Page 1 — Cover + Snapshot
+	•	“Structural Breakpoint Report” + date
+	•	Key tiles:
+	•	True Monthly Burn
+	•	Accessible Capital (Total)
+	•	Liquidity Line Capital (Tier1+2)
+	•	Liquidity Line Months (under severe scenario)
+	•	Structural Breakpoint Score
+	•	One short paragraph: “This is a stress test, not a prediction.”
+
+Page 2 — What this is (Plain English)
+	•	Explain burn, runway, liquidity, liquidity line, tiers.
+	•	Explain why retirement is not “primary runway.”
+
+Page 3 — Monthly Burn Breakdown (with fixed vs flexible)
+	•	Show stacked breakdown with percentages.
+	•	Call out:
+	•	“Fixed obligations are the hardest to cut under stress.”
+	•	Explain tax reserve flex behavior.
+
+Page 4 — Liquidity Defense Map (Tiers)
+	•	Show Tier table with amounts + haircuts.
+	•	Emphasize Tier1+2 as primary safety line.
+	•	Include an “Emergency Zone” explanation for Tier3.
+
+Page 5 — Liquidity Line Result (The headline page)
+	•	Show: “Months until Tier 1+2 is exhausted” under:
+	•	Expected
+	•	-15%
+	•	-30%
+	•	Ramp +3
+	•	Add friendly narrative explaining what it means emotionally: “Here’s when the plan stops being comfortable.”
+
+Page 6 — Scenario Set: Revenue Stress
+	•	Show 3 scenarios (Expected, -15, -30)
+	•	Include tier exposure timeline and a compact cash coverage ladder snapshot (first 24 months) with milestone month callouts.
+
+Page 7 — Scenario Set: Ramp Timing (Early vs Late)
+	•	Show +/- 1/2/3 month impacts.
+	•	Include a small table:
+	•	Ramp delta → Liquidity Line month → Tier3 entry yes/no
+
+Page 8 — Scenario Set: Partner Job Loss
+	•	3/6/12 month variants
+	•	Explain in plain English:
+	•	“This is the exact kind of shock that forces Tier3 earlier.”
+
+Page 9 — Scenario Set: New Child (Assumptions)
+	•	One-time + monthly delta
+	•	Must label as assumptions and explain how to override later.
+	•	Show Liquidity Line shift vs base.
+
+Page 10 — What Moves the Needle (Levers)
+
+Include 3 levers with quantified impacts:
+	1.	Reducing burn by $500 / $1,000 / $2,000
+	2.	Increasing stable revenue target by $500 / $1,000
+	3.	Healthcare plan delta changes
+Each lever block must say:
+
+	•	“This doesn’t mean you should do it. It shows sensitivity.”
+
+Page 11 — Stability Thresholds (“To avoid Tier 3 under stress…”)
+
+Compute and show:
+	•	Minimum Tier1+2 required to survive severe scenario without Tier3
+	•	OR minimum revenue stability required
+	•	OR burn target required
+Explain as: “These are thresholds, not advice.”
+
+Page 12 — Appendix: Your Inputs (Audit Page)
+
+List every input used, clearly labeled in groups:
+	•	Income context (single/dual)
+	•	Expenses (household, business)
+	•	Debt payments (required minimums)
+	•	Healthcare delta
+	•	Tax reserve %
+	•	Partner offset
+	•	Capital by tier + haircut assumptions
+	•	Ramp timeline + revenue target inputs
+
+⸻
+
+6) REPORT COPY REQUIREMENTS (VOICE)
+
+Throughout the report:
+	•	Use “you” language, calm and supportive.
+	•	Explain outputs: “Here’s what this means” sections.
+	•	Avoid deterministic predictions.
+	•	Never frame retirement withdrawals as normal.
+	•	Always distinguish:
+	•	Expenses (what life costs)
+	•	Debt payments (contractual minimums)
+	•	Debt balance (optional risk context)
+	•	Add short “why we’re asking” microcopy in the flow.
+
+⸻
+
+7) PDF POLISH REQUIREMENTS
+	•	Must be visually tight: good spacing, not wall-of-text.
+	•	Use consistent typography and section headers.
+	•	Use charts/tables that fit pages cleanly.
+	•	Keep any long tables to appendix or compress with milestone rows (Month 1, 3, 6, 12, 18, 24, then yearly).
+	•	Provide “Download full report” button that triggers generation.
+
+⸻
+
+8) IMPLEMENTATION NOTES
+	•	Use existing app styling and component patterns.
+	•	Ensure mobile rendering is excellent.
+	•	Ensure the report page before download (“Here’s what the numbers show…”) is tight and mirrors the new narrative (Liquidity Line focus).
+	•	Fix any mismatched numbers (e.g., the burn breakdown narrative must match the actual %s shown; do not say 36% tax if chart shows 18%).
+
+⸻
+
+9) ACCEPTANCE TESTS (MUST PASS)
+	1.	A user who pays all spending on a credit card can correctly enter:
+	•	Household expenses in expenses
+	•	Credit card minimum in debt payments
+	•	No confusion from UI text
+	2.	Report headline includes Liquidity Line months and Tier3 warning language.
+	3.	Under severe scenario, PDF clearly shows the month Tier1+2 is exhausted and whether Tier3 would be required.
+	4.	Ramp timing scenarios show how early/late revenue changes Tier3 exposure.
+	5.	Partner job loss scenarios show clear impact.
+	6.	PDF is 12 pages, polished, and reads like a co-pilot.
+
+⸻
+
+Build this now.
