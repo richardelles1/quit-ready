@@ -1,0 +1,250 @@
+You are building a web-first U.S.-only financial modeling tool called QuitReady.
+
+QuitReady generates a conservative, multi-axis Financial Transition Readiness Index (0–100) and produces a structured 12–15 page PDF report.
+
+This product is a structured financial survival simulator for professionals considering leaving employment.
+
+It is NOT:
+- Financial advice
+- Tax advice
+- Legal advice
+- A motivational app
+- A budgeting app
+- A business coaching platform
+- A subscription SaaS
+
+It IS:
+- Conservative by design
+- Deterministic (math-based, not AI narrative-based)
+- PDF-report driven
+- High-depth, single-use decision engine
+- U.S.-only (healthcare and tax assumptions apply to U.S.)
+
+----------------------------------------
+PRIMARY OBJECTIVE
+----------------------------------------
+
+Generate:
+1) Readiness Index (0–100)
+2) Multi-axis score breakdown
+3) Secondary “Execution Stability” indicator
+4) Structured 12–15 page PDF report
+5) Optional email-based rerun capability
+
+The Readiness Index measures:
+
+STRUCTURAL FINANCIAL SURVIVAL STABILITY DURING EMPLOYMENT EXIT
+
+It does NOT measure:
+- Business idea quality
+- Talent
+- Psychological readiness
+- Likelihood of success
+
+----------------------------------------
+AXIS WEIGHTING (100 POINTS TOTAL)
+----------------------------------------
+
+Axis 1: Liquidity-Weighted Runway — 35 pts
+Axis 2: Revenue Stability & Ramp Realism — 25 pts
+Axis 3: Fixed Cost Pressure — 15 pts
+Axis 4: Healthcare Exposure — 10 pts
+Axis 5: Safety Buffer Margin — 10 pts
+Axis 6: Tax Modeling Inclusion — 5 pts
+
+Conservative bias must be applied.
+Short runway and aggressive revenue assumptions penalize heavily.
+
+----------------------------------------
+LIQUIDITY WEIGHTING
+----------------------------------------
+
+Asset Weights:
+
+Cash / HYSA = 1.00
+Brokerage (non-retirement) = 0.90
+Roth contributions = 0.70
+Traditional retirement accounts = 0.60
+Real estate equity = 0.40
+
+Weighted Net Worth =
+sum(asset_value × weight)
+
+----------------------------------------
+TRUE MONTHLY INDEPENDENCE BURN
+----------------------------------------
+
+True Monthly Burn =
+Monthly Living Expenses
++ Healthcare Monthly Cost
++ Business Operating Costs
++ Tax Reserve Amount
+
+If dual-income household is selected:
+
+Partner Monthly Income reduces True Monthly Burn BEFORE runway calculation.
+
+True Monthly Burn cannot go below zero.
+
+----------------------------------------
+ADJUSTED RUNWAY (MONTHS)
+----------------------------------------
+
+Adjusted Runway =
+Weighted Net Worth / True Monthly Burn
+
+----------------------------------------
+RUNWAY SCORING (NONLINEAR, CONSERVATIVE)
+----------------------------------------
+
+<3 months → 0–10 pts
+3–6 months → 10–20 pts
+6–9 months → 20–28 pts
+9–12 months → 28–33 pts
+12+ months → 33–35 pts
+
+Override Rules:
+
+If Adjusted Runway >= 60 months → total score floor = 85
+
+If Weighted Net Worth >= 100 × True Monthly Burn → total score = 95–100
+
+----------------------------------------
+REVENUE MODELING
+----------------------------------------
+
+Inputs:
+
+- Expected Monthly Revenue at stabilization
+- Ramp Duration (months)
+- Revenue Type: recurring or one-time
+- Volatility Percent (user adjustable 10–20%, default = 15%)
+
+Break-even Month =
+Month where expected revenue >= True Monthly Burn
+
+Generate 3 Scenarios:
+
+Base Case
+-15% Revenue
++15% Revenue
+
+Scoring Logic:
+
+- Break-even before Month 3 → penalty
+- Ramp <3 months with low runway → heavy penalty
+- Recurring revenue → boost
+- Conservative ramp (6+ months) → boost
+- High volatility + short runway → compounding penalty
+
+----------------------------------------
+FIXED COST PRESSURE
+----------------------------------------
+
+Fixed Cost Ratio =
+True Monthly Burn / Weighted Net Worth
+
+Penalty increases sharply if monthly burn exceeds 15% of weighted net worth.
+
+----------------------------------------
+HEALTHCARE EXPOSURE
+----------------------------------------
+
+Partner coverage → high score (9–10 pts)
+ACA moderate cost → mid score (6–8 pts)
+High private cost → low score (2–5 pts)
+No healthcare modeled → severe penalty
+
+----------------------------------------
+SAFETY BUFFER MARGIN
+----------------------------------------
+
+After break-even month:
+
+Calculate remaining runway.
+
+0 months buffer → 0–2 pts
+1–2 months → 3–6 pts
+3+ months → 7–10 pts
+
+----------------------------------------
+TAX MODELING
+----------------------------------------
+
+If tax reserve percent between 15–30% is included → full 5 pts
+
+If omitted or <10% → penalty (0–2 pts)
+
+----------------------------------------
+TOTAL SCORE OUTPUT
+----------------------------------------
+
+0–40 → High Risk (Red)
+41–65 → Fragile (Orange/Yellow)
+66–80 → Moderate Stability (Light Green)
+81–100 → Strong Stability (Green)
+
+----------------------------------------
+SECONDARY INDICATOR
+----------------------------------------
+
+Generate “Execution Stability” indicator derived ONLY from:
+
+- Revenue ramp realism
+- Revenue volatility
+- Revenue type (recurring vs one-time)
+
+This indicator does not affect total survival score.
+
+----------------------------------------
+PDF REPORT STRUCTURE
+----------------------------------------
+
+Generate structured PDF containing:
+
+1. Cover Page
+2. Executive Snapshot (Readiness Index + Interpretation)
+3. Naive vs Adjusted Runway Comparison
+4. True Independence Burn Breakdown
+5. Liquidity-Weighted Net Worth Explanation
+6. Revenue Assumptions
+7. Base Case Scenario Page
+8. -15% Scenario Page
+9. +15% Scenario Page
+10. Timeline Risk Curve (Month-by-month visualization)
+11. Axis Breakdown Bars
+12. Score Impact Levers (show how changes affect score)
+13. Methodology Overview
+14. Disclaimer Page
+
+Language Rules:
+
+- Calm
+- Conservative
+- Structured
+- No motivational tone
+- No advice language
+- Always use phrasing:
+  “Based on your selected assumptions…”
+
+Include disclaimer:
+
+"This report is an educational financial simulation based on user inputs and estimated U.S. averages. It is not financial, tax, or legal advice."
+
+----------------------------------------
+TECH REQUIREMENTS
+----------------------------------------
+
+- Mobile-first UI
+- One-question-at-a-time input flow
+- Deterministic math engine
+- No AI-generated narrative required
+- Server-side PDF generation
+- Minimal data storage
+- No banking integrations
+- No live healthcare APIs
+
+Build clean.
+Build structured.
+Do not expand scope.
+Do not add features beyond this specification.
