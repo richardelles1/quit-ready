@@ -5,45 +5,53 @@ import { z } from "zod";
 export const simulations = pgTable("simulations", {
   id: serial("id").primaryKey(),
 
-  // Section 1: Current Stability
-  currentSalary: integer("current_salary").notNull(),
+  // Stability & Lifestyle
+  currentSalary: integer("current_salary").notNull().default(0),
   livingExpenses: integer("living_expenses").notNull(),
-  totalDebt: integer("total_debt").notNull(),
-  monthlyDebtPayments: integer("monthly_debt_payments").notNull(),
+  totalDebt: integer("total_debt").notNull().default(0),
+  monthlyDebtPayments: integer("monthly_debt_payments").notNull().default(0),
   isDualIncome: boolean("is_dual_income").notNull().default(false),
   partnerIncome: integer("partner_income").notNull().default(0),
-  healthcareType: text("healthcare_type").notNull(),
 
-  // Section 2: Liquidity Position
-  cash: integer("cash").notNull(),
-  brokerage: integer("brokerage").notNull(),
-  roth: integer("roth").notNull(),
-  traditional: integer("traditional").notNull(),
-  realEstate: integer("real_estate").notNull(),
+  // Healthcare inputs — dependent-aware model
+  healthcareType: text("healthcare_type").notNull().default('aca'),
+  adultsOnPlan: integer("adults_on_plan").notNull().default(1),
+  dependentChildren: integer("dependent_children").notNull().default(0),
+  currentPayrollHealthcare: integer("current_payroll_healthcare").notNull().default(0),
+  healthcareCostOverride: integer("healthcare_cost_override"),
 
-  // Section 3: Business Transition Model
-  businessModelType: text("business_model_type").notNull(),
+  // Liquidity Position
+  cash: integer("cash").notNull().default(0),
+  brokerage: integer("brokerage").notNull().default(0),
+  roth: integer("roth").notNull().default(0),
+  traditional: integer("traditional").notNull().default(0),
+  realEstate: integer("real_estate").notNull().default(0),
+
+  // Business Transition Model
+  businessModelType: text("business_model_type").notNull().default('solo_bootstrap'),
   businessCostOverride: integer("business_cost_override"),
   expectedRevenue: integer("expected_revenue").notNull(),
   volatilityPercent: integer("volatility_percent").notNull().default(15),
-  rampDuration: integer("ramp_duration").notNull(),
-  breakevenMonths: integer("breakeven_months").notNull(),
+  rampDuration: integer("ramp_duration").notNull().default(0),
+  breakevenMonths: integer("breakeven_months").notNull().default(0),
 
   // Computed Results
-  tmib: integer("tmib").notNull(),
-  accessibleCapital: integer("accessible_capital").notNull(),
-  selfEmploymentTax: integer("self_employment_tax").notNull(),
-  businessCostBaseline: integer("business_cost_baseline").notNull(),
-  baseRunway: integer("base_runway").notNull(),
-  runway15Down: integer("runway_15_down").notNull(),
-  runway30Down: integer("runway_30_down").notNull(),
-  runwayRampDelay: integer("runway_ramp_delay").notNull(),
-  structuralBreakpointScore: integer("structural_breakpoint_score").notNull(),
-  debtExposureRatio: real("debt_exposure_ratio").notNull(),
-  healthcareRisk: text("healthcare_risk").notNull(),
-  breakpointMonth: integer("breakpoint_month").notNull(),
-  breakpointScenario: text("breakpoint_scenario").notNull(),
-  healthcareMonthlyCost: integer("healthcare_monthly_cost").notNull(),
+  tmib: integer("tmib").notNull().default(0),
+  accessibleCapital: integer("accessible_capital").notNull().default(0),
+  selfEmploymentTax: integer("self_employment_tax").notNull().default(0),
+  businessCostBaseline: integer("business_cost_baseline").notNull().default(0),
+  estimatedHealthcarePlanCost: integer("estimated_healthcare_plan_cost").notNull().default(0),
+  healthcareDelta: integer("healthcare_delta").notNull().default(0),
+  healthcareMonthlyCost: integer("healthcare_monthly_cost").notNull().default(0),
+  baseRunway: integer("base_runway").notNull().default(0),
+  runway15Down: integer("runway_15_down").notNull().default(0),
+  runway30Down: integer("runway_30_down").notNull().default(0),
+  runwayRampDelay: integer("runway_ramp_delay").notNull().default(0),
+  structuralBreakpointScore: integer("structural_breakpoint_score").notNull().default(0),
+  debtExposureRatio: real("debt_exposure_ratio").notNull().default(0),
+  healthcareRisk: text("healthcare_risk").notNull().default(''),
+  breakpointMonth: integer("breakpoint_month").notNull().default(999),
+  breakpointScenario: text("breakpoint_scenario").notNull().default(''),
 
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
@@ -55,6 +63,8 @@ export const insertSimulationSchema = createInsertSchema(simulations).omit({
   accessibleCapital: true,
   selfEmploymentTax: true,
   businessCostBaseline: true,
+  estimatedHealthcarePlanCost: true,
+  healthcareDelta: true,
   baseRunway: true,
   runway15Down: true,
   runway30Down: true,
@@ -70,6 +80,12 @@ export const insertSimulationSchema = createInsertSchema(simulations).omit({
   businessModelType: z.enum(['solo_bootstrap', 'contractor_heavy', 'agency_service', 'inventory_heavy', 'saas_product']),
   volatilityPercent: z.coerce.number().min(10).max(40).default(15),
   businessCostOverride: z.coerce.number().min(0).optional().nullable(),
+  healthcareCostOverride: z.coerce.number().min(0).optional().nullable(),
+  adultsOnPlan: z.coerce.number().min(1).max(2).default(1),
+  dependentChildren: z.coerce.number().min(0).default(0),
+  currentPayrollHealthcare: z.coerce.number().min(0).default(0),
+  totalDebt: z.coerce.number().min(0).default(0),
+  monthlyDebtPayments: z.coerce.number().min(0).default(0),
 });
 
 export type Simulation = typeof simulations.$inferSelect;

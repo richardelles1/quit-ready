@@ -1,0 +1,187 @@
+You are updating the QuitReady application. This is a structural model refactor. Do not remove existing working logic unless explicitly replaced below. Preserve existing routing and layout structure.
+
+GOAL: Clarify the financial model, eliminate double-counting confusion, add dependent-aware healthcare modeling (auto-estimated with override), improve financial input UX, and expose transparent burn math before report generation.
+
+–––––––––––––––––––––––––––––––
+MODEL REFACTOR REQUIREMENTS
+–––––––––––––––––––––––––––––––
+	1.	RESTRUCTURE MONTHLY BURN INTO CLEAR BUCKETS
+
+Replace ambiguous expense inputs with these four required burn categories:
+
+A. Lifestyle Expenses (monthly, non-debt)
+	•	Rent (if not mortgage)
+	•	Utilities
+	•	Food
+	•	Insurance (non-health)
+	•	Discretionary
+	•	Childcare (if applicable)
+→ Single input field: “Total Monthly Lifestyle Expenses (excluding debt)”
+
+B. Monthly Debt Obligations
+→ Single input field: “Total Monthly Debt Payments”
+(Mortgage payment, student loans, car, credit cards, etc.)
+
+C. Healthcare Delta (auto-estimated, dependent-aware)
+See healthcare logic below.
+
+D. Business Overhead (conditional)
+Only show if user selects “Transitioning to Self-Employment”
+→ Input: “Estimated Monthly Business Operating Costs”
+
+E. Partner Income Offset
+If user indicates dual-income household:
+→ Input: “Partner Monthly Net Income Contributing to Household”
+
+–––––––––––––––––––––––––––––––
+DEPENDENT-AWARE HEALTHCARE MODEL (OPTION 2 LOCKED)
+–––––––––––––––––––––––––––––––
+
+Add these inputs:
+
+• Number of adults covered (1 or 2)
+• Number of dependent children
+
+Keep existing:
+• Current monthly healthcare payroll deduction
+
+AUTO-ESTIMATE independent plan cost using this tier logic:
+
+If adults = 1 and children = 0:
+estimatedPlan = 600
+
+If adults = 2 and children = 0:
+estimatedPlan = 1100
+
+If adults = 1 and children >=1:
+estimatedPlan = 1200 + (children * 250)
+
+If adults = 2 and children >=1:
+estimatedPlan = 1500 + (children * 300)
+
+Cap at 3000 maximum.
+
+Then compute:
+
+Healthcare Delta = estimatedPlan – currentPayrollHealthcare
+
+Display:
+“Estimated Independent Plan Cost (Based on Household Size): $X”
+Allow manual override with toggle:
+[ ] Override estimated healthcare cost
+
+If override checked → user enters custom monthly independent healthcare cost.
+
+–––––––––––––––––––––––––––––––
+OPTIONAL TOTAL DEBT BALANCE (RISK CONTEXT ONLY)
+–––––––––––––––––––––––––––––––
+
+Add optional field:
+
+“Total Outstanding Debt Balance (Optional – Long-Term Risk Context Only)”
+
+Display tooltip:
+“This does not affect monthly burn. It informs leverage and structural risk commentary.”
+
+This value must NOT be used in monthly burn calculation.
+
+–––––––––––––––––––––––––––––––
+CLEAR BURN FORMULA (VISIBLE ON SUMMARY SCREEN)
+–––––––––––––––––––––––––––––––
+
+Compute:
+
+True Monthly Burn (TMB) =
+Lifestyle
+	•	Monthly Debt Payments
+	•	Healthcare Delta
+	•	Business Overhead (if applicable)
+– Partner Income Contribution
+
+Display breakdown visibly before report:
+
+Monthly Burn Breakdown:
+• Lifestyle: $X
+• Debt: $X
+• Healthcare Delta: $X
+• Business: $X
+• Partner Offset: -$X
+—————————
+True Monthly Burn: $X
+
+Make this section always visible before stress test results.
+
+–––––––––––––––––––––––––––––––
+REVENUE STRESS LOGIC
+–––––––––––––––––––––––––––––––
+
+Revenue stress only affects revenue.
+Burn must remain static.
+
+Maintain existing revenue variance logic (± stress %).
+Ensure stress never alters burn inputs.
+
+–––––––––––––––––––––––––––––––
+FINANCIAL INPUT UX IMPROVEMENTS
+–––––––––––––––––––––––––––––––
+
+Apply to ALL currency fields:
+
+• Default value = blank (NOT 0)
+• Live comma formatting
+• Dollar sign prefix
+• Right-aligned numbers
+• Prevent negative values
+
+Apply percent mask formatting to revenue stress input.
+
+–––––––––––––––––––––––––––––––
+HOUSEHOLD STRUCTURE LOGIC
+–––––––––––––––––––––––––––––––
+
+Add toggle:
+
+“Household Structure”
+( ) Single Income
+( ) Dual Income
+
+If Dual:
+Show Partner Income field
+If Single:
+Hide Partner Income field
+
+–––––––––––––––––––––––––––––––
+VALIDATION
+–––––––––––––––––––––––––––––––
+
+Do not allow:
+• Submission if required fields empty
+• Negative numbers
+• Healthcare delta calculation without current payroll healthcare input
+
+Show inline validation messages.
+
+–––––––––––––––––––––––––––––––
+DO NOT MODIFY YET
+–––––––––––––––––––––––––––––––
+
+• Do not redesign report pages yet.
+• Do not change routing.
+• Do not remove existing stress test math.
+• Do not remove existing readiness score logic.
+
+Only refactor model clarity, burn math transparency, healthcare estimation, and input UX.
+
+–––––––––––––––––––––––––––––––
+SUCCESS CONDITION
+–––––––––––––––––––––––––––––––
+
+When complete:
+	1.	Monthly burn is transparent and visibly calculated.
+	2.	No double-count confusion.
+	3.	Healthcare cost adjusts automatically based on dependents.
+	4.	Total debt balance does not affect burn.
+	5.	All money inputs are properly formatted.
+	6.	Burn breakdown appears clearly before stress output.
+
+End of update.

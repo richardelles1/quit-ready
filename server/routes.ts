@@ -2,7 +2,7 @@ import type { Express } from "express";
 import type { Server } from "http";
 import { storage } from "./storage";
 import { api } from "@shared/routes";
-import { calculateSimulation, generateNarrative, HEALTHCARE_COSTS, HEALTHCARE_RISK_LABELS, BUSINESS_COST_BASELINES } from "./services/simulator";
+import { calculateSimulation, generateNarrative, HEALTHCARE_RISK_LABELS, BUSINESS_COST_BASELINES } from "./services/simulator";
 import { z } from "zod";
 import PDFDocument from "pdfkit";
 
@@ -20,6 +20,10 @@ export async function registerRoutes(
         totalDebt: Number(req.body.totalDebt || 0),
         monthlyDebtPayments: Number(req.body.monthlyDebtPayments || 0),
         partnerIncome: Number(req.body.partnerIncome || 0),
+        adultsOnPlan: Number(req.body.adultsOnPlan || 1),
+        dependentChildren: Number(req.body.dependentChildren || 0),
+        currentPayrollHealthcare: Number(req.body.currentPayrollHealthcare || 0),
+        healthcareCostOverride: req.body.healthcareCostOverride ? Number(req.body.healthcareCostOverride) : null,
         cash: Number(req.body.cash || 0),
         brokerage: Number(req.body.brokerage || 0),
         roth: Number(req.body.roth || 0),
@@ -42,6 +46,8 @@ export async function registerRoutes(
         accessibleCapital: computed.accessibleCapital,
         selfEmploymentTax: computed.selfEmploymentTax,
         businessCostBaseline: computed.businessCostBaseline,
+        estimatedHealthcarePlanCost: computed.estimatedHealthcarePlanCost,
+        healthcareDelta: computed.healthcareDelta,
         healthcareMonthlyCost: computed.healthcareMonthlyCost,
         baseRunway: computed.baseRunway,
         runway15Down: computed.runway15Down,

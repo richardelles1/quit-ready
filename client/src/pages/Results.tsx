@@ -129,12 +129,12 @@ export default function Results() {
   ];
 
   const TMIB_ROWS = [
-    { label: 'Living expenses',                  val: sim.livingExpenses },
-    { label: 'Healthcare coverage (estimated)',   val: sim.healthcareMonthlyCost },
+    { label: 'Lifestyle expenses',               val: sim.livingExpenses },
     { label: 'Monthly debt payments',             val: sim.monthlyDebtPayments },
-    { label: 'Self-employment tax reserve (28%)', val: sim.selfEmploymentTax },
-    { label: 'Business operating cost',           val: sim.businessCostBaseline },
-    { label: 'Less: partner income',              val: -sim.partnerIncome, subtract: true },
+    { label: 'Healthcare delta (independent plan cost − payroll deduction)', val: sim.healthcareDelta ?? sim.healthcareMonthlyCost },
+    { label: 'SE tax reserve (28% of revenue)',  val: sim.selfEmploymentTax },
+    { label: 'Business operating cost',          val: sim.businessCostBaseline },
+    { label: 'Partner income offset',            val: sim.partnerIncome, subtract: true },
   ].filter(r => r.val !== 0);
 
   return (
