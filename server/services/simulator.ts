@@ -1,15 +1,20 @@
 import { InsertSimulation } from "@shared/schema";
 
-// ─── Healthcare risk labels (for qualitative output) ──────────────────────
+// ─── Healthcare risk labels ────────────────────────────────────────────────
 export const HEALTHCARE_RISK_LABELS: Record<string, string> = {
   employer: 'Low — Retained employer coverage',
-  cobra: 'Moderate — COBRA is time-limited (18 months)',
-  aca: 'Moderate — ACA subsidy dependent on income level',
-  partner: 'Low — Covered by partner plan',
-  none: 'Severe — No coverage exposes all medical costs',
+  cobra:    'Moderate — COBRA is time-limited to 18 months',
+  aca:      'Moderate — ACA subsidy depends on post-quit income',
+  partner:  'Low — Covered by partner plan',
+  none:     'Severe — No coverage, all medical costs are out-of-pocket',
 };
 
-// ─── Dependent-aware healthcare plan cost estimate ─────────────────────────
+// ─── 2024 Federal Poverty Level (FPL) by household size ──────────────────
+function calcFPL(householdSize: number): number {
+  return 15060 + Math.max(0, householdSize - 1) * 5380;
+}
+
+// ─── Unsubsidized independent plan cost (household-size based) ────────────
 export function estimateIndependentHealthcarePlan(adults: number, children: number): number {
   let base: number;
   if (adults === 2 && children >= 1) base = 1500 + (children * 300);
@@ -19,59 +24,86 @@ export function estimateIndependentHealthcarePlan(adults: number, children: numb
   return Math.min(base, 3000);
 }
 
+// ─── ACA income-aware subsidized premium ─────────────────────────────────
+// Uses simplified ACA cap-rate logic based on FPL percentage.
+// annualIncome = expectedRevenue * 12 (post-quit income estimate)
+export function estimateACASubsidizedPremium(
+  adults: number,
+  children: number,
+  annualIncome: number,
+): number {
+  const fullPremium = estimateIndependentHealthcarePlan(adults, children);
+  const householdSize = adults + children;
+  const fpl = calcFPL(householdSize);
+  const fplPct = annualIncome > 0 ? annualIncome / fpl : 0;
+
+  // Below 138% FPL → Medicaid eligible (effectively $0 premium for modeling)
+  if (fplPct < 1.38) return 0;
+  // Above 400% FPL → no subsidy, full unsubsidized premium
+  if (fplPct >= 4.0) return fullPremium;
+
+  // ACA caps the subscriber's premium as a % of annual income
+  let capRate: number;
+  if (fplPct < 1.5)  capRate = 0.02;
+  else if (fplPct < 2.0)  capRate = 0.04;
+  else if (fplPct < 2.5)  capRate = 0.06;
+  else if (fplPct < 3.0)  capRate = 0.07;
+  else capRate = 0.085;
+
+  const monthlyCapped = (annualIncome * capRate) / 12;
+  return Math.min(fullPremium, Math.max(0, monthlyCapped));
+}
+
 // ─── Business cost baselines by model type (monthly) ─────────────────────
 export const BUSINESS_COST_BASELINES: Record<string, number> = {
-  solo_bootstrap: 500,
+  solo_bootstrap:   500,
   contractor_heavy: 2000,
-  agency_service: 3000,
-  inventory_heavy: 4500,
-  saas_product: 2500,
+  agency_service:   3000,
+  inventory_heavy:  4500,
+  saas_product:     2500,
 };
 
-// Self-employment tax rate (conservative, SE + federal estimate)
 const SE_TAX_RATE = 0.28;
 
+// ─── Main calculation engine ───────────────────────────────────────────────
 export function calculateSimulation(data: InsertSimulation) {
 
-  // ─────────────────────────────────────────────
-  // 1. HEALTHCARE DELTA (dependent-aware)
-  // ─────────────────────────────────────────────
+  // 1. HEALTHCARE — income-aware ACA subsidy or flat estimate
   const estimatedHealthcarePlanCost = estimateIndependentHealthcarePlan(
     data.adultsOnPlan ?? 1,
     data.dependentChildren ?? 0,
   );
 
-  // If user provided an override, use that; otherwise use auto-estimate
-  const independentPlanCost = (data.healthcareCostOverride != null && data.healthcareCostOverride > 0)
-    ? data.healthcareCostOverride
-    : estimatedHealthcarePlanCost;
+  let independentPlanCost: number;
+  if (data.healthcareCostOverride != null && data.healthcareCostOverride > 0) {
+    independentPlanCost = data.healthcareCostOverride;
+  } else if (data.healthcareType === 'aca') {
+    // Apply income-aware subsidy using expected post-quit revenue
+    const annualPostQuitIncome = data.expectedRevenue * 12;
+    independentPlanCost = estimateACASubsidizedPremium(
+      data.adultsOnPlan ?? 1,
+      data.dependentChildren ?? 0,
+      annualPostQuitIncome,
+    );
+  } else {
+    independentPlanCost = estimatedHealthcarePlanCost;
+  }
 
-  // Partner coverage = no healthcare cost delta
   const isPartnerCovered = data.healthcareType === 'partner';
   const effectiveIndependentCost = isPartnerCovered ? 0 : independentPlanCost;
-
   const healthcareDelta = Math.max(0, effectiveIndependentCost - (data.currentPayrollHealthcare ?? 0));
+  const healthcareMonthlyCost = healthcareDelta;
   const healthcareRisk = HEALTHCARE_RISK_LABELS[data.healthcareType] ?? 'Unknown';
 
-  // healthcareMonthlyCost = the cost we add to burn (the delta)
-  const healthcareMonthlyCost = healthcareDelta;
-
-  // ─────────────────────────────────────────────
   // 2. BUSINESS COST
-  // ─────────────────────────────────────────────
-  const businessCostBaseline = data.businessCostOverride != null && data.businessCostOverride > 0
+  const businessCostBaseline = (data.businessCostOverride != null && data.businessCostOverride > 0)
     ? data.businessCostOverride
     : (BUSINESS_COST_BASELINES[data.businessModelType] ?? 1000);
 
-  // ─────────────────────────────────────────────
   // 3. SE TAX RESERVE
-  // ─────────────────────────────────────────────
   const selfEmploymentTax = Math.round(data.expectedRevenue * SE_TAX_RATE);
 
-  // ─────────────────────────────────────────────
   // 4. TRUE MONTHLY INDEPENDENCE BURN (TMIB)
-  //    Lifestyle + Debt + Healthcare Delta + SE Tax + Business - Partner
-  // ─────────────────────────────────────────────
   let tmib =
     data.livingExpenses +
     data.monthlyDebtPayments +
@@ -79,27 +111,19 @@ export function calculateSimulation(data: InsertSimulation) {
     selfEmploymentTax +
     businessCostBaseline;
 
-  if (data.isDualIncome) {
-    tmib -= data.partnerIncome;
-  }
-
+  if (data.isDualIncome) tmib -= data.partnerIncome;
   tmib = Math.max(0, tmib);
 
-  // ─────────────────────────────────────────────
-  // 5. LIQUIDITY HAIRCUTS → ACCESSIBLE CAPITAL
-  // ─────────────────────────────────────────────
-  const accessibleCapital = Math.round(
-    data.cash * 1.00 +
-    data.brokerage * 0.80 +
-    data.roth * 1.00 +
-    data.traditional * 0.50 +
-    data.realEstate * 0.30
-  );
+  // 5. LIQUIDITY HAIRCUTS — Tier 1 / Tier 2 / Tier 3
+  const tier1 = data.cash;                               // fully liquid
+  const tier2 = Math.round(data.brokerage * 0.80);       // semi-liquid
+  const tier3Roth = Math.round(data.roth * 1.00);        // retirement (contributions)
+  const tier3Trad = Math.round(data.traditional * 0.50); // retirement (taxed + penalty)
+  const tier3RE   = Math.round(data.realEstate * 0.30);  // illiquid
 
-  // ─────────────────────────────────────────────
-  // 6. RUNWAY CALCULATIONS (four stress scenarios)
-  //    Revenue stress only — burn remains static
-  // ─────────────────────────────────────────────
+  const accessibleCapital = tier1 + tier2 + tier3Roth + tier3Trad + tier3RE;
+
+  // 6. RUNWAY — four stress scenarios
   function calcRunway(revMultiplier: number, rampMonths: number): number {
     if (tmib <= 0) return 999;
     let capital = accessibleCapital;
@@ -109,48 +133,36 @@ export function calculateSimulation(data: InsertSimulation) {
       const rampProgress = rampMonths > 0 ? Math.min(m / rampMonths, 1) : 1;
       const rampFactor = m <= rampMonths ? 0.50 * rampProgress : 1.0;
       const monthlyRev = stableRev * rampFactor;
-
-      // Volatility haircut on revenue side only — burn is never adjusted
       const volatilityHaircut = 1 - (data.volatilityPercent / 100);
       const effectiveRev = monthlyRev * volatilityHaircut;
-
-      const netMonthlyDrain = tmib - effectiveRev;
-      capital -= netMonthlyDrain;
-
+      capital -= (tmib - effectiveRev);
       if (capital <= 0) return m;
     }
     return 999;
   }
 
-  const baseRunway = calcRunway(1.0, data.rampDuration);
-  const runway15Down = calcRunway(0.85, data.rampDuration);
-  const runway30Down = calcRunway(0.70, data.rampDuration);
-  const runwayRampDelay = calcRunway(1.0, data.rampDuration + 3);
+  const baseRunway    = calcRunway(1.00, data.rampDuration);
+  const runway15Down  = calcRunway(0.85, data.rampDuration);
+  const runway30Down  = calcRunway(0.70, data.rampDuration);
+  const runwayRampDelay = calcRunway(1.00, data.rampDuration + 3);
 
-  // Breakpoint = worst case across all scenarios
   const worstRunway = Math.min(baseRunway, runway15Down, runway30Down, runwayRampDelay);
-  let breakpointMonth = worstRunway;
+  let breakpointMonth = worstRunway >= 999 ? 999 : worstRunway;
   let breakpointScenario = 'Base Case';
-  if (runway30Down === worstRunway) breakpointScenario = '-30% Revenue Shock';
-  else if (runwayRampDelay === worstRunway) breakpointScenario = 'Ramp Delay (+3 months)';
-  else if (runway15Down === worstRunway) breakpointScenario = '-15% Revenue Shock';
-  if (breakpointMonth >= 999) breakpointMonth = 999;
+  if (runway30Down === worstRunway) breakpointScenario = 'Severe income contraction (−30%)';
+  else if (runwayRampDelay === worstRunway) breakpointScenario = 'Ramp delay (+3 months)';
+  else if (runway15Down === worstRunway) breakpointScenario = 'Moderate income contraction (−15%)';
 
-  // ─────────────────────────────────────────────
-  // 7. DEBT EXPOSURE RATIO (totalDebt for risk context only, does not affect burn)
-  // ─────────────────────────────────────────────
+  // 7. DEBT EXPOSURE RATIO (context only, does not affect burn)
   const debtExposureRatio = accessibleCapital > 0
     ? Math.min(data.totalDebt / accessibleCapital, 9.99)
     : 9.99;
 
-  // ─────────────────────────────────────────────
   // 8. STRUCTURAL BREAKPOINT SCORE (0–100)
-  //    40% Runway | 25% Revenue | 20% Debt | 10% Healthcare | 5% Business Cost
-  // ─────────────────────────────────────────────
   let runwayPts = 0;
-  if (baseRunway < 6) runwayPts = Math.round((baseRunway / 6) * 10);
-  else if (baseRunway < 12) runwayPts = 10 + Math.round(((baseRunway - 6) / 6) * 15);
-  else if (baseRunway < 24) runwayPts = 25 + Math.round(((baseRunway - 12) / 12) * 10);
+  if (baseRunway < 6)        runwayPts = Math.round((baseRunway / 6) * 10);
+  else if (baseRunway < 12)  runwayPts = 10 + Math.round(((baseRunway - 6) / 6) * 15);
+  else if (baseRunway < 24)  runwayPts = 25 + Math.round(((baseRunway - 12) / 12) * 10);
   else runwayPts = 35 + Math.min(5, Math.round((baseRunway - 24) / 12));
   runwayPts = Math.min(40, runwayPts);
 
@@ -159,9 +171,9 @@ export function calculateSimulation(data: InsertSimulation) {
   const revPts = Math.round(25 * rampScore * volScore);
 
   let debtPts = 0;
-  if (debtExposureRatio >= 0.70) debtPts = Math.round(20 * 0.1);
-  else if (debtExposureRatio >= 0.40) debtPts = Math.round(20 * 0.4);
-  else if (debtExposureRatio >= 0.20) debtPts = Math.round(20 * 0.7);
+  if (debtExposureRatio >= 0.70)      debtPts = 2;
+  else if (debtExposureRatio >= 0.40) debtPts = 8;
+  else if (debtExposureRatio >= 0.20) debtPts = 14;
   else debtPts = 20;
 
   const healthcarePtsMap: Record<string, number> = {
@@ -197,32 +209,9 @@ export function calculateSimulation(data: InsertSimulation) {
     breakpointMonth,
     breakpointScenario,
     debtFlagged: debtExposureRatio > 0.70,
+    // Tier breakdown for PDF/report
+    tier1Capital: tier1,
+    tier2Capital: tier2,
+    tier3Capital: tier3Roth + tier3Trad + tier3RE,
   };
-}
-
-// ─── Deterministic narrative ──────────────────────────────────────────────
-export function generateNarrative(sim: {
-  breakpointMonth: number;
-  breakpointScenario: string;
-  baseRunway: number;
-  runway30Down: number;
-  tmib: number;
-  accessibleCapital: number;
-  debtExposureRatio: number;
-  structuralBreakpointScore: number;
-}): string {
-  const { breakpointMonth, breakpointScenario, baseRunway, runway30Down, tmib, accessibleCapital, debtExposureRatio } = sim;
-
-  if (breakpointMonth >= 999) {
-    return `Based on your selected assumptions, your capital position sustains the transition through all modeled stress scenarios. Liquidity is structurally sufficient. Continued monitoring of revenue realization and debt obligations is advisable.`;
-  }
-
-  let failureCause = 'capital depletion';
-  if (debtExposureRatio > 0.70) {
-    failureCause = 'debt stress compounded by capital depletion';
-  } else if (tmib > accessibleCapital * 0.12) {
-    failureCause = 'burn rate exceeding accessible capital reserves';
-  }
-
-  return `Based on your selected assumptions, your plan reaches a structural breakpoint in Month ${breakpointMonth} under the ${breakpointScenario} scenario. The primary failure mechanism is ${failureCause}. Base-case runway extends to Month ${baseRunway >= 999 ? '24+' : baseRunway}. Under a -30% revenue reduction, runway compresses to Month ${runway30Down >= 999 ? '24+' : runway30Down}.`;
 }

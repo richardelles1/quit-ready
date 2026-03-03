@@ -17,13 +17,12 @@ function fmtYears(months: number): string {
 }
 
 function fmtYearsLong(months: number): string {
-  if (months >= 999) return '24+ years (288+ months)';
+  if (months >= 999) return '24+ years';
   const yrs = (months / 12).toFixed(1);
   return `${yrs} years (${months} months)`;
 }
 
-// ─── Client-side runway calculator (mirrors server) ────────────────────────
-
+// ─── Client-side runway calculator ────────────────────────────────────────
 function calcRunwayClient(capital: number, burn: number, revenue: number, ramp: number, vol: number): number {
   if (burn <= 0) return 999;
   let cap = capital;
@@ -36,8 +35,7 @@ function calcRunwayClient(capital: number, burn: number, revenue: number, ramp: 
   return 999;
 }
 
-// ─── Shared UI components ──────────────────────────────────────────────────
-
+// ─── Shared UI ────────────────────────────────────────────────────────────
 function SectionCard({ children, className = "" }: { children: React.ReactNode; className?: string }) {
   return <div className={`border border-border rounded-md ${className}`}>{children}</div>;
 }
@@ -51,28 +49,68 @@ function SectionHeader({ children, sub }: { children: React.ReactNode; sub?: str
   );
 }
 
-function Label({ children }: { children: React.ReactNode }) {
-  return <p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground mb-1">{children}</p>;
+// ─── Plain-English executive bullets ─────────────────────────────────────
+function buildAdvisorBullets(sim: SimulationResult): string[] {
+  const score = sim.structuralBreakpointScore;
+  const hc = sim.healthcareDelta ?? sim.healthcareMonthlyCost;
+  const tier1 = sim.cash;
+  const tier2 = Math.round(sim.brokerage * 0.80);
+  const tier3 = Math.round(sim.roth + sim.traditional * 0.50 + sim.realEstate * 0.30);
+  const monthlyDrain = Math.max(0, sim.tmib - sim.expectedRevenue * (1 - sim.volatilityPercent / 100));
+  const tier1Months = monthlyDrain > 0 ? Math.min(999, Math.round(tier1 / monthlyDrain)) : 999;
+  const reliesOnRetirement = tier3 > 0 && tier1 + tier2 < sim.tmib * 12;
+
+  let b1: string;
+  if (score >= 70) b1 = `Based on your inputs, your finances can support this move under expected conditions. You have meaningful breathing room before things become structurally tight.`;
+  else if (score >= 50) b1 = `Your finances can support this transition under expected conditions, but there's meaningful risk if revenue takes a significant hit in the first year.`;
+  else b1 = `Your finances face real pressure here. You have some runway, but less margin for error than is comfortable — small problems could compound quickly.`;
+
+  const b2 = sim.baseRunway >= 999
+    ? `If revenue comes in as expected, your savings would last well beyond the model's horizon. Capital is not your constraint — execution is.`
+    : `If revenue comes in as expected, your savings would cover roughly ${fmtYearsLong(sim.baseRunway)} of expenses before running out.`;
+
+  const b3 = sim.runway30Down >= 999
+    ? `Even if income dropped by 30%, your savings would remain sufficient. The model found no depletion point within its range.`
+    : `If income dropped by 30% from your expected level, your savings would run out in about ${fmtYearsLong(sim.runway30Down)}.`;
+
+  let b4: string;
+  if (reliesOnRetirement && tier1Months < 12) {
+    b4 = `Your liquid savings alone (cash and brokerage) cover roughly ${fmtYears(tier1 + tier2 > 0 ? Math.round((tier1 + tier2) / (monthlyDrain || 1)) : 0)} under stress. Without retirement assets, this move would be financially premature.`;
+  } else if (hc > sim.tmib * 0.18) {
+    b4 = `Healthcare cost is a notable pressure point — it represents ${Math.round((hc / sim.tmib) * 100)}% of your monthly burn. Subsidized ACA or partner coverage could materially improve your position.`;
+  } else if (sim.debtExposureRatio > 0.70) {
+    b4 = `Outstanding loan obligations represent ${fmtPct(sim.debtExposureRatio)} of your accessible capital. This is the highest-leverage structural risk in your profile.`;
+  } else {
+    b4 = `Your ramp timeline and revenue reliability are the variables most likely to shift your outcome — a slower start or higher income variance extends the time capital must cover the gap.`;
+  }
+
+  return [b1, b2, b3, b4];
 }
 
-// ─── Runway bar chart ──────────────────────────────────────────────────────
+// ─── Score helpers ─────────────────────────────────────────────────────────
+function getScoreLabel(score: number): string {
+  if (score >= 86) return 'Strong buffer position';
+  if (score >= 70) return 'Structurally stable';
+  if (score >= 50) return 'Moderately exposed';
+  return 'Structurally fragile';
+}
+function getScoreColors(score: number) {
+  if (score >= 70) return { text: 'text-green-700', bg: 'bg-green-50', border: 'border-green-200' };
+  if (score >= 50) return { text: 'text-amber-700', bg: 'bg-amber-50', border: 'border-amber-200' };
+  return { text: 'text-red-700', bg: 'bg-red-50', border: 'border-red-200' };
+}
 
-function RunwayBar({ label, months, maxMonths, accent = false }: {
-  label: string; months: number; maxMonths: number; accent?: boolean;
-}) {
+// ─── Runway bar ────────────────────────────────────────────────────────────
+function RunwayBar({ label, months, maxMonths }: { label: string; months: number; maxMonths: number }) {
   const pct = months >= 999 ? 100 : Math.min((months / maxMonths) * 100, 100);
-  const yrs = fmtYears(months);
-  const monthStr = months >= 999 ? '24+ months' : `${months} months`;
-  const isGood = months >= 24;
-  const barClass = isGood ? 'bg-foreground/80' : months >= 12 ? 'bg-foreground/50' : 'bg-foreground/30';
-
+  const barClass = months >= 24 ? 'bg-foreground/80' : months >= 12 ? 'bg-foreground/50' : 'bg-foreground/25';
   return (
     <div className="py-3.5 border-b border-border last:border-0">
       <div className="flex items-baseline justify-between mb-2 gap-3">
         <span className="text-sm text-muted-foreground flex-1">{label}</span>
         <div className="text-right shrink-0">
-          <span className="text-sm font-bold text-foreground">{yrs}</span>
-          <span className="text-xs text-muted-foreground ml-1.5">{monthStr}</span>
+          <span className="text-sm font-bold text-foreground">{fmtYears(months)}</span>
+          <span className="text-xs text-muted-foreground ml-1.5">{months >= 999 ? '' : `(${months} months)`}</span>
         </div>
       </div>
       <div className="h-2 bg-muted/40 rounded-full overflow-hidden">
@@ -82,30 +120,24 @@ function RunwayBar({ label, months, maxMonths, accent = false }: {
   );
 }
 
-// ─── Burn composition bar ──────────────────────────────────────────────────
-
+// ─── Burn composition visual ───────────────────────────────────────────────
 function BurnCompositionBar({ sim }: { sim: SimulationResult }) {
   const hc = sim.healthcareDelta ?? sim.healthcareMonthlyCost;
-  const gross = sim.tmib + (sim.isDualIncome ? sim.partnerIncome : 0);
   const segments = [
-    { label: 'Debt', val: sim.monthlyDebtPayments, opacity: 'opacity-100' },
-    { label: 'Living', val: sim.livingExpenses, opacity: 'opacity-70' },
+    { label: 'Loan payments', val: sim.monthlyDebtPayments, opacity: 'opacity-100' },
+    { label: 'Living costs', val: sim.livingExpenses, opacity: 'opacity-70' },
     { label: 'Healthcare', val: hc, opacity: 'opacity-50' },
     { label: 'Tax reserve', val: sim.selfEmploymentTax, opacity: 'opacity-30' },
     { label: 'Business', val: sim.businessCostBaseline, opacity: 'opacity-20' },
   ].filter(s => s.val > 0);
-
   const total = segments.reduce((a, s) => a + s.val, 0);
-
   return (
     <div className="mt-4">
-      <div className="flex h-4 rounded-full overflow-hidden gap-px">
+      <div className="flex h-3.5 rounded-full overflow-hidden gap-px">
         {segments.map(s => (
-          <div key={s.label}
-            style={{ width: `${(s.val / total) * 100}%` }}
+          <div key={s.label} style={{ width: `${(s.val / total) * 100}%` }}
             className={`bg-foreground ${s.opacity} first:rounded-l-full last:rounded-r-full`}
-            title={`${s.label}: ${fmt(s.val)}`}
-          />
+            title={`${s.label}: ${fmt(s.val)}`} />
         ))}
       </div>
       <div className="flex flex-wrap gap-x-4 gap-y-1.5 mt-3">
@@ -120,98 +152,7 @@ function BurnCompositionBar({ sim }: { sim: SimulationResult }) {
   );
 }
 
-// ─── Liquidity tier bar ────────────────────────────────────────────────────
-
-function LiquidityTierBar({ sim }: { sim: SimulationResult }) {
-  const tiers = [
-    { label: 'Cash & HYSA', raw: sim.cash, rate: 1.00, val: Math.round(sim.cash * 1.00) },
-    { label: 'Brokerage',   raw: sim.brokerage, rate: 0.80, val: Math.round(sim.brokerage * 0.80) },
-    { label: 'Roth',        raw: sim.roth, rate: 1.00, val: Math.round(sim.roth * 1.00) },
-    { label: 'Retirement',  raw: sim.traditional, rate: 0.50, val: Math.round(sim.traditional * 0.50) },
-    { label: 'Real estate', raw: sim.realEstate, rate: 0.30, val: Math.round(sim.realEstate * 0.30) },
-  ].filter(t => t.val > 0);
-
-  const total = tiers.reduce((a, t) => a + t.val, 0);
-  const opacities = ['opacity-100', 'opacity-75', 'opacity-55', 'opacity-35', 'opacity-20'];
-
-  if (total === 0) return null;
-
-  return (
-    <div className="mt-4">
-      <div className="flex h-4 rounded-full overflow-hidden gap-px">
-        {tiers.map((t, i) => (
-          <div key={t.label}
-            style={{ width: `${(t.val / total) * 100}%` }}
-            className={`bg-foreground ${opacities[i] ?? 'opacity-20'} first:rounded-l-full last:rounded-r-full`}
-            title={`${t.label}: ${fmt(t.val)}`}
-          />
-        ))}
-      </div>
-      <div className="flex flex-wrap gap-x-4 gap-y-1.5 mt-3">
-        {tiers.map((t, i) => (
-          <div key={t.label} className="flex items-center gap-1.5">
-            <div className={`w-2.5 h-2.5 rounded-sm bg-foreground ${opacities[i] ?? 'opacity-20'} shrink-0`} />
-            <span className="text-xs text-muted-foreground">{t.label} <span className="font-medium text-foreground">{fmt(t.val)}</span></span>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-// ─── Executive summary bullets ─────────────────────────────────────────────
-
-function buildExecutiveBullets(sim: SimulationResult): string[] {
-  const score = sim.structuralBreakpointScore;
-  const hc = sim.healthcareDelta ?? sim.healthcareMonthlyCost;
-  const debtFlagged = sim.debtExposureRatio > 0.70;
-  const highBurn = sim.tmib > sim.accessibleCapital * 0.12;
-
-  // Bullet 1: Overall assessment
-  let b1: string;
-  if (score >= 70) b1 = `Your finances are structurally stable under expected conditions. The model does not identify a critical breakpoint in the base case.`;
-  else if (score >= 50) b1 = `Your finances show moderate structural exposure. Runway is positive in the base case but constrained under stress.`;
-  else b1 = `Your finances show meaningful structural fragility. Capital reserves are under pressure across multiple modeled scenarios.`;
-
-  // Bullet 2: Base runway
-  const b2 = sim.baseRunway >= 999
-    ? `Base-case runway extends beyond 24 years — capital is not a binding constraint under expected conditions.`
-    : `Base-case runway extends to ${fmtYearsLong(sim.baseRunway)}. Liquidity is exhausted at that point if revenue and expenses hold.`;
-
-  // Bullet 3: Worst case
-  const worst = Math.min(sim.runway15Down, sim.runway30Down, sim.runwayRampDelay);
-  const b3 = worst >= 999
-    ? `Under a severe income contraction (30% reduction), the plan remains solvent. No depletion identified within the 24-year model horizon.`
-    : `Under a severe income contraction (30% reduction), liquidity is exhausted in ${fmtYearsLong(sim.runway30Down)}.`;
-
-  // Bullet 4: Primary vulnerability
-  let vuln: string;
-  if (debtFlagged) vuln = 'debt load relative to accessible capital — debt-to-capital ratio exceeds 70%.';
-  else if (hc > sim.tmib * 0.20) vuln = 'healthcare transition cost — the delta represents a significant portion of monthly burn.';
-  else if (highBurn) vuln = 'monthly burn rate relative to accessible capital reserves.';
-  else vuln = 'revenue realization during the ramp period — early-stage underperformance is the most likely constraint.';
-  const b4 = `Your primary structural vulnerability is ${vuln}`;
-
-  return [b1, b2, b3, b4];
-}
-
-// ─── Score helpers ─────────────────────────────────────────────────────────
-
-function scoreLabel(score: number): string {
-  if (score >= 86) return 'Strong buffer position';
-  if (score >= 70) return 'Structurally stable';
-  if (score >= 50) return 'Moderately exposed';
-  return 'Structurally fragile';
-}
-
-function scoreColors(score: number): { text: string; bg: string; border: string } {
-  if (score >= 70) return { text: 'text-green-700', bg: 'bg-green-50', border: 'border-green-200' };
-  if (score >= 50) return { text: 'text-amber-700', bg: 'bg-amber-50', border: 'border-amber-200' };
-  return { text: 'text-red-700', bg: 'bg-red-50', border: 'border-red-200' };
-}
-
-// ─── Main component ───────────────────────────────────────────────────────
-
+// ─── Main component ────────────────────────────────────────────────────────
 export default function Results() {
   const params = useParams();
   const id = params.id ? parseInt(params.id, 10) : null;
@@ -231,69 +172,78 @@ export default function Results() {
       <Layout>
         <div className="flex-1 flex flex-col items-center justify-center py-24 gap-4">
           <div className="w-7 h-7 border-2 border-muted border-t-foreground rounded-full animate-spin" />
-          <p className="text-sm text-muted-foreground">Running structural stress models...</p>
+          <p className="text-sm text-muted-foreground">Running structural stress analysis...</p>
         </div>
       </Layout>
     );
   }
-
   if (isError || !sim) {
     return (
       <Layout>
         <div className="flex-1 flex flex-col items-center justify-center py-24 px-4 text-center gap-4">
           <AlertCircle className="w-9 h-9 text-muted-foreground" />
           <h2 className="text-xl font-bold font-serif text-foreground">Report not found</h2>
-          <p className="text-sm text-muted-foreground max-w-xs">This simulation may have expired or the link is invalid.</p>
+          <p className="text-sm text-muted-foreground max-w-xs">This simulation may have expired. Start a new one.</p>
           <Link href="/simulator"><Button>Start new simulation</Button></Link>
         </div>
       </Layout>
     );
   }
 
-  // ─── Derived values ──────────────────────────────────────────────────────
+  // ─── Derived values ────────────────────────────────────────────────────
   const score = sim.structuralBreakpointScore;
-  const sc = scoreColors(score);
+  const sc = getScoreColors(score);
   const worstRunway = Math.min(sim.runway15Down, sim.runway30Down, sim.runwayRampDelay);
   const debtFlagged = sim.debtExposureRatio > 0.70;
   const hc = sim.healthcareDelta ?? sim.healthcareMonthlyCost;
   const reportDate = new Date(sim.createdAt).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
-  const bullets = buildExecutiveBullets(sim);
+  const bullets = buildAdvisorBullets(sim);
+
+  // Liquidity tiers
+  const tier1 = sim.cash;
+  const tier2 = Math.round(sim.brokerage * 0.80);
+  const tier3Roth = Math.round(sim.roth * 1.00);
+  const tier3Trad = Math.round(sim.traditional * 0.50);
+  const tier3RE   = Math.round(sim.realEstate * 0.30);
+  const tier3Total = tier3Roth + tier3Trad + tier3RE;
+  const tier1And2 = tier1 + tier2;
+  const reliesOnRetirement = tier3Total > 0 && tier1And2 < sim.tmib * 12;
 
   // Runway chart scale
   const runways = [sim.baseRunway, sim.runway15Down, sim.runway30Down, sim.runwayRampDelay].filter(r => r < 999);
-  const maxScale = Math.max(Math.min(Math.max(...runways, 36) * 1.15, 288), 36);
+  const maxScale = Math.max(Math.min(Math.max(...runways, 36) * 1.2, 288), 36);
 
   // Burn interpretation
   const fixedBurnTotal = (sim.monthlyDebtPayments ?? 0) + hc;
   const fixedPct = sim.tmib > 0 ? Math.round((fixedBurnTotal / sim.tmib) * 100) : 0;
   const sePct = sim.tmib > 0 ? Math.round((sim.selfEmploymentTax / sim.tmib) * 100) : 0;
 
-  // "What moves the needle" — sensitivity against severe contraction scenario
+  // Sensitivity
   const severeBase = sim.runway30Down;
   const burnMinus1k = calcRunwayClient(sim.accessibleCapital, Math.max(0, sim.tmib - 1000), sim.expectedRevenue * 0.70, sim.rampDuration, sim.volatilityPercent);
   const revPlus1k = calcRunwayClient(sim.accessibleCapital, sim.tmib, (sim.expectedRevenue + 1000) * 0.70, sim.rampDuration, sim.volatilityPercent);
-  const burnDelta = burnMinus1k >= 999 ? 'eliminates the breakpoint entirely' : severeBase >= 999 ? 'has no effect — already stable' : `extends severe-case runway by ${burnMinus1k - severeBase} months`;
-  const revDelta = revPlus1k >= 999 ? 'eliminates the breakpoint entirely' : severeBase >= 999 ? 'has no effect — already stable' : `extends severe-case runway by ${revPlus1k - severeBase} months`;
+  const burnDeltaMonths = burnMinus1k >= 999 ? null : severeBase >= 999 ? null : burnMinus1k - severeBase;
+  const revDeltaMonths = revPlus1k >= 999 ? null : severeBase >= 999 ? null : revPlus1k - severeBase;
   const hcBurnPct = sim.tmib > 0 ? Math.round((hc / sim.tmib) * 100) : 0;
 
-  // Asset rows
-  const ASSET_ROWS = [
-    { label: 'Cash & HYSA',               raw: sim.cash,        rate: 1.00, tag: 'fully liquid' },
-    { label: 'Brokerage (taxable)',        raw: sim.brokerage,   rate: 0.80, tag: 'semi-liquid' },
-    { label: 'Roth IRA (contributions)',   raw: sim.roth,        rate: 1.00, tag: 'fully liquid' },
-    { label: 'Traditional IRA / 401(k)',   raw: sim.traditional, rate: 0.50, tag: 'penalty + tax' },
-    { label: 'Real Estate Equity',         raw: sim.realEstate,  rate: 0.30, tag: 'illiquid' },
-  ].filter(r => r.raw > 0);
+  // Advisor "what this means" section
+  const isStable = score >= 70;
+  const advisorSummary = isStable
+    ? `You have meaningful flexibility. Your savings, when combined with expected revenue, create a defensible runway that doesn't require tapping retirement accounts under base-case conditions.`
+    : score >= 50
+    ? `Your position is workable but not comfortable. A slower-than-expected ramp or an early income dip could push you toward retirement assets sooner than planned.`
+    : `Your savings alone are unlikely to carry this transition through the ramp period without putting pressure on retirement funds. The numbers suggest this move would benefit from more preparation time or lower burn before exit.`;
 
-  // Burn rows for breakdown table
-  const BURN_ROWS = [
-    { label: 'Monthly debt service',                       val: sim.monthlyDebtPayments, subtract: false },
-    { label: 'Operating cost of living',                   val: sim.livingExpenses, subtract: false },
-    { label: 'Healthcare delta',                           val: hc, subtract: false },
-    { label: 'SE tax reserve (28% of stable revenue)',     val: sim.selfEmploymentTax, subtract: false },
-    { label: 'Business operating cost',                    val: sim.businessCostBaseline, subtract: false },
-    { label: 'Partner income offset',                      val: sim.partnerIncome, subtract: true },
-  ].filter(r => r.val !== 0);
+  const advisorRetirementNote = reliesOnRetirement && tier3Total > 0
+    ? `Based on your Tier 1 and Tier 2 capital (${fmt(tier1And2)}), you would likely need to access retirement accounts to sustain beyond ${fmtYears(tier1And2 > 0 && sim.tmib > 0 ? Math.round(tier1And2 / Math.max(1, sim.tmib - sim.expectedRevenue * 0.7)) : 0)} under a stressed scenario. Accessing retirement early reduces long-term compounding significantly — treat it as emergency capital, not a plan.`
+    : null;
+
+  const advisorBestMove = (() => {
+    if (fixedPct > 60) return `Reducing fixed obligations (loan payments and healthcare) would have the highest impact on runway. Fixed costs leave no flexibility during income shortfalls.`;
+    if (hcBurnPct >= 15) return `Healthcare cost is your highest single lever — partner coverage or income-based ACA subsidies could free up ${fmt(hc)}/month immediately.`;
+    if (sim.rampDuration > 6) return `Shortening your ramp timeline or entering with a client contract already in hand would significantly reduce the capital your savings need to cover.`;
+    return `Increasing stable revenue by even $1,000/month would extend your worst-case runway by ${revDeltaMonths ? `${revDeltaMonths} months` : 'a meaningful amount'}.`;
+  })();
 
   return (
     <Layout>
@@ -307,7 +257,7 @@ export default function Results() {
                 Structural Breakpoint Report · {reportDate}
               </p>
               <h1 className="text-3xl font-bold font-serif text-foreground leading-tight">
-                Here's what would break first — and when.
+                Here's what the numbers show — and what they mean.
               </h1>
             </div>
             <Button onClick={handleDownload} disabled={downloadPdf.isPending} variant="outline" className="gap-2 shrink-0" data-testid="button-download-pdf">
@@ -316,19 +266,17 @@ export default function Results() {
             </Button>
           </div>
 
-          {/* ── SECTION 1: Executive Summary ───────────────────────────── */}
+          {/* ── SECTION 1: Executive Summary ──────────────────────────────── */}
           <SectionCard className="mb-6">
             <SectionHeader>Executive Summary</SectionHeader>
-            <div className="p-6 space-y-3">
+            <div className="p-6 space-y-3.5">
               {bullets.map((b, i) => (
                 <div key={i} className="flex items-start gap-3">
-                  <span className="mt-1 w-5 h-5 rounded-full bg-foreground/10 text-foreground text-xs font-bold flex items-center justify-center shrink-0">{i + 1}</span>
+                  <span className="mt-0.5 w-5 h-5 rounded-full bg-foreground/10 text-xs font-bold flex items-center justify-center shrink-0 text-foreground">{i + 1}</span>
                   <p className="text-sm text-muted-foreground leading-relaxed" data-testid="text-narrative">{b}</p>
                 </div>
               ))}
             </div>
-
-            {/* Key metrics */}
             <div className="grid grid-cols-2 sm:grid-cols-4 border-t border-border">
               {[
                 { label: 'Monthly burn', val: fmt(sim.tmib), testid: 'metric-tmib' },
@@ -344,7 +292,7 @@ export default function Results() {
             </div>
           </SectionCard>
 
-          {/* ── SECTION 2: Breakpoint Score ─────────────────────────────── */}
+          {/* ── SECTION 2: Breakpoint Score ────────────────────────────────── */}
           <SectionCard className="mb-6">
             <SectionHeader>Structural Breakpoint Score</SectionHeader>
             <div className="p-6">
@@ -354,16 +302,14 @@ export default function Results() {
                   <p className="text-xs text-muted-foreground mt-1">out of 100</p>
                 </div>
                 <div>
-                  <p className={`text-base font-semibold ${sc.text} mb-1`}>{scoreLabel(score)}</p>
+                  <p className={`text-base font-semibold ${sc.text} mb-1.5`}>{getScoreLabel(score)}</p>
                   <p className="text-sm text-muted-foreground leading-relaxed">
                     {sim.breakpointMonth >= 999
-                      ? 'No structural breakpoint identified within the 24-year model horizon.'
-                      : `Earliest structural breakpoint: ${fmtYearsLong(sim.breakpointMonth)} — ${sim.breakpointScenario}.`}
+                      ? 'No structural breakpoint found within the model range. Capital and revenue projections remain solvent across all scenarios.'
+                      : `The earliest pressure point appears at ${fmtYearsLong(sim.breakpointMonth)} — under the ${sim.breakpointScenario} scenario.`}
                   </p>
                 </div>
               </div>
-
-              {/* Score legend */}
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                 {[
                   { range: '0 – 49', label: 'Structurally fragile', active: score < 50 },
@@ -371,7 +317,7 @@ export default function Results() {
                   { range: '70 – 85', label: 'Structurally stable', active: score >= 70 && score <= 85 },
                   { range: '86 – 100', label: 'Strong buffer position', active: score > 85 },
                 ].map(l => (
-                  <div key={l.range} className={`p-3 rounded-md border text-center ${l.active ? 'border-foreground bg-foreground/5' : 'border-border opacity-50'}`}>
+                  <div key={l.range} className={`p-3 rounded-md border text-center ${l.active ? 'border-foreground bg-foreground/5' : 'border-border opacity-40'}`}>
                     <p className="text-xs font-bold text-foreground mb-0.5">{l.range}</p>
                     <p className="text-xs text-muted-foreground leading-tight">{l.label}</p>
                   </div>
@@ -380,18 +326,18 @@ export default function Results() {
             </div>
           </SectionCard>
 
-          {/* ── SECTION 3: Runway comparison ─────────────────────────────── */}
+          {/* ── SECTION 3: Runway Comparison ───────────────────────────────── */}
           <SectionCard className="mb-6">
-            <SectionHeader sub="Bars show liquidity runway before capital depletion under each scenario. Revenue stress never alters burn.">
+            <SectionHeader sub="How long your savings would last before running out, in each scenario. Revenue stress reduces income — your burn stays constant.">
               Liquidity Runway Under Stress Scenarios
             </SectionHeader>
             <div className="px-6 py-2">
-              <RunwayBar label="Base case — expected conditions" months={sim.baseRunway} maxMonths={maxScale} />
+              <RunwayBar label="Expected conditions — revenue at target" months={sim.baseRunway} maxMonths={maxScale} />
               <RunwayBar label="Moderate income contraction (−15%)" months={sim.runway15Down} maxMonths={maxScale} />
               <RunwayBar label="Severe income contraction (−30%)" months={sim.runway30Down} maxMonths={maxScale} />
-              <RunwayBar label="Ramp delayed by 3 months" months={sim.runwayRampDelay} maxMonths={maxScale} />
+              <RunwayBar label="Ramp takes 3 months longer than planned" months={sim.runwayRampDelay} maxMonths={maxScale} />
             </div>
-            <div className="px-6 pb-4 pt-2 border-t border-border">
+            <div className="border-t border-border px-6 pb-4 pt-4">
               <div className="overflow-x-auto">
                 <table className="w-full text-sm" data-testid="table-scenarios">
                   <thead>
@@ -403,17 +349,17 @@ export default function Results() {
                   </thead>
                   <tbody>
                     {[
-                      { label: 'Base case', runway: sim.baseRunway },
+                      { label: 'Expected conditions', runway: sim.baseRunway },
                       { label: 'Moderate income contraction (−15%)', runway: sim.runway15Down },
                       { label: 'Severe income contraction (−30%)', runway: sim.runway30Down },
                       { label: 'Ramp delayed +3 months', runway: sim.runwayRampDelay },
                     ].map(s => {
-                      const exhausted = s.runway >= 999 ? 'Not within horizon' : `${fmtYears(s.runway)} (month ${s.runway})`;
                       const color = s.runway >= 999 ? 'text-green-700' : s.runway < 12 ? 'text-red-700' : 'text-amber-700';
+                      const exhausted = s.runway >= 999 ? 'Not within horizon' : `${fmtYears(s.runway)} (month ${s.runway})`;
                       return (
                         <tr key={s.label} className="border-b border-border last:border-0">
                           <td className="py-3 text-sm text-muted-foreground">{s.label}</td>
-                          <td className="py-3 text-sm font-semibold text-right text-foreground">{fmtYears(s.runway)}</td>
+                          <td className="py-3 text-sm font-semibold text-foreground text-right">{fmtYears(s.runway)}</td>
                           <td className={`py-3 text-sm font-semibold text-right ${color}`}>{exhausted}</td>
                         </tr>
                       );
@@ -424,135 +370,251 @@ export default function Results() {
             </div>
           </SectionCard>
 
-          {/* ── SECTION 4: Structural Burn Breakdown ──────────────────────── */}
+          {/* ── SECTION 4: Structural Burn Breakdown ───────────────────────── */}
           <SectionCard className="mb-6">
-            <SectionHeader>Structural Burn Breakdown</SectionHeader>
+            <SectionHeader>Monthly Burn Breakdown</SectionHeader>
             <div className="px-6 py-4">
-              <div className="divide-y divide-border mb-4">
-                {BURN_ROWS.map(row => (
-                  <div key={row.label} className="flex items-center justify-between py-3.5">
-                    <span className="text-sm text-muted-foreground">{row.label}</span>
-                    <span className={`text-sm font-semibold ${row.subtract ? 'text-green-700' : 'text-foreground'}`}>
-                      {row.subtract ? `(${fmt(row.val)})` : fmt(row.val)}
-                    </span>
+              {/* Group 1: Fixed */}
+              <div className="mb-4">
+                <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">Required Fixed Obligations</p>
+                {[
+                  { label: 'Required loan payments', val: sim.monthlyDebtPayments },
+                  { label: 'Household living costs', val: sim.livingExpenses },
+                ].filter(r => r.val > 0).map(r => (
+                  <div key={r.label} className="flex items-center justify-between py-2.5 border-b border-border last:border-0">
+                    <span className="text-sm text-muted-foreground">{r.label}</span>
+                    <span className="text-sm font-semibold text-foreground">{fmt(r.val)}</span>
                   </div>
                 ))}
-                <div className="flex items-center justify-between py-4">
-                  <span className="text-sm font-bold text-foreground">True Monthly Burn</span>
-                  <span className="text-xl font-bold font-serif text-foreground" data-testid="text-tmib-total">{fmt(sim.tmib)}</span>
-                </div>
               </div>
 
-              {/* Composition bar */}
+              {/* Group 2: Transition */}
+              <div className="mb-4">
+                <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">Transition Adjustments</p>
+                {hc > 0 && (
+                  <div className="flex items-center justify-between py-2.5 border-b border-border last:border-0">
+                    <span className="text-sm text-muted-foreground">Healthcare cost change</span>
+                    <span className="text-sm font-semibold text-foreground">{fmt(hc)}</span>
+                  </div>
+                )}
+                {sim.isDualIncome && sim.partnerIncome > 0 && (
+                  <div className="flex items-center justify-between py-2.5 border-b border-border last:border-0">
+                    <span className="text-sm text-muted-foreground">Partner income offset</span>
+                    <span className="text-sm font-semibold text-green-700">({fmt(sim.partnerIncome)})</span>
+                  </div>
+                )}
+              </div>
+
+              {/* Group 3: Income plan costs */}
+              <div className="mb-4">
+                <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">Income Plan Costs</p>
+                {[
+                  { label: 'Self-employment tax reserve (28%)', val: sim.selfEmploymentTax },
+                  { label: 'Business operating cost', val: sim.businessCostBaseline },
+                ].filter(r => r.val > 0).map(r => (
+                  <div key={r.label} className="flex items-center justify-between py-2.5 border-b border-border last:border-0">
+                    <span className="text-sm text-muted-foreground">{r.label}</span>
+                    <span className="text-sm font-semibold text-foreground">{fmt(r.val)}</span>
+                  </div>
+                ))}
+              </div>
+
+              <div className="flex items-center justify-between py-4 border-t-2 border-border">
+                <span className="text-sm font-bold text-foreground">True Monthly Burn</span>
+                <span className="text-xl font-bold font-serif text-foreground" data-testid="text-tmib-total">{fmt(sim.tmib)}</span>
+              </div>
+
               <BurnCompositionBar sim={sim} />
 
-              {/* Interpretation */}
               {sim.tmib > 0 && (
                 <div className="mt-5 pt-5 border-t border-border space-y-1.5">
                   <p className="text-xs text-muted-foreground leading-relaxed">
-                    Fixed obligations (debt service and healthcare delta) represent <strong className="text-foreground">{fixedPct}%</strong> of total burn — these cannot be reduced without structural changes to your debt or coverage situation.
+                    <strong className="text-foreground">{fixedPct}% of your burn is fixed</strong> — loan payments and healthcare costs that won't decrease if revenue slows down. These are the hardest costs to cut under pressure.
                   </p>
-                  <p className="text-xs text-muted-foreground leading-relaxed">
-                    Revenue-linked components (SE tax reserve) represent <strong className="text-foreground">{sePct}%</strong> of total burn and scale with income — lower revenue periods reduce this component automatically.
-                  </p>
+                  {sePct > 0 && (
+                    <p className="text-xs text-muted-foreground leading-relaxed">
+                      The <strong className="text-foreground">{sePct}% tax reserve</strong> does ease naturally in lower-revenue months, giving your burn some flexibility tied to income.
+                    </p>
+                  )}
                 </div>
               )}
 
               {debtFlagged && (
                 <div className="mt-4 flex items-start gap-2.5 p-3.5 bg-red-50 border border-red-200 rounded-md">
                   <AlertTriangle className="w-4 h-4 text-red-600 shrink-0 mt-0.5" />
-                  <p className="text-xs text-red-700">Outstanding debt exceeds 70% of accessible capital — an elevated structural risk position.</p>
+                  <p className="text-xs text-red-700">Outstanding loan balances represent {fmtPct(sim.debtExposureRatio)} of your accessible capital — above the 70% elevated risk threshold.</p>
                 </div>
               )}
             </div>
           </SectionCard>
 
-          {/* ── SECTION 5: Liquidity Defense Map ──────────────────────────── */}
+          {/* ── SECTION 5: Liquidity Defense Map ───────────────────────────── */}
           <SectionCard className="mb-6">
-            <SectionHeader sub="Your liquidity stack is layered from fully liquid to illiquid. Under stress, depletion follows this order.">
+            <SectionHeader sub="Your savings are layered by how easily you can reach them. When your burn exceeds income, money comes from here — in this order.">
               Liquidity Defense Map
             </SectionHeader>
             <div className="px-6 py-4">
-              {/* Tier visual */}
-              <LiquidityTierBar sim={sim} />
 
-              {/* Detail rows */}
-              <div className="divide-y divide-border mt-5">
-                {ASSET_ROWS.map(row => {
-                  const counted = Math.round(row.raw * row.rate);
-                  const barWidth = Math.round(row.rate * 100);
-                  return (
-                    <div key={row.label} className="py-4">
-                      <div className="flex items-center justify-between mb-2">
-                        <div>
-                          <span className="text-sm font-medium text-foreground">{row.label}</span>
-                          <span className="ml-2 text-xs text-muted-foreground opacity-60">{row.tag}</span>
-                        </div>
-                        <div className="text-right">
-                          <span className="text-xs text-muted-foreground block">{fmt(row.raw)} declared</span>
-                          <span className="text-sm font-bold text-foreground">{fmt(counted)} accessible</span>
-                        </div>
-                      </div>
-                      <div className="h-1 bg-muted rounded-full overflow-hidden">
-                        <div className="h-full bg-foreground/50 rounded-full" style={{ width: `${barWidth}%` }} />
-                      </div>
+              {/* Tier 1 */}
+              <div className="mb-5">
+                <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3">
+                  Tier 1 — Fully Liquid <span className="normal-case font-normal">(Primary Runway)</span>
+                </p>
+                {tier1 > 0 ? (
+                  <div className="flex items-center justify-between py-3 border border-border rounded-md px-4">
+                    <div>
+                      <p className="text-sm font-medium text-foreground">Cash & HYSA</p>
+                      <p className="text-xs text-muted-foreground">No penalty, no tax, no delay</p>
                     </div>
-                  );
-                })}
+                    <p className="text-sm font-bold text-foreground">{fmt(tier1)}</p>
+                  </div>
+                ) : (
+                  <p className="text-sm text-muted-foreground italic">No Tier 1 capital entered.</p>
+                )}
               </div>
-              <div className="flex items-center justify-between py-4 mt-1 border-t border-border bg-muted/10 -mx-6 px-6 rounded-b-md">
+
+              {/* Tier 2 */}
+              <div className="mb-5">
+                <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3">
+                  Tier 2 — Semi-Liquid <span className="normal-case font-normal">(Access with trade-offs)</span>
+                </p>
+                {tier2 > 0 ? (
+                  <div className="flex items-center justify-between py-3 border border-border rounded-md px-4">
+                    <div>
+                      <p className="text-sm font-medium text-foreground">Brokerage accounts</p>
+                      <p className="text-xs text-muted-foreground">Selling may trigger capital gains taxes</p>
+                    </div>
+                    <p className="text-sm font-bold text-foreground">{fmt(tier2)}</p>
+                  </div>
+                ) : (
+                  <p className="text-sm text-muted-foreground italic">No Tier 2 capital entered.</p>
+                )}
+              </div>
+
+              {/* Tier 3 */}
+              <div className="mb-5">
+                <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-1">
+                  Tier 3 — Restricted <span className="normal-case font-normal">(Last resort — not primary runway)</span>
+                </p>
+                <p className="text-xs text-muted-foreground mb-3">These are not considered primary runway. Accessing them early may trigger penalties and long-term damage to retirement security.</p>
+                {tier3Total > 0 ? (
+                  <div className="border border-border rounded-md overflow-hidden">
+                    {tier3Roth > 0 && (
+                      <div className="flex items-center justify-between py-3 px-4 border-b border-border">
+                        <div>
+                          <p className="text-sm font-medium text-foreground">Roth IRA contributions</p>
+                          <p className="text-xs text-muted-foreground">Penalty-free contributions (100%)</p>
+                        </div>
+                        <p className="text-sm font-bold text-foreground">{fmt(tier3Roth)}</p>
+                      </div>
+                    )}
+                    {tier3Trad > 0 && (
+                      <div className="flex items-center justify-between py-3 px-4 border-b border-border">
+                        <div>
+                          <p className="text-sm font-medium text-foreground">Traditional IRA / 401(k)</p>
+                          <p className="text-xs text-muted-foreground">Counted at 50% — income tax + 10% penalty</p>
+                        </div>
+                        <p className="text-sm font-bold text-foreground">{fmt(tier3Trad)}</p>
+                      </div>
+                    )}
+                    {tier3RE > 0 && (
+                      <div className="flex items-center justify-between py-3 px-4">
+                        <div>
+                          <p className="text-sm font-medium text-foreground">Home equity</p>
+                          <p className="text-xs text-muted-foreground">Counted at 30% — illiquid, costly to access</p>
+                        </div>
+                        <p className="text-sm font-bold text-foreground">{fmt(tier3RE)}</p>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <p className="text-sm text-muted-foreground italic">No Tier 3 capital entered.</p>
+                )}
+                {reliesOnRetirement && (
+                  <div className="mt-3 flex items-start gap-2.5 p-3.5 bg-amber-50 border border-amber-200 rounded-md">
+                    <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+                    <p className="text-xs text-amber-700 leading-relaxed">
+                      You are not currently liquid enough to sustain this transition without accessing retirement funds. Tier 1 + Tier 2 capital ({fmt(tier1And2)}) covers less than 12 months of burn under stress.
+                    </p>
+                  </div>
+                )}
+              </div>
+
+              <div className="flex items-center justify-between py-4 border-t border-border bg-muted/10 -mx-6 px-6 rounded-b-md">
                 <span className="text-sm font-bold text-foreground">Total accessible capital</span>
                 <span className="text-xl font-bold font-serif text-foreground" data-testid="text-accessible-capital">{fmt(sim.accessibleCapital)}</span>
               </div>
             </div>
           </SectionCard>
 
-          {/* ── SECTION 6: What Moves the Needle ─────────────────────────── */}
+          {/* ── SECTION 6: What Moves the Needle ──────────────────────────── */}
           <SectionCard className="mb-6">
-            <SectionHeader sub="These are the highest-leverage changes available to you based on your inputs.">
+            <SectionHeader sub="The specific changes that would improve your position most based on your inputs.">
               What Moves the Needle
             </SectionHeader>
-            <div className="px-6 py-4 space-y-4">
-              <div className="p-4 rounded-md border border-border bg-muted/20">
-                <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-1.5">Reducing burn by $1,000/month</p>
-                <p className="text-sm text-foreground leading-relaxed">
-                  {burnDelta.startsWith('extends')
-                    ? `Reducing burn by $1,000/month ${burnDelta} under a severe income contraction.`
-                    : `Reducing burn by $1,000/month ${burnDelta}.`}
-                </p>
-              </div>
-              <div className="p-4 rounded-md border border-border bg-muted/20">
-                <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-1.5">Increasing stable revenue by $1,000/month</p>
-                <p className="text-sm text-foreground leading-relaxed">
-                  {revDelta.startsWith('extends')
-                    ? `Increasing stable revenue by $1,000/month ${revDelta} under a severe income contraction.`
-                    : `Increasing stable revenue by $1,000/month ${revDelta}.`}
-                </p>
-              </div>
+            <div className="px-6 py-4 space-y-3">
+              {burnDeltaMonths !== null && burnDeltaMonths > 0 && (
+                <div className="p-4 rounded-md border border-border bg-muted/20">
+                  <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-1.5">Reducing burn by $1,000/month</p>
+                  <p className="text-sm text-foreground leading-relaxed">
+                    Cutting monthly expenses by $1,000 would extend your worst-case runway by approximately {burnDeltaMonths} months — roughly {fmtYears(burnDeltaMonths)} of additional protection under a severe income contraction.
+                  </p>
+                </div>
+              )}
+              {revDeltaMonths !== null && revDeltaMonths > 0 && (
+                <div className="p-4 rounded-md border border-border bg-muted/20">
+                  <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-1.5">Increasing stable revenue by $1,000/month</p>
+                  <p className="text-sm text-foreground leading-relaxed">
+                    Adding $1,000/month to your stable revenue target extends worst-case runway by approximately {revDeltaMonths} months. Even modest revenue increases have outsized structural impact.
+                  </p>
+                </div>
+              )}
               {hcBurnPct >= 12 && (
                 <div className="p-4 rounded-md border border-border bg-muted/20">
-                  <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-1.5">Healthcare transition exposure</p>
+                  <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-1.5">Healthcare cost ({hcBurnPct}% of total burn)</p>
                   <p className="text-sm text-foreground leading-relaxed">
-                    Healthcare transition represents {hcBurnPct}% of total monthly burn — a significant lever. Partner coverage or income-based ACA subsidies could materially reduce this exposure.
+                    Healthcare transition represents {hcBurnPct}% of your monthly burn — {fmt(hc)}/month. Partner coverage, a lower-cost plan, or income-based ACA subsidies could eliminate a significant portion of this cost.
                   </p>
                 </div>
               )}
               {debtFlagged && (
                 <div className="p-4 rounded-md border border-border bg-muted/20">
-                  <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-1.5">Debt-to-capital exposure</p>
+                  <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-1.5">Loan balance relative to capital</p>
                   <p className="text-sm text-foreground leading-relaxed">
-                    Debt obligations represent {fmtPct(sim.debtExposureRatio)} of accessible capital. Reducing debt load prior to exit would improve structural runway.
+                    Outstanding loans represent {fmtPct(sim.debtExposureRatio)} of accessible capital. Reducing total loan balances before exit would lower your structural risk score and free up burn capacity.
+                  </p>
+                </div>
+              )}
+              {(burnDeltaMonths === null || burnDeltaMonths <= 0) && (revDeltaMonths === null || revDeltaMonths <= 0) && hcBurnPct < 12 && !debtFlagged && (
+                <div className="p-4 rounded-md border border-border bg-muted/20">
+                  <p className="text-sm text-foreground leading-relaxed">
+                    Your position is strong enough that marginal changes have limited impact on the stressed runway. The biggest variable at this point is execution — particularly how quickly revenue stabilizes after the ramp.
                   </p>
                 </div>
               )}
             </div>
           </SectionCard>
 
+          {/* ── ADVISOR SECTION: What This Means For You ──────────────────── */}
+          <SectionCard className="mb-6">
+            <SectionHeader>What This Means For You</SectionHeader>
+            <div className="px-6 py-4 space-y-4">
+              <p className="text-sm text-foreground leading-relaxed">{advisorSummary}</p>
+              {advisorRetirementNote && (
+                <p className="text-sm text-foreground leading-relaxed">{advisorRetirementNote}</p>
+              )}
+              <div className="pt-3 border-t border-border">
+                <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">The single change that most improves your position</p>
+                <p className="text-sm text-foreground leading-relaxed">{advisorBestMove}</p>
+              </div>
+            </div>
+          </SectionCard>
+
           {/* Download CTA */}
           <div className="border border-border rounded-md p-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-8">
             <div>
-              <p className="text-sm font-semibold text-foreground">Full PDF report — 5 pages</p>
-              <p className="text-xs text-muted-foreground mt-0.5">Includes all sections and deterministic scenario analysis.</p>
+              <p className="text-sm font-semibold text-foreground">Full PDF report</p>
+              <p className="text-xs text-muted-foreground mt-0.5">All sections, branded, with scenario tables and advisor commentary.</p>
             </div>
             <Button onClick={handleDownload} disabled={downloadPdf.isPending} className="gap-2 shrink-0" data-testid="button-download-pdf-bottom">
               <Download className="w-4 h-4" />
@@ -571,7 +633,6 @@ export default function Results() {
           <p className="text-xs text-muted-foreground text-center leading-relaxed max-w-2xl mx-auto">
             This report is an educational financial simulation based on user-provided inputs and estimated U.S. averages. It is not financial, tax, or legal advice. Consult a qualified professional before making any major financial decisions.
           </p>
-
         </div>
       </div>
     </Layout>

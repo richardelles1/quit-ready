@@ -1,0 +1,340 @@
+Perfect. Below is a copy-paste ready Replit prompt that restructures the entire system, clarifies debt vs expenses beyond confusion, upgrades ACA logic, and transforms the report into a true co-pilot advisor voice.
+
+No commentary. Just the prompt.
+
+⸻
+
+REPLIT PROMPT
+
+You are refactoring QuitReady into a clear, authoritative, advisor-style financial simulator.
+
+This is not a calculator.
+It is a guided financial co-pilot.
+
+We are rebuilding:
+	1.	Input flow architecture
+	2.	Category clarity (debt vs living)
+	3.	Healthcare logic (income-aware ACA math)
+	4.	Structural burn grouping
+	5.	Liquidity tiers (liquid vs semi-liquid vs retirement)
+	6.	Scenario modeling
+	7.	Advisor-style narrative report
+	8.	PDF output mirroring in-app report exactly
+
+⸻
+
+PRIMARY OBJECTIVES
+
+1. Eliminate Debt vs Living Confusion Completely
+
+We will replace all ambiguous terms.
+
+OLD
+	•	Monthly debt service
+	•	Operating cost of living
+
+NEW STRUCTURE
+
+SECTION: REQUIRED LOAN PAYMENTS (Cannot skip without default)
+
+Label:
+
+Required Loan Payments
+These are contractual minimum payments. Missing them damages credit or triggers default.
+
+Field:
+
+Total monthly required loan payments
+Subtext:
+Include mortgage (or rent-to-own loans), car loans, student loans, credit cards — minimum payments only.
+
+Optional field:
+
+Total remaining loan balances
+Subtext:
+This does NOT change your monthly burn. It helps assess leverage risk.
+
+No use of the word “operating” anywhere in personal flow.
+
+⸻
+
+SECTION: HOUSEHOLD LIVING COSTS (Non-debt spending)
+
+Label:
+
+Household Living Costs (Non-Debt)
+This is what it costs your household to function each month — excluding loan payments and healthcare.
+
+Field:
+
+Total monthly household expenses
+Subtext:
+Food, utilities, insurance, childcare, transportation, subscriptions, discretionary spending.
+Do NOT include loan payments or healthcare premiums here.
+
+The language must explicitly say:
+
+If you pay a mortgage, it belongs in Required Loan Payments — not here.
+
+No ambiguity.
+
+⸻
+
+2. Flow Reorder (Narrative First)
+
+New journey order:
+
+1️⃣ Income Overview
+2️⃣ Required Loan Payments
+3️⃣ Household Living Costs
+4️⃣ Healthcare Transition
+5️⃣ Partner Income (if applicable)
+6️⃣ Structural Burn Summary
+7️⃣ Liquidity Mapping
+8️⃣ Scenario Modeling
+
+The story must feel linear:
+
+Income → Obligations → What changes → What remains → What covers it
+
+⸻
+
+3. Healthcare Logic Upgrade (Income-Aware ACA Math)
+
+Healthcare calculation must consider:
+
+Inputs:
+	•	Adults on plan
+	•	Dependent children
+	•	Current household income
+	•	Coverage type (ACA, COBRA, partner, etc.)
+	•	Current payroll deduction
+
+ACA Logic Requirements:
+	•	Estimate unsubsidized premium based on adults + dependents
+	•	Apply income-based subsidy reduction using simplified tier logic:
+	•	<250% FPL → strong subsidy
+	•	250–400% FPL → partial subsidy
+	•	400% FPL → minimal subsidy
+	•	Adjust by household size
+	•	Region-neutral but tier-sensitive (no hard-coded flat number)
+
+Display:
+
+Estimated independent plan cost: $X/month
+Based on household size and income range.
+
+If user income drops to zero (quit scenario), subsidy must increase appropriately.
+
+Healthcare delta should clearly show:
+
+Additional monthly cost compared to what you pay today.
+
+⸻
+
+4. Structural Burn Rebuild (Grouped Clearly)
+
+Structural Burn must be grouped:
+
+REQUIRED FIXED OBLIGATIONS
+	•	Required loan payments
+	•	Household living costs
+
+Subtotal shown
+
+TRANSITION ADJUSTMENTS
+	•	Healthcare change
+	•	Partner income offset
+
+Subtotal shown
+
+MONTHLY STRUCTURAL BURN
+
+Clear final number
+
+Add explanatory text:
+
+This is the amount your savings must cover each month if employment income stops.
+
+No math language. Plain English.
+
+⸻
+
+5. Liquidity Tier Classification
+
+Assets must be separated into three tiers:
+
+Tier 1: Fully Liquid (Primary Runway)
+	•	Cash
+	•	Checking
+	•	Savings
+	•	Money market
+
+Tier 2: Semi-Liquid (Access with trade-offs)
+	•	Brokerage accounts
+	•	Taxable investments
+	•	Stock grants
+
+Must explain:
+
+Selling these may trigger capital gains taxes.
+
+Tier 3: Restricted / Retirement (Last Resort)
+	•	401(k)
+	•	IRA
+	•	Pension assets
+
+Must explicitly state:
+
+These are not considered primary runway.
+Accessing them early may trigger penalties and long-term damage to retirement security.
+
+Scenario modeling must:
+	•	Calculate runway using Tier 1 only
+	•	Then Tier 1 + Tier 2
+	•	Only show Tier 3 as emergency extension
+	•	Clearly label it “Last Resort — Not Recommended”
+
+Never present retirement assets as encouraging runway.
+
+If user needs retirement funds to exceed 12 months runway, report must say:
+
+You are not currently liquid enough to leave without relying on retirement funds.
+
+⸻
+
+6. Scenario Modeling Upgrade
+
+Model 3 income scenarios:
+	1.	Income remains stable
+	2.	Income drops by 50%
+	3.	Income drops to 0
+
+For each scenario show:
+	•	Monthly surplus or deficit
+	•	Runway in months and years
+	•	Which liquidity tier is required
+
+Do not display raw month numbers like “Month 73.”
+Display:
+
+Approximately 2.4 years of runway.
+
+Interpretation required.
+
+⸻
+
+7. Conversational Co-Pilot Report Rewrite
+
+Tone must be:
+
+Calm
+Plain-language
+Supportive
+Honest
+Not alarmist
+Not corporate
+
+Examples of required voice:
+
+Instead of:
+“Liquidity exhausted in 2.2 years.”
+
+Write:
+
+If income stopped completely, your cash savings would cover about 2.2 years before running out.
+
+Instead of:
+“Structural vulnerability identified.”
+
+Write:
+
+The pressure point appears when income drops significantly — not under normal conditions.
+
+Every major section must include:
+	•	What this means
+	•	Why it matters
+	•	What increases safety
+	•	What reduces flexibility
+
+⸻
+
+8. Liquidity Explanation Section
+
+Add educational sidebar:
+
+What is liquidity?
+Liquidity means how quickly you can access money without penalties or taxes.
+Cash is highly liquid.
+Retirement accounts are not.
+
+Keep simple.
+
+⸻
+
+9. Advisor Guidance Section
+
+Add final section:
+
+“What This Means For You”
+
+Include:
+	•	Whether user is structurally stable
+	•	Whether liquidity is sufficient
+	•	Whether retirement funds are required
+	•	What single change most improves runway
+
+No fear tactics.
+No sugarcoating.
+
+If liquidity is weak:
+
+You would need to rely on retirement funds within X months. That suggests this move may be financially premature.
+
+If strong:
+
+You have meaningful flexibility without touching retirement assets.
+
+⸻
+
+10. PDF Output Requirements
+
+PDF must:
+	•	Mirror app sections exactly
+	•	Use identical headings
+	•	Maintain grouping
+	•	Include scenario tables
+	•	Include runway chart
+	•	Include liquidity tier visualization
+	•	Include advisor commentary blocks
+
+No blank pages.
+No missing sections.
+Professional layout.
+
+⸻
+
+11. UI Improvements
+	•	Monetary inputs must auto-format with commas
+	•	Fields start blank (not zero)
+	•	Real-time formatting while typing
+	•	Clear labels above every field
+	•	No overlapping category wording
+
+⸻
+
+12. Final Validation Rules
+
+Before finishing build:
+	•	Mortgage cannot appear in both categories
+	•	Retirement cannot be counted as primary liquidity
+	•	ACA cost must change with income input
+	•	Scenario outputs must match liquidity tiers correctly
+	•	PDF must render identical structure to in-app
+
+⸻
+
+Refactor the system accordingly.
+Preserve styling system.
+Maintain clean serif headings and modern layout.
+Deliver structured, advisor-grade financial simulation.
