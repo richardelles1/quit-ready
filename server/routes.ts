@@ -447,12 +447,16 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
         'A snapshot of your current income, monthly structure, and projected savings runway.', y);
 
       const totalIncome = (sim.currentSalary ?? 0) + (sim.isDualIncome ? (sim.partnerIncome ?? 0) : 0);
-      const netSurplus = totalIncome - sim.tmib;
+      // grossOutflowPDF = all expense components BEFORE partner income offset
+      // tmib already subtracts partner income — must not mix tmib with totalIncome or partner is counted twice
+      const grossOutflowPDF = (sim.livingExpenses ?? 0) + (sim.monthlyDebtPayments ?? 0) + hc +
+        (sim.selfEmploymentTax ?? 0) + (sim.businessCostBaseline ?? 0);
+      const grossSurplus = totalIncome - grossOutflowPDF;
 
       y = statRow(doc, [
         { label: 'Total Monthly Income', val: fmtM(totalIncome) },
-        { label: 'Monthly Outflow', val: fmtM(sim.tmib) },
-        { label: 'Monthly Surplus / Deficit', val: (netSurplus >= 0 ? '+' : '') + fmtM(netSurplus), color: netSurplus >= 0 ? C.green : C.red },
+        { label: 'Total Monthly Outflow (all expenses)', val: fmtM(grossOutflowPDF) },
+        { label: 'Monthly Surplus / Deficit', val: (grossSurplus >= 0 ? '+' : '') + fmtM(grossSurplus), color: grossSurplus >= 0 ? C.green : C.red },
       ], y);
 
       y = statRow(doc, [
@@ -499,37 +503,41 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       y = secHead(doc, 2, 'Income Strength & Stability',
         'Your current income picture and how it compares to the outflow structure that would be required after a transition.', y);
 
-      // Income table
+      // Income table — uses gross outflow (before partner offset) to avoid double-counting
+      const partnerIncomePDF = sim.isDualIncome ? (sim.partnerIncome ?? 0) : 0;
       const incomeRows = [
         { label: 'Your monthly take-home income (current)', val: fmtM(sim.currentSalary ?? 0) },
         ...(sim.isDualIncome && sim.partnerIncome > 0
           ? [{ label: 'Partner monthly take-home income', val: fmtM(sim.partnerIncome) }] : []),
         { label: 'Total household monthly income', val: fmtM(totalIncome) },
-        { label: 'Required monthly outflow (post-transition)', val: fmtM(sim.tmib) },
-        { label: 'Net monthly surplus / (deficit)', val: (netSurplus >= 0 ? '+' : '') + fmtM(netSurplus) },
+        { label: 'Total monthly outflow — all expenses', val: fmtM(grossOutflowPDF) },
+        ...(partnerIncomePDF > 0 ? [{ label: 'Less: partner income offset', val: `(${fmtM(partnerIncomePDF)})` }] : []),
+        { label: 'Net gap (savings + new revenue must cover)', val: fmtM(sim.tmib) },
+        { label: 'Monthly surplus / (deficit) vs. total income', val: (grossSurplus >= 0 ? '+' : '') + fmtM(grossSurplus) },
       ];
       incomeRows.forEach((row, i) => {
-        const isTotal = row.label.startsWith('Total') || row.label.startsWith('Net');
+        const isTotal = row.label.startsWith('Total') || row.label.startsWith('Monthly surplus') || row.label.startsWith('Net gap');
+        const isCredit = row.label.startsWith('Less:');
         const bg = isTotal ? C.mid : i % 2 === 0 ? C.light : C.white;
         doc.rect(L, y, W, 26).fill(bg);
         doc.fillColor(C.coal).fontSize(9).font(isTotal ? 'Helvetica-Bold' : 'Helvetica').text(row.label, L + 10, y + 8, { width: 340 });
-        doc.fillColor(isTotal && netSurplus < 0 && row.label.startsWith('Net') ? C.red : C.navy)
-          .fontSize(isTotal ? 10 : 9).font('Helvetica-Bold').text(row.val, L, y + 8, { width: W - 10, align: 'right' });
+        const valColor = isCredit ? C.green : (isTotal && grossSurplus < 0 && row.label.startsWith('Monthly') ? C.red : C.navy);
+        doc.fillColor(valColor).fontSize(isTotal ? 10 : 9).font('Helvetica-Bold').text(row.val, L, y + 8, { width: W - 10, align: 'right' });
         y += 26;
       });
       y += 10;
 
-      // Income vs Outflow bar
-      doc.fillColor(C.muted).fontSize(8).font('Helvetica-Bold').text('INCOME VS. MONTHLY OUTFLOW', L, y); y += 12;
-      const maxBar = Math.max(totalIncome, sim.tmib, 1);
+      // Income vs Outflow bar — use gross outflow for honest comparison
+      doc.fillColor(C.muted).fontSize(8).font('Helvetica-Bold').text('INCOME VS. TOTAL OUTFLOW', L, y); y += 12;
+      const maxBar = Math.max(totalIncome, grossOutflowPDF, 1);
       const incomeBarW = Math.round((totalIncome / maxBar) * W);
-      const outflowBarW = Math.round((sim.tmib / maxBar) * W);
+      const outflowBarW = Math.round((grossOutflowPDF / maxBar) * W);
 
       doc.rect(L, y, incomeBarW, 18).fill(C.navy);
       doc.fillColor(C.white).fontSize(7.5).font('Helvetica').text(`Income ${fmtM(totalIncome)}`, L + 6, y + 5);
       y += 22;
-      doc.rect(L, y, outflowBarW, 18).fill(sim.tmib > totalIncome ? C.red : C.muted);
-      doc.fillColor(C.white).fontSize(7.5).font('Helvetica').text(`Outflow ${fmtM(sim.tmib)}`, L + 6, y + 5);
+      doc.rect(L, y, outflowBarW, 18).fill(grossOutflowPDF > totalIncome ? C.red : C.muted);
+      doc.fillColor(C.white).fontSize(7.5).font('Helvetica').text(`Outflow ${fmtM(grossOutflowPDF)}`, L + 6, y + 5);
       y += 30;
 
       // Dependents note
@@ -538,9 +546,9 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
           `You have ${sim.dependentChildren} dependent child${(sim.dependentChildren ?? 0) > 1 ? 'ren' : ''} in the household. This is reflected in the healthcare cost estimate. Dependent costs (childcare, education, activities) should be included in your living expenses figure.`, y);
       }
 
-      // Paragraph
-      const incomeVerb = totalIncome > sim.tmib * 1.1 ? 'exceeds' : totalIncome >= sim.tmib * 0.9 ? 'roughly matches' : 'falls below';
-      const incomeP = `Today, your household income ${incomeVerb} your required monthly outflow structure. ${netSurplus >= 0 ? `The ${fmtM(netSurplus)}/month surplus shows financial capacity that could be directed toward savings before a transition.` : `The ${fmtM(Math.abs(netSurplus))}/month shortfall means the transition would require drawing from savings from day one even before accounting for ramp delays.`}`;
+      // Paragraph — use gross comparison for income vs. outflow narrative
+      const incomeVerb = totalIncome > grossOutflowPDF * 1.1 ? 'exceeds' : totalIncome >= grossOutflowPDF * 0.9 ? 'roughly matches' : 'falls below';
+      const incomeP = `Today, your household income ${incomeVerb} your total monthly outflow structure. ${grossSurplus >= 0 ? `The ${fmtM(grossSurplus)}/month household surplus reflects total income against all expenses combined.${partnerIncomePDF > 0 ? ` After the partner income offset of ${fmtM(partnerIncomePDF)}, the net gap that savings or new business revenue must cover is ${fmtM(sim.tmib)}/month.` : ''}` : `The ${fmtM(Math.abs(grossSurplus))}/month shortfall means total expenses exceed total income today — the transition would require drawing from savings from day one.`}`;
       y = insight(doc, 'What This Means', incomeP, y);
 
       ftr(doc, 2);

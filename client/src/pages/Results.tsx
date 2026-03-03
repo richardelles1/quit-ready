@@ -296,8 +296,11 @@ export default function Results() {
   const revDelta  = revPlus1k  < 999 && sev30 < 999 ? revPlus1k  - sev30 : null;
 
   // Income totals
+  // grossOutflow = all expense components before partner income offset
+  // tmib = gross - partnerIncome = what savings/business revenue must cover
+  // Snapshot must use grossOutflow to avoid double-counting partner income
   const totalIncome = (sim.currentSalary ?? 0) + (sim.isDualIncome ? partnerOff : 0);
-  const netSurplus = totalIncome - sim.tmib;
+  const grossSurplus = totalIncome - grossOutflow; // correct: income vs. all expenses
 
   // Advisor paragraph
   const advisorSummary = score >= 70
@@ -339,16 +342,26 @@ export default function Results() {
             <SectionHeader n={1}>Executive Snapshot — Your Financial Position Today</SectionHeader>
             <div className="grid grid-cols-2 sm:grid-cols-3 border-b border-border">
               {[
-                { label: 'Total Monthly Income', val: fmt(totalIncome), testid: 'metric-income' },
-                { label: 'Monthly Outflow', val: fmt(sim.tmib), testid: 'metric-tmib' },
-                { label: 'Monthly Surplus / Deficit', val: (netSurplus >= 0 ? '+' : '') + fmt(netSurplus), testid: 'metric-surplus', color: netSurplus >= 0 ? 'text-green-700' : 'text-red-700' },
+                { label: 'Total Monthly Income', val: fmt(totalIncome), testid: 'metric-income', sub: sim.isDualIncome && partnerOff > 0 ? `${fmt(sim.currentSalary ?? 0)} + ${fmt(partnerOff)} partner` : undefined },
+                { label: 'Total Monthly Outflow', val: fmt(grossOutflow), testid: 'metric-tmib', sub: 'All expenses, before partner income offset' },
+                { label: 'Monthly Surplus / Deficit', val: (grossSurplus >= 0 ? '+' : '') + fmt(grossSurplus), testid: 'metric-surplus', color: grossSurplus >= 0 ? 'text-green-700' : 'text-red-700', sub: grossSurplus >= 0 ? 'Household income exceeds total outflow' : 'Total outflow exceeds household income' },
               ].map((m, i) => (
                 <div key={m.label} className={`p-5 ${i < 2 ? 'border-r border-border' : ''}`} data-testid={m.testid}>
-                  <p className="text-xs text-muted-foreground uppercase tracking-wider mb-1.5">{m.label}</p>
+                  <p className="text-xs text-muted-foreground uppercase tracking-wider mb-1">{m.label}</p>
                   <p className={`text-lg font-bold font-serif ${m.color ?? 'text-foreground'}`}>{m.val}</p>
+                  {m.sub && <p className="text-xs text-muted-foreground/70 mt-0.5 leading-tight">{m.sub}</p>}
                 </div>
               ))}
             </div>
+            {/* TMIB clarification — shows what savings must cover */}
+            {sim.isDualIncome && partnerOff > 0 && (
+              <div className="mx-6 mt-3 mb-1 px-4 py-2.5 bg-muted/20 border border-border rounded-md flex items-center justify-between gap-4">
+                <p className="text-xs text-muted-foreground leading-relaxed">
+                  <span className="font-semibold text-foreground">Net savings gap:</span> {fmt(grossOutflow)} outflow − {fmt(partnerOff)} partner income = <span className="font-semibold text-foreground">{fmt(sim.tmib)}/month</span> that new business revenue and savings must cover.
+                </p>
+                <span className="text-xs text-muted-foreground shrink-0 font-medium" data-testid="metric-tmib-net">{fmt(sim.tmib)}</span>
+              </div>
+            )}
             {/* Primary Savings Runway callout */}
             <div className={`mx-6 my-4 flex items-center justify-between px-4 py-3 rounded-md border ${psrStatusBg}`}>
               <div>
