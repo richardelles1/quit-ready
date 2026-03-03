@@ -76,27 +76,36 @@ A deterministic, conservative financial stress engine for U.S. professionals mod
 6. What Moves the Needle — sensitivity cards (burn, revenue, healthcare, debt)
 7. What This Means For You — advisor summary + best single move
 
-## Extended Scenario Engine (PDF only, server-computed)
-- Ramp timing: ±1/2/3 months (7 variants) — shows LL shift for each
-- Partner job loss: 3/6/12 month duration (only if isDualIncome) — burn + partnerIncome for N months
-- New child: $3,000 one-time + $1,500/month delta
-- Levers: burn -$500/-$1K/-$2K, revenue +$500/+$1K — all show LL delta
-- Stability thresholds: min T1+T2 / min revenue / max burn for 12-month T1+T2 under -30% stress
-- Cash coverage ladder: milestone months (1, 3, 6, 12, 18, 24) — Revenue/Burn/Gap/Remaining-T1+T2/Status
+## Report Terminology (canonical — enforced everywhere)
+- "Monthly Outflow" (NOT burn): displayed as "Net Monthly Outflow"
+- "Primary Accessible Savings" (NOT Tier 1+2): cash + brokerage×0.80
+- "Primary Savings Runway" (NOT Liquidity Line): months until PAS exhausted
+- "Restricted or Long-Term Assets" (NOT Tier 3): retirement + home equity — emergency only
+- Runway format: "X years Y months" (NEVER decimal like "1.5 years")
+- Percentages: always exactly 100% using pct100() (floor + fractional-remainder distribution)
+- Total Outstanding Debt: context ONLY — never in outflow % breakdown, never in runway math
 
-## PDF Report (12 pages)
-1. Cover — navy, QuitReady wordmark, 6 stat tiles, LL status pill
-2. Plain English Explainer — burn, runway, liquidity, tier system, why retirement ≠ runway, debt vs expenses
-3. Burn Breakdown — 3 groups, composition bar, fixed% callout, SE tax note
-4. Liquidity Defense Map — tier table with haircuts, LL subtotal row, T3 emergency warning
-5. Liquidity Line headline — 4-scenario bars + table, LL warning callout
-6. Revenue Stress — 3-scenario table + cash coverage ladder (milestone months)
-7. Ramp Timing — ±1/2/3 month delta table + interpretation block
-8. Household Shocks — partner job loss table (if dual income) + new child impact
-9. What Moves the Needle — burn/revenue lever tables + sensitivity note
-10. Stability Thresholds — 3 threshold cards (T1+T2 required, min revenue, max burn)
-11. Advisor Commentary — score card, overall assessment, retirement dependency, best single move
-12. Appendix — all inputs listed by group
+## Math Integrity
+- Outflow = livingExpenses + monthlyDebtPayments + healthcareDelta + selfEmploymentTax + businessCostBaseline − partnerIncome
+- Validation before PDF: non-negative runways, stage ordering (PAS ≤ full runway), outflow consistency
+- PDF blocked with 422 if validation fails
+- Pre-render validation function in server/routes.ts
+
+## PDF Report (14 pages — current)
+1. Executive Snapshot — income/outflow/surplus tiles, PAS status pill, 3-scenario mini grid
+2. Income Strength & Stability — income table, vs-outflow bar, narrative
+3. Monthly Outflow Breakdown — 5 components, pct100() percentages, composition bar, partner offset
+4. Debt Structure & Exposure — outstanding balance, debt/savings ratio, mortgage clarity note
+5. Primary Savings Runway Definition — PAS vs Restricted definitions, tier table with haircuts, visual timeline
+6. Stress Scenario Modeling — 3 scenarios (mild/moderate/severe) with PSR, full runway, pressure month
+7. Revenue Timing Sensitivity — ±3 months delta table + narrative
+8. Household Shock Scenarios — partner loss 6mo + new child ($3K+$1.5K/mo) + combined
+9. Savings Tier Timeline — Stage 1/2/3 progression under severe stress, visual bar
+10. Revenue vs. Liquidity Curve — PDFKit path-based line chart (base + severe, 36-month horizon)
+11. What Moves the Needle — top 3 levers ranked by PSR delta impact
+12. Scenario Comparison Grid — 5 columns (Base/Mild/Severe/Partner Loss/New Child) × 3 rows
+13. Risk Profile Summary — 4 plain-language blocks (position, risk driver, pressure, execution sensitivity)
+14. Final Synthesis — 4 paragraphs (stability, risk driver, pressure timeline, two stabilizers)
 
 ## Design Principles
 - Institutional minimalism — navy/charcoal/slate palette, Inter + Times-Bold

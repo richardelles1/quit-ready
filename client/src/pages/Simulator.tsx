@@ -720,7 +720,7 @@ function SimulatorInner() {
                     </p>
                     <div className="border border-border rounded-md overflow-hidden mb-4">
                       <div className="px-5 py-3 bg-muted/20 border-b border-border">
-                        <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">Complete Monthly Burn</p>
+                        <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">Complete Monthly Outflow</p>
                       </div>
                       <div className="px-5 py-2 bg-muted/10 border-b border-border">
                         <p className="text-xs text-muted-foreground font-medium">Required fixed obligations</p>
@@ -737,7 +737,7 @@ function SimulatorInner() {
                       </div>
                       <BurnRow label="Business operating cost" value={bizCost} />
                       <BurnRow label="Self-employment tax reserve (28%)" value={seTax} />
-                      <BurnRow label="True Monthly Burn" value={totalBurn} total />
+                      <BurnRow label="Net Monthly Outflow" value={totalBurn} total />
                     </div>
                     <div className="grid grid-cols-3 gap-3 mb-5">
                       <div className="p-3 bg-muted/30 rounded-md border border-border">
@@ -745,7 +745,7 @@ function SimulatorInner() {
                         <p className="text-sm font-bold font-serif text-foreground">{fmt(accessibleCapital)}</p>
                       </div>
                       <div className="p-3 bg-muted/30 rounded-md border border-border">
-                        <p className="text-xs text-muted-foreground mb-1">Liquidity line</p>
+                        <p className="text-xs text-muted-foreground mb-1">Primary Accessible Savings</p>
                         <p className="text-sm font-bold font-serif text-foreground">{fmt(liquidityLineCapital)}</p>
                       </div>
                       <div className="p-3 bg-muted/30 rounded-md border border-border">

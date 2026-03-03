@@ -1,0 +1,244 @@
+You are updating QuitReady’s REPORT + PDF only.
+
+Do NOT change:
+	•	Core engine math (except to fix inconsistencies/bugs)
+	•	Input flow UI
+	•	App styling/theme outside the report view
+	•	Add new features, accounts, or subscriptions
+
+You MUST:
+	•	Preserve the existing professional visual style
+	•	Make the PDF mirror the on-screen report exactly
+	•	Expand the report to a clean, premium 14-page structure
+	•	Eliminate all math inconsistencies (percent totals, runway mismatches, tier logic conflicts)
+	•	Use clear, plain-English labeling so debt vs expenses cannot be confused
+
+⸻
+
+GLOBAL REPORT TERMINOLOGY (REPLACE EVERYWHERE IN REPORT + PDF)
+
+Replace:
+	•	“Burn” → “Monthly Outflow”
+	•	“Liquidity Line” → “Primary Savings Runway”
+	•	“Tier 1+2” → “Primary Accessible Savings”
+	•	“Tier 3” → “Restricted or Long-Term Assets”
+
+Define each term once (Page 5), then use consistently.
+
+⸻
+
+CRITICAL CLARITY RULES (NON-NEGOTIABLE)
+	1.	Monthly Outflow must be computed ONLY from:
+
+	•	Living Expenses (day-to-day)
+	•	Debt Payments (required minimums)
+	•	Healthcare (monthly premium cost)
+	•	Tax Reserve (monthly set-aside)
+
+	2.	Total Outstanding Debt is a separate concept:
+
+	•	It must NOT affect Monthly Outflow directly
+	•	It must NEVER be included in the outflow breakdown percentages
+
+	3.	Mortgage must not be double counted:
+
+	•	Mortgage payment belongs in exactly one place
+	•	If you treat mortgage as a required debt payment, keep it in Debt Payments and remove it from Living Expenses
+	•	If you treat housing payment as part of living structure, keep it in Living Expenses and exclude it from Debt Payments
+Pick one and enforce it everywhere.
+
+	4.	All “% of outflow” charts must total exactly 100% with rounding handled cleanly.
+	5.	All runway numbers must display as:
+“X years Y months”
+Never months-only.
+	6.	No blank pages. No orphan charts. No cut-off sections.
+
+⸻
+
+FIX KNOWN INTEGRITY ERRORS
+	•	Remove any possibility of reporting “fixed obligations are 423% of burn” (impossible)
+	•	Ensure tax reserve percent matches the actual reserve formula used
+	•	Ensure “Restricted assets required?” matches the timeline and depletion logic used later in the report
+	•	Ensure ramp timing sensitivity produces non-zero deltas when it should
+
+Add a pre-render validation function that asserts:
+	•	percentages ≈ 100%
+	•	runway values non-negative
+	•	stage ordering consistent (Primary savings depletion must occur before restricted assets)
+If validation fails, show a clean error message and block PDF generation until resolved.
+
+⸻
+
+REPORT + PDF MUST FOLLOW THIS 14-PAGE STRUCTURE (PREMIUM, NO FILLER)
+
+Implement the report as a deterministic set of sections/pages in this order, with consistent headers, spacing, and page numbers.
+
+PAGE 1 — Executive Snapshot
+
+Title: Your Financial Position Today
+Include:
+	•	Monthly Income
+	•	Monthly Outflow
+	•	Monthly Surplus/Deficit
+	•	Primary Savings Runway (Years + Months)
+Add one identity line:
+“You are currently operating with [strong/moderate/thin/negative] structural margin based on your inputs.”
+
+PAGE 2 — Income Strength & Stability
+
+Title: Income Strength & Stability
+Include:
+	•	Primary income and partner income (if present)
+	•	Dependents count and impact note (narrative only)
+	•	Visual: Income vs Outflow bar
+Plain English paragraph:
+“Today, your household income [exceeds / roughly matches / falls below] your required monthly structure.”
+
+PAGE 3 — Monthly Outflow Breakdown
+
+Title: Where Your Money Goes Each Month
+Show:
+	•	Living Expenses
+	•	Debt Payments
+	•	Healthcare
+	•	Tax Reserve
+Include:
+	•	Stacked bar or donut chart
+	•	Percent totals = 100%
+Add short definitions under each category.
+
+PAGE 4 — Debt Structure & Exposure
+
+Title: Debt Structure & Exposure (Balances)
+Show:
+	•	Total outstanding debt by category (mortgage, student, revolving, auto, other)
+Add plain-language note:
+“These balances do not change your month-to-month outflow directly. They affect long-term flexibility and exposure.”
+
+PAGE 5 — Primary Savings Runway (Definition Page)
+
+Title: Primary Savings Runway
+Define:
+	•	Primary Accessible Savings (what counts toward runway)
+	•	Restricted or Long-Term Assets (last-resort)
+Show:
+	•	Total Primary Accessible Savings
+	•	Runway in Years + Months (base case)
+	•	Visual timeline
+Add:
+“Financial pressure would begin around Year X under severe contraction.”
+
+PAGE 6 — Stress Scenario Modeling
+
+Title: Stress Scenario Modeling
+Three scenarios with plain-English names:
+	•	“Revenue arrives slower than expected” (mild)
+	•	“Revenue underperforms” (moderate)
+	•	“Revenue materially underperforms” (severe)
+For each:
+	•	Runway (Years + Months)
+	•	Pressure begins around Year X
+
+PAGE 7 — Revenue Timing Sensitivity
+
+Title: Revenue Timing Sensitivity
+Show:
+	•	Revenue ramp 3 months early / on time / 3 months late
+For each:
+	•	Runway (Years + Months)
+Add sentence:
+“A 3-month delay reduces your runway by X months.”
+
+PAGE 8 — Household Shock Scenarios
+
+Title: Household Shock Scenarios
+Include:
+	•	Partner income loss (6 months)
+	•	New child
+	•	Combined shock
+For each:
+	•	Runway (Years + Months)
+	•	“Would restricted assets be required?” Yes/No
+If Yes: “Restricted assets would be needed around Year X.”
+
+PAGE 9 — Savings Tier Timeline
+
+Title: Savings Tier Timeline
+Visual stages:
+	•	Stage 1: Primary Accessible Savings
+	•	Stage 2: Restricted or Long-Term Assets
+	•	Stage 3: Total Exhaustion
+For severe contraction:
+	•	Show when each stage begins (Years + Months)
+
+PAGE 10 — Revenue vs Liquidity Curve
+
+Title: Revenue vs Liquidity Curve
+Line chart:
+	•	X-axis: time
+	•	Y-axis: remaining primary savings
+Plot:
+	•	Base case
+	•	Severe case
+Annotate “pressure point” clearly.
+
+PAGE 11 — What Moves the Needle
+
+Title: What Moves the Needle
+Rank the top 3 levers (based on actual sensitivity math):
+	1.	Reduce Monthly Outflow by $X → +Y months
+	2.	Increase early revenue by $X → +Y months
+	3.	Delay transition by X months → +Y months
+Only include levers that materially change runway.
+
+PAGE 12 — Scenario Comparison Grid
+
+Title: Scenario Comparison
+Table with columns:
+Base | Mild | Severe | Partner Loss | New Child
+Rows:
+	•	Runway (Years + Months)
+	•	Restricted assets required (Yes/No)
+	•	Pressure point (Year X)
+
+PAGE 13 — Risk Profile Summary
+
+Title: Risk Profile Summary
+Plain-language synthesis with 4 blocks:
+	1.	Structural Position
+	2.	Primary Risk Driver
+	3.	Pressure Timeline
+	4.	Execution Sensitivity
+No advice. No prescriptions.
+
+PAGE 14 — Final Synthesis
+
+Title: What This Means Based on Your Inputs
+Answer directly with short paragraphs:
+	•	Structural stability level
+	•	What actually drives the risk
+	•	When pressure begins under severe stress
+	•	Two highest-impact stabilizers (non-prescriptive wording)
+
+⸻
+
+PDF OUTPUT REQUIREMENTS (MUST MATCH REPORT)
+	•	PDF uses the exact same section order, charts, typography, spacing, and labels as the report view
+	•	No missing charts
+	•	No blank pages
+	•	Page numbers on every page
+	•	Consistent margins and header styling
+	•	PDF generation must be reliable (add retry + render-complete guard)
+	•	Block PDF download until all charts finish rendering and validation passes
+
+⸻
+
+IMPLEMENTATION NOTES
+	•	Reuse existing chart components; do not introduce new libraries unless required
+	•	Add a single “report schema” object/array defining pages/sections so both on-screen rendering and PDF rendering use the same source of truth (prevents mismatch)
+	•	Add a formatting utility for:
+	•	currency with commas
+	•	Years + Months conversion
+	•	percent rounding that preserves total = 100%
+
+Proceed to implement these report and PDF updates now.

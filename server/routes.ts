@@ -7,160 +7,250 @@ import { z } from "zod";
 import PDFDocument from "pdfkit";
 import type { Simulation } from "@shared/schema";
 
-// ─── PDF Palette ───────────────────────────────────────────────────────────
-const C = {
-  navy:    '#1e293b',
-  coal:    '#334155',
-  muted:   '#64748b',
-  mid:     '#f1f5f9',
-  light:   '#f8fafc',
-  border:  '#e2e8f0',
-  white:   '#ffffff',
-  green:   '#15803d',
-  amber:   '#b45309',
-  red:     '#dc2626',
-  blue:    '#1d4ed8',
-};
-const LEFT = 60, W = 492, RIGHT = 552;
-const USABLE_H = 700;
+// ─── Palette ───────────────────────────────────────────────────────────────
+const C = { navy:'#1e293b', coal:'#334155', muted:'#64748b', mid:'#f1f5f9',
+  light:'#f8fafc', border:'#e2e8f0', white:'#ffffff',
+  green:'#15803d', amber:'#b45309', red:'#dc2626', blue:'#1d4ed8' };
+const L = 52, W = 508, R = 560, TOTAL = 14;
 
-// ─── Formatting helpers ────────────────────────────────────────────────────
+// ─── Formatting utilities ──────────────────────────────────────────────────
 const fmtM = (n: number) => `$${Math.round(n).toLocaleString('en-US')}`;
-const fmtYrs = (m: number) => m >= 999 ? '24+ yrs' : `${(m / 12).toFixed(1)} yrs (${m} mo)`;
-const fmtMoShort = (m: number) => m >= 999 ? '24+ yrs' : `${m} mo`;
-const fmtPct = (n: number) => `${(n * 100).toFixed(1)}%`;
 
-function scoreLabel(s: number): string {
-  if (s >= 86) return 'Strong Buffer Position';
-  if (s >= 70) return 'Structurally Stable';
-  if (s >= 50) return 'Moderately Exposed';
-  return 'Structurally Fragile';
+function fmtRunway(months: number): string {
+  if (months >= 999) return '24+ years';
+  if (months <= 0) return 'Less than 1 month';
+  const yrs = Math.floor(months / 12);
+  const mo = months % 12;
+  if (yrs === 0) return `${mo} month${mo !== 1 ? 's' : ''}`;
+  if (mo === 0) return `${yrs} year${yrs !== 1 ? 's' : ''}`;
+  return `${yrs} year${yrs !== 1 ? 's' : ''} ${mo} month${mo !== 1 ? 's' : ''}`;
 }
 
-// ─── Scenario / liquidity computation helpers ──────────────────────────────
-function t1(s: Simulation): number { return s.cash; }
-function t2(s: Simulation): number { return Math.round(s.brokerage * 0.80); }
-function t3(s: Simulation): number {
-  return Math.round(s.roth * 1.00 + s.traditional * 0.50 + s.realEstate * 0.30);
+function fmtRunwayShort(months: number): string {
+  if (months >= 999) return '24+ yrs';
+  if (months <= 0) return '< 1 mo';
+  const yrs = Math.floor(months / 12);
+  const mo = months % 12;
+  if (yrs === 0) return `${mo} mo`;
+  if (mo === 0) return `${yrs} yr${yrs !== 1 ? 's' : ''}`;
+  return `${yrs} yr${yrs !== 1 ? 's' : ''} ${mo} mo`;
 }
-function t1t2(s: Simulation): number { return t1(s) + t2(s); }
 
-// When does Tier1+2 run out? (Liquidity Line)
-function liquidityLine(
-  s: Simulation,
-  revMult: number,
-  rampMonths: number,
-  extraBurnByMonth: (m: number) => number = () => 0,
-): number {
+// Distribute rounding so percentages sum to exactly 100
+function pct100(values: number[]): number[] {
+  const sum = values.reduce((a, b) => a + b, 0);
+  if (sum === 0) return values.map(() => 0);
+  const raw = values.map(v => (v / sum) * 100);
+  const floored = raw.map(Math.floor);
+  let rem = 100 - floored.reduce((a, b) => a + b, 0);
+  const byFrac = raw.map((r, i) => ({ i, frac: r - Math.floor(r) }))
+    .sort((a, b) => b.frac - a.frac);
+  for (let j = 0; j < rem; j++) floored[byFrac[j].i]++;
+  return floored;
+}
+
+// ─── Capital helpers ───────────────────────────────────────────────────────
+const t1 = (s: Simulation) => s.cash;
+const t2 = (s: Simulation) => Math.round(s.brokerage * 0.80);
+const t3 = (s: Simulation) => Math.round(s.roth + s.traditional * 0.50 + s.realEstate * 0.30);
+const pas = (s: Simulation) => t1(s) + t2(s); // Primary Accessible Savings
+
+// Primary Savings Runway: months until T1+T2 exhausted
+function psRunway(s: Simulation, revMult = 1.0, rampOverride?: number,
+  extraBurn: (m: number) => number = () => 0): number {
   if (s.tmib <= 0) return 999;
-  let cap = t1t2(s);
+  let cap = pas(s);
   const vol = 1 - s.volatilityPercent / 100;
-  for (let m = 1; m <= 300; m++) {
-    const rampFactor = rampMonths > 0 && m <= rampMonths ? 0.50 * (m / rampMonths) : 1.0;
-    const rev = s.expectedRevenue * revMult * rampFactor * vol;
-    cap -= (s.tmib + extraBurnByMonth(m) - rev);
+  const ramp = rampOverride ?? s.rampDuration;
+  for (let m = 1; m <= 360; m++) {
+    const rf = ramp > 0 && m <= ramp ? 0.50 * (m / ramp) : 1.0;
+    cap -= (s.tmib + extraBurn(m) - s.expectedRevenue * revMult * rf * vol);
     if (cap <= 0) return m;
   }
   return 999;
 }
 
-// Full runway (all capital)
-function fullRunway(
-  s: Simulation,
-  revMult: number,
-  rampMonths: number,
-  extraBurnByMonth: (m: number) => number = () => 0,
-): number {
+// Full runway: months until all capital exhausted
+function fullRunway(s: Simulation, revMult = 1.0, rampOverride?: number,
+  extraBurn: (m: number) => number = () => 0): number {
   if (s.tmib <= 0) return 999;
   let cap = s.accessibleCapital;
   const vol = 1 - s.volatilityPercent / 100;
-  for (let m = 1; m <= 300; m++) {
-    const rampFactor = rampMonths > 0 && m <= rampMonths ? 0.50 * (m / rampMonths) : 1.0;
-    const rev = s.expectedRevenue * revMult * rampFactor * vol;
-    cap -= (s.tmib + extraBurnByMonth(m) - rev);
+  const ramp = rampOverride ?? s.rampDuration;
+  for (let m = 1; m <= 360; m++) {
+    const rf = ramp > 0 && m <= ramp ? 0.50 * (m / ramp) : 1.0;
+    cap -= (s.tmib + extraBurn(m) - s.expectedRevenue * revMult * rf * vol);
     if (cap <= 0) return m;
   }
   return 999;
 }
 
-// Cash coverage ladder (milestone months)
-type LadderRow = {
-  month: number; revenue: number; burn: number; gap: number;
-  remainingT1T2: number; inTier3Zone: boolean;
-};
-function coverageLadder(s: Simulation, revMult: number, rampMonths: number): LadderRow[] {
-  const milestones = new Set([1, 3, 6, 12, 18, 24]);
-  let cap = t1t2(s);
+// Month when PAS falls below 6× monthly drain (pressure begins)
+function pressureMonth(s: Simulation, revMult: number): number {
   const vol = 1 - s.volatilityPercent / 100;
-  const rows: LadderRow[] = [];
-  for (let m = 1; m <= 24; m++) {
-    const rampFactor = rampMonths > 0 && m <= rampMonths ? 0.50 * (m / rampMonths) : 1.0;
-    const rev = Math.round(s.expectedRevenue * revMult * rampFactor * vol);
-    const gap = s.tmib - rev;
-    cap -= gap;
-    if (milestones.has(m)) {
-      rows.push({ month: m, revenue: rev, burn: s.tmib, gap, remainingT1T2: Math.max(0, cap), inTier3Zone: cap < 0 });
-    }
+  const stableRev = s.expectedRevenue * revMult * vol;
+  const drain = Math.max(0, s.tmib - stableRev);
+  if (drain <= 0) return 999;
+  const threshold = drain * 6;
+  let cap = pas(s);
+  for (let m = 1; m <= 360; m++) {
+    const rf = s.rampDuration > 0 && m <= s.rampDuration ? 0.50 * (m / s.rampDuration) : 1.0;
+    cap -= (s.tmib - s.expectedRevenue * revMult * rf * vol);
+    if (cap <= threshold) return m;
   }
-  return rows;
+  return 999;
 }
 
-// ─── PDF rendering helpers ─────────────────────────────────────────────────
-function pageHeader(doc: PDFKit.PDFDocument, date: string) {
-  doc.rect(0, 0, 612, 34).fill(C.navy);
-  doc.fillColor(C.white).fontSize(8).font('Helvetica-Bold')
-    .text('QUITREADY · STRUCTURAL BREAKPOINT REPORT', LEFT, 12)
-    .text(date, LEFT, 12, { width: W, align: 'right' });
+// Monthly capital series for line chart
+function capitalSeries(s: Simulation, revMult: number, n: number): number[] {
+  let cap = pas(s);
+  const vol = 1 - s.volatilityPercent / 100;
+  const pts: number[] = [cap];
+  for (let m = 1; m <= n; m++) {
+    const rf = s.rampDuration > 0 && m <= s.rampDuration ? 0.50 * (m / s.rampDuration) : 1.0;
+    cap = Math.max(0, cap - (s.tmib - s.expectedRevenue * revMult * rf * vol));
+    pts.push(cap);
+    if (cap === 0) break;
+  }
+  while (pts.length <= n) pts.push(0);
+  return pts;
 }
 
-function pageFooter(doc: PDFKit.PDFDocument, n: number, total: number) {
-  doc.fillColor(C.muted).fontSize(7.5).font('Helvetica')
-    .text('This is a financial simulation, not advice. Consult a qualified professional before major financial decisions.', LEFT, 760, { width: W - 80 })
-    .text(`Page ${n} of ${total}`, LEFT, 760, { width: W, align: 'right' });
+// ─── Validation ────────────────────────────────────────────────────────────
+function validateReport(s: Simulation): string[] {
+  const errs: string[] = [];
+  if (s.baseRunway < 0) errs.push('Base runway is negative');
+  if (s.runway30Down < 0) errs.push('Severe scenario runway is negative');
+  const hc = s.healthcareDelta ?? s.healthcareMonthlyCost;
+  const partnerOff = s.isDualIncome ? (s.partnerIncome ?? 0) : 0;
+  const gross = (s.livingExpenses ?? 0) + (s.monthlyDebtPayments ?? 0) + hc +
+    (s.selfEmploymentTax ?? 0) + (s.businessCostBaseline ?? 0);
+  const expected = Math.max(0, gross - partnerOff);
+  if (Math.abs(s.tmib - expected) > 100) {
+    errs.push(`Monthly outflow mismatch: stored ${fmtM(s.tmib)}, computed ${fmtM(expected)}`);
+  }
+  const psr = psRunway(s, 1.0);
+  if (psr > s.baseRunway + 3 && s.baseRunway < 999) {
+    errs.push('Stage ordering error: primary savings runway exceeds total runway');
+  }
+  return errs;
 }
 
-function sectionHead(doc: PDFKit.PDFDocument, title: string, sub: string | null, y: number): number {
-  doc.rect(LEFT, y, W, 1).fill(C.border);
-  y += 7;
-  doc.fillColor(C.navy).fontSize(15).font('Times-Bold').text(title, LEFT, y, { width: W });
-  y += 20;
+// ─── PDF helpers ───────────────────────────────────────────────────────────
+function hdr(doc: PDFKit.PDFDocument, date: string) {
+  doc.rect(0, 0, 612, 32).fill(C.navy);
+  doc.fillColor(C.white).fontSize(7.5).font('Helvetica-Bold')
+    .text('QUITREADY · FINANCIAL POSITION REPORT', L, 11)
+    .text(date, L, 11, { width: W, align: 'right' });
+}
+
+function ftr(doc: PDFKit.PDFDocument, n: number) {
+  doc.fillColor(C.muted).fontSize(7).font('Helvetica')
+    .text('This report is a financial simulation based on your inputs. It is not financial, tax, or legal advice. Consult a qualified professional.', L, 763, { width: W - 60 })
+    .text(`Page ${n} of ${TOTAL}`, L, 763, { width: W, align: 'right' });
+}
+
+function secHead(doc: PDFKit.PDFDocument, pg: number, title: string, sub: string | null, y: number): number {
+  doc.rect(L, y, W, 1).fill(C.border); y += 8;
+  doc.fillColor('#94a3b8').fontSize(7.5).font('Helvetica').text(`PAGE ${pg} OF ${TOTAL}`, L, y); y += 11;
+  doc.fillColor(C.navy).fontSize(16).font('Times-Bold').text(title, L, y, { width: W }); y += 22;
   if (sub) {
-    doc.fillColor(C.muted).fontSize(8.5).font('Helvetica').text(sub, LEFT, y, { width: W, lineGap: 1.5 });
-    y += 18;
+    doc.fillColor(C.muted).fontSize(8.5).font('Helvetica').text(sub, L, y, { width: W, lineGap: 1.5 }); y += 18;
   }
   return y + 4;
 }
 
-function tile(doc: PDFKit.PDFDocument, x: number, y: number, w: number, label: string, value: string, color = C.navy) {
-  doc.rect(x, y, w, 48).fill(C.mid);
-  doc.fillColor(C.muted).fontSize(7).font('Helvetica').text(label.toUpperCase(), x + 10, y + 8, { width: w - 20 });
-  doc.fillColor(color).fontSize(13).font('Times-Bold').text(value, x + 10, y + 22, { width: w - 20 });
+function statRow(doc: PDFKit.PDFDocument, items: {label:string; val:string; color?:string}[], y: number, rowH = 52): number {
+  const w = Math.floor(W / items.length);
+  items.forEach((item, i) => {
+    const x = L + i * w;
+    doc.rect(x, y, w - 4, rowH).fill(C.mid);
+    doc.fillColor(C.muted).fontSize(7).font('Helvetica').text(item.label.toUpperCase(), x + 8, y + 8, { width: w - 20 });
+    doc.fillColor(item.color ?? C.navy).fontSize(13).font('Times-Bold').text(item.val, x + 8, y + 22, { width: w - 20 });
+  });
+  return y + rowH + 6;
 }
 
-function burnRow(doc: PDFKit.PDFDocument, label: string, value: number, y: number, even: boolean, negate = false): number {
-  if (value === 0) return y;
-  doc.rect(LEFT, y, W, 24).fill(even ? C.light : C.mid);
-  doc.fillColor(C.coal).fontSize(9).font('Helvetica').text(label, LEFT + 10, y + 7, { width: 330 });
-  const vStr = negate ? `(${fmtM(value)})` : fmtM(value);
-  doc.fillColor(negate ? C.green : C.navy).fontSize(9).font('Helvetica-Bold')
-    .text(vStr, LEFT, y + 7, { width: W - 10, align: 'right' });
-  return y + 24;
+function tableHead(doc: PDFKit.PDFDocument, cols: {label:string; x:number}[], y: number): number {
+  doc.rect(L, y, W, 22).fill(C.navy);
+  cols.forEach(c => {
+    doc.fillColor(C.white).fontSize(7.5).font('Helvetica-Bold').text(c.label, c.x, y + 7);
+  });
+  return y + 22;
 }
 
-function groupHead(doc: PDFKit.PDFDocument, label: string, y: number): number {
-  doc.rect(LEFT, y, W, 18).fill(C.border);
-  doc.fillColor(C.muted).fontSize(7.5).font('Helvetica-Bold').text(label.toUpperCase(), LEFT + 10, y + 5);
-  return y + 18;
+function tableRow(doc: PDFKit.PDFDocument, cells: {val:string; x:number; bold?:boolean; color?:string}[],
+  y: number, even: boolean, h = 26): number {
+  doc.rect(L, y, W, h).fill(even ? C.light : C.mid);
+  cells.forEach(c => {
+    doc.fillColor(c.color ?? C.coal).fontSize(9).font(c.bold ? 'Helvetica-Bold' : 'Helvetica')
+      .text(c.val, c.x, y + (h - 10) / 2, { width: 200 });
+  });
+  return y + h;
 }
 
-function insightBlock(doc: PDFKit.PDFDocument, heading: string, body: string, y: number): number {
-  const lineCount = Math.max(2, Math.ceil(body.length / 82));
-  const h = lineCount * 10 + 30;
-  doc.rect(LEFT, y, W, h).fill(C.light);
-  doc.rect(LEFT, y, 3, h).fill(C.navy);
-  doc.fillColor(C.muted).fontSize(7.5).font('Helvetica-Bold').text(heading.toUpperCase(), LEFT + 12, y + 8, { width: W - 24 });
-  doc.fillColor(C.coal).fontSize(9.5).font('Helvetica').text(body, LEFT + 12, y + 20, { width: W - 24, lineGap: 1.5 });
-  return y + h + 7;
+function insight(doc: PDFKit.PDFDocument, heading: string, body: string, y: number): number {
+  const lines = Math.max(2, Math.ceil(body.length / 86));
+  const h = lines * 10 + 30;
+  doc.rect(L, y, W, h).fill(C.light);
+  doc.rect(L, y, 3, h).fill(C.navy);
+  doc.fillColor(C.muted).fontSize(7).font('Helvetica-Bold').text(heading.toUpperCase(), L + 12, y + 8, { width: W - 24 });
+  doc.fillColor(C.coal).fontSize(9).font('Helvetica').text(body, L + 12, y + 20, { width: W - 24, lineGap: 1.5 });
+  return y + h + 8;
+}
+
+function compositionBar(doc: PDFKit.PDFDocument, segments: {val:number;opacity:number}[], maxVal: number, y: number, h = 14): number {
+  const total = segments.reduce((a, s) => a + s.val, 0) || 1;
+  let x = L;
+  segments.forEach(s => {
+    const bw = Math.round((s.val / total) * W);
+    doc.save().fillOpacity(s.opacity).rect(x, y, bw, h).fill(C.navy).restore();
+    x += bw;
+  });
+  return y + h + 4;
+}
+
+function lineChart(doc: PDFKit.PDFDocument, base: number[], severe: number[], maxCap: number,
+  cx: number, cy: number, cw: number, ch: number, totalMonths: number) {
+  // Background
+  doc.rect(cx, cy, cw, ch).fill(C.light);
+  // Grid lines (4 horizontal)
+  for (let i = 1; i <= 4; i++) {
+    const gy = cy + (i / 4) * ch;
+    doc.moveTo(cx, gy).lineTo(cx + cw, gy).strokeColor(C.border).lineWidth(0.5).stroke();
+    doc.fillColor(C.muted).fontSize(7).font('Helvetica')
+      .text(fmtM(maxCap * (1 - i / 4)), cx - 52, gy - 4, { width: 50, align: 'right' });
+  }
+  // Y-axis label
+  doc.fillColor(C.muted).fontSize(7).font('Helvetica').text(fmtM(0), cx - 52, cy + ch - 4, { width: 50, align: 'right' });
+  // X-axis labels
+  [0, 6, 12, 18, 24, 30, 36].forEach(m => {
+    if (m <= totalMonths) {
+      const px = cx + (m / totalMonths) * cw;
+      doc.fillColor(C.muted).fontSize(7).font('Helvetica').text(`Mo ${m}`, px - 10, cy + ch + 4, { width: 24, align: 'center' });
+    }
+  });
+  // Draw base case line
+  let started = false;
+  base.forEach((cap, m) => {
+    const px = cx + (m / totalMonths) * cw;
+    const py = cy + ch - (Math.min(cap, maxCap) / Math.max(1, maxCap)) * ch;
+    if (!started) { doc.moveTo(px, py); started = true; } else { doc.lineTo(px, py); }
+  });
+  doc.strokeColor(C.navy).lineWidth(2).stroke();
+  // Draw severe case line (dashed effect via short strokes)
+  started = false;
+  severe.forEach((cap, m) => {
+    const px = cx + (m / totalMonths) * cw;
+    const py = cy + ch - (Math.min(cap, maxCap) / Math.max(1, maxCap)) * ch;
+    if (!started) { doc.moveTo(px, py); started = true; } else { doc.lineTo(px, py); }
+  });
+  doc.strokeColor(C.muted).lineWidth(1.5).stroke();
+  // Legend
+  doc.rect(cx + cw - 120, cy + 6, 10, 4).fill(C.navy);
+  doc.fillColor(C.navy).fontSize(7).font('Helvetica').text('Base case', cx + cw - 107, cy + 4);
+  doc.rect(cx + cw - 120, cy + 16, 10, 4).fill(C.muted);
+  doc.fillColor(C.muted).fontSize(7).font('Helvetica').text('Severe (−30%)', cx + cw - 107, cy + 14);
 }
 
 // ─── Route registration ────────────────────────────────────────────────────
@@ -228,10 +318,19 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     res.json(sim);
   });
 
-  // ─── PDF GENERATION ────────────────────────────────────────────────────────
+  // ─── PDF Generation ────────────────────────────────────────────────────
   app.get(api.simulations.downloadPdf.path, async (req, res) => {
     const sim = await storage.getSimulation(Number(req.params.id));
     if (!sim) return res.status(404).json({ message: 'Simulation not found' });
+
+    // Validate before generating
+    const validationErrors = validateReport(sim);
+    if (validationErrors.length > 0) {
+      return res.status(422).json({
+        message: 'Report validation failed — please re-run the simulation.',
+        errors: validationErrors,
+      });
+    }
 
     try {
       const doc = new PDFDocument({ margin: 0, size: 'LETTER', autoFirstPage: true });
@@ -239,45 +338,45 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       res.setHeader('Content-Disposition', `attachment; filename="QuitReady_Report_${sim.id}.pdf"`);
       doc.pipe(res);
 
-      const reportDate = new Date(sim.createdAt).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
-      const TOTAL = 12;
-      const score = sim.structuralBreakpointScore;
+      const date = new Date(sim.createdAt).toLocaleDateString('en-US', { year:'numeric', month:'long', day:'numeric' });
       const hc = sim.healthcareDelta ?? sim.healthcareMonthlyCost;
-      const tier1Cap = t1(sim), tier2Cap = t2(sim), tier3Cap = t3(sim), t1t2Cap = t1t2(sim);
+      const partnerOff = sim.isDualIncome ? (sim.partnerIncome ?? 0) : 0;
+      const pasCap = pas(sim);
+      const t3Cap = t3(sim);
 
-      // Pre-compute all scenarios
-      const llBase   = liquidityLine(sim, 1.00, sim.rampDuration);
-      const ll15     = liquidityLine(sim, 0.85, sim.rampDuration);
-      const ll30     = liquidityLine(sim, 0.70, sim.rampDuration);
-      const llRamp3  = liquidityLine(sim, 1.00, sim.rampDuration + 3);
+      // Pre-compute scenario values
+      const psrBase = psRunway(sim, 1.00);
+      const psr15   = psRunway(sim, 0.85);
+      const psr30   = psRunway(sim, 0.70);
+      const psrRamp3 = psRunway(sim, 1.00, sim.rampDuration + 3);
 
-      // Ramp timing variants
-      const rampVariants = [-3, -2, -1, 0, 1, 2, 3].map(d => {
-        const ramp = Math.max(0, sim.rampDuration + d);
-        return {
-          delta: d, rampMonths: ramp,
-          ll: liquidityLine(sim, 1.00, ramp),
-          full: fullRunway(sim, 1.00, ramp),
-          needsTier3: t1t2Cap < sim.tmib * ramp, // rough heuristic
-        };
-      });
+      const frBase  = sim.baseRunway;
+      const fr15    = sim.runway15Down;
+      const fr30    = sim.runway30Down;
+      const frRamp3 = sim.runwayRampDelay;
 
-      // Partner job loss (only if dual income)
-      const partnerLoss = sim.isDualIncome && sim.partnerIncome > 0
-        ? [3, 6, 12].map(dur => ({
-            dur,
-            ll: liquidityLine(sim, 1.00, sim.rampDuration, (m) => m <= dur ? sim.partnerIncome : 0),
-            full: fullRunway(sim, 1.00, sim.rampDuration, (m) => m <= dur ? sim.partnerIncome : 0),
-          }))
-        : null;
+      const pmBase = pressureMonth(sim, 1.00);
+      const pm15   = pressureMonth(sim, 0.85);
+      const pm30   = pressureMonth(sim, 0.70);
 
-      // New child scenario
+      const rampEarly3 = psRunway(sim, 1.00, Math.max(0, sim.rampDuration - 3));
+      const rampLate3  = psRunway(sim, 1.00, sim.rampDuration + 3);
+
+      // Partner loss (6 months)
+      const psrPartnerLoss = sim.isDualIncome && sim.partnerIncome > 0
+        ? psRunway(sim, 1.00, undefined, (m) => m <= 6 ? sim.partnerIncome : 0)
+        : psrBase;
+      const frPartnerLoss = sim.isDualIncome && sim.partnerIncome > 0
+        ? fullRunway(sim, 1.00, undefined, (m) => m <= 6 ? sim.partnerIncome : 0)
+        : frBase;
+
+      // New child (3k one-time + 1500/mo)
       const CHILD_ONETIME = 3000, CHILD_MONTHLY = 1500;
-      const llNewChild = (() => {
+      const psrNewChild = (() => {
         if (sim.tmib <= 0) return 999;
-        let cap = t1t2Cap - CHILD_ONETIME;
+        let cap = pasCap - CHILD_ONETIME;
         const vol = 1 - sim.volatilityPercent / 100;
-        for (let m = 1; m <= 300; m++) {
+        for (let m = 1; m <= 360; m++) {
           const rf = sim.rampDuration > 0 && m <= sim.rampDuration ? 0.50 * (m / sim.rampDuration) : 1.0;
           cap -= (sim.tmib + CHILD_MONTHLY - sim.expectedRevenue * rf * vol);
           if (cap <= 0) return m;
@@ -285,23 +384,35 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
         return 999;
       })();
 
-      // Levers (burn -500/-1000/-2000, rev +500/+1000)
-      const calcLLBurnAdj = (adj: number) => {
-        if (sim.tmib <= 0) return 999;
-        let cap = t1t2Cap;
+      // Combined shock
+      const psrCombined = (() => {
+        if (!sim.isDualIncome || sim.partnerIncome <= 0) return psrNewChild;
+        let cap = pasCap - CHILD_ONETIME;
         const vol = 1 - sim.volatilityPercent / 100;
-        for (let m = 1; m <= 300; m++) {
+        for (let m = 1; m <= 360; m++) {
+          const rf = sim.rampDuration > 0 && m <= sim.rampDuration ? 0.50 * (m / sim.rampDuration) : 1.0;
+          const extra = CHILD_MONTHLY + (m <= 6 ? sim.partnerIncome : 0);
+          cap -= (sim.tmib + extra - sim.expectedRevenue * rf * vol);
+          if (cap <= 0) return m;
+        }
+        return 999;
+      })();
+
+      // Levers
+      const calcBurnLever = (adj: number) => {
+        if (sim.tmib <= 0) return 999;
+        let cap = pasCap; const vol = 1 - sim.volatilityPercent / 100;
+        for (let m = 1; m <= 360; m++) {
           const rf = sim.rampDuration > 0 && m <= sim.rampDuration ? 0.50 * (m / sim.rampDuration) : 1.0;
           cap -= ((sim.tmib - adj) - sim.expectedRevenue * rf * vol);
           if (cap <= 0) return m;
         }
         return 999;
       };
-      const calcLLRevAdj = (adj: number) => {
+      const calcRevLever = (adj: number) => {
         if (sim.tmib <= 0) return 999;
-        let cap = t1t2Cap;
-        const vol = 1 - sim.volatilityPercent / 100;
-        for (let m = 1; m <= 300; m++) {
+        let cap = pasCap; const vol = 1 - sim.volatilityPercent / 100;
+        for (let m = 1; m <= 360; m++) {
           const rf = sim.rampDuration > 0 && m <= sim.rampDuration ? 0.50 * (m / sim.rampDuration) : 1.0;
           cap -= (sim.tmib - (sim.expectedRevenue + adj) * rf * vol);
           if (cap <= 0) return m;
@@ -309,800 +420,754 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
         return 999;
       };
 
-      // Stability thresholds
-      const monthlyDrain30 = Math.max(0, sim.tmib - sim.expectedRevenue * 0.70 * (1 - sim.volatilityPercent / 100));
-      const minT1T2For12Mo = monthlyDrain30 * 12;
-      const minRevFor12Mo = monthlyDrain30 > 0
-        ? Math.round((sim.tmib - t1t2Cap / 12) / (0.70 * (1 - sim.volatilityPercent / 100)))
-        : 0;
-      const maxBurnFor12Mo = Math.round(t1t2Cap / 12 + sim.expectedRevenue * 0.70 * (1 - sim.volatilityPercent / 100));
+      // Score
+      const score = sim.structuralBreakpointScore;
+      const scoreLabel = score >= 86 ? 'Strong Buffer Position' : score >= 70 ? 'Structurally Stable'
+        : score >= 50 ? 'Moderately Exposed' : 'Structurally Fragile';
+      const marginLabel = score >= 70 ? 'strong' : score >= 50 ? 'moderate' : score >= 30 ? 'thin' : 'negative';
 
-      // Liquidity line warning level for cover
-      const llWarnColor = ll30 < 6 ? C.red : ll30 < 12 ? C.amber : C.green;
-      const llWarnLabel = ll30 < 6 ? 'Critical' : ll30 < 12 ? 'Caution' : 'Adequate';
+      // Outflow components for pct breakdown (gross, before partner offset)
+      const outflowComponents = [
+        { label: 'Living Expenses',     val: sim.livingExpenses,          opacity: 1.00 },
+        { label: 'Debt Payments',       val: sim.monthlyDebtPayments,     opacity: 0.74 },
+        { label: 'Healthcare',          val: hc,                           opacity: 0.54 },
+        { label: 'Tax Reserve',         val: sim.selfEmploymentTax,       opacity: 0.36 },
+        { label: 'Business Costs',      val: sim.businessCostBaseline,    opacity: 0.22 },
+      ].filter(c => c.val > 0);
+      const grossOutflow = outflowComponents.reduce((a, c) => a + c.val, 0);
+      const pcts = pct100(outflowComponents.map(c => c.val));
 
       let y = 0;
 
-      // ═══════════════════════════════════════════════════════════════════════
-      // PAGE 1 — COVER + SNAPSHOT
-      // ═══════════════════════════════════════════════════════════════════════
-      doc.rect(0, 0, 612, 792).fill(C.navy);
-      doc.fillColor(C.white).fontSize(40).font('Times-Bold').text('QuitReady.', LEFT, 90);
-      doc.rect(LEFT, 138, 60, 2).fill('#3b82f6');
-      doc.fillColor(C.white).fontSize(19).font('Times-Roman').text('Structural Breakpoint Report', LEFT, 148);
-      doc.fillColor('#94a3b8').fontSize(10).font('Helvetica').text(`${reportDate}  ·  Simulation #${sim.id}`, LEFT, 172);
+      // ════════════════════════════════════════════════════════════════════
+      // PAGE 1 — EXECUTIVE SNAPSHOT
+      // ════════════════════════════════════════════════════════════════════
+      hdr(doc, date); y = 42;
+      y = secHead(doc, 1, 'Your Financial Position Today',
+        'A snapshot of your current income, monthly structure, and projected savings runway.', y);
 
-      // Key tiles (2 per row)
-      const coverTiles = [
-        { label: 'True Monthly Burn', val: fmtM(sim.tmib) },
-        { label: 'Accessible Capital (Total)', val: fmtM(sim.accessibleCapital) },
-        { label: 'Liquidity Line Capital (Tier 1+2)', val: fmtM(t1t2Cap) },
-        { label: `Liquidity Line — Severe Stress (−30%)`, val: fmtMoShort(ll30), color: llWarnColor },
-        { label: 'Structural Breakpoint Score', val: `${score}/100` },
-        { label: 'Score Band', val: scoreLabel(score) },
-      ];
-      let tx = LEFT; let ty = 220;
-      coverTiles.forEach((ct, i) => {
-        const tw = 236;
-        doc.rect(tx, ty, tw, 52).fill('#0f172a');
-        doc.fillColor('#94a3b8').fontSize(7.5).font('Helvetica').text(ct.label.toUpperCase(), tx + 10, ty + 8, { width: tw - 20 });
-        doc.fillColor(ct.color ?? C.white).fontSize(14).font('Times-Bold').text(ct.val, tx + 10, ty + 24, { width: tw - 20 });
-        tx += tw + 10;
-        if (i % 2 === 1) { tx = LEFT; ty += 60; }
+      const totalIncome = (sim.currentSalary ?? 0) + (sim.isDualIncome ? (sim.partnerIncome ?? 0) : 0);
+      const netSurplus = totalIncome - sim.tmib;
+
+      y = statRow(doc, [
+        { label: 'Total Monthly Income', val: fmtM(totalIncome) },
+        { label: 'Monthly Outflow', val: fmtM(sim.tmib) },
+        { label: 'Monthly Surplus / Deficit', val: (netSurplus >= 0 ? '+' : '') + fmtM(netSurplus), color: netSurplus >= 0 ? C.green : C.red },
+      ], y);
+
+      y = statRow(doc, [
+        { label: 'Primary Accessible Savings (Cash + Brokerage)', val: fmtM(pasCap) },
+        { label: 'Primary Savings Runway — Base Case', val: fmtRunway(psrBase) },
+        { label: 'Risk Position Score', val: `${score}/100` },
+      ], y);
+
+      // Identity line
+      const identityLine = `You are currently operating with ${marginLabel} structural margin based on your inputs.`;
+      const marginBg = score >= 70 ? '#f0fdf4' : score >= 50 ? '#fffbeb' : '#fef2f2';
+      const marginBorder = score >= 70 ? C.green : score >= 50 ? C.amber : C.red;
+      doc.rect(L, y, W, 36).fill(marginBg);
+      doc.rect(L, y, 3, 36).fill(marginBorder);
+      doc.fillColor(C.coal).fontSize(10).font('Times-Roman').text(identityLine, L + 12, y + 12, { width: W - 24 });
+      y += 46;
+
+      // Mini scenario snapshot
+      doc.rect(L, y, W, 22).fill(C.navy);
+      [['Scenario', L + 8], ['Primary Savings Runway', L + 175], ['Full Runway', L + 310], ['Restricted Assets?', L + 400]].forEach(([h, x]) => {
+        doc.fillColor(C.white).fontSize(7.5).font('Helvetica-Bold').text(h as string, x as number, y + 7);
+      });
+      y += 22;
+      [
+        { label: 'Expected conditions', psr: psrBase, full: frBase, r3: t3Cap > 0 && psrBase < frBase },
+        { label: 'Moderate contraction (−15%)', psr: psr15, full: fr15, r3: t3Cap > 0 && psr15 < fr15 },
+        { label: 'Severe contraction (−30%)', psr: psr30, full: fr30, r3: t3Cap > 0 && psr30 < fr30 },
+      ].forEach((sc, i) => {
+        doc.rect(L, y, W, 24).fill(i % 2 === 0 ? C.light : C.mid);
+        doc.fillColor(C.coal).fontSize(9).font('Helvetica').text(sc.label, L + 8, y + 7, { width: 165 });
+        doc.fillColor(C.navy).fontSize(9).font('Helvetica-Bold').text(fmtRunwayShort(sc.psr), L + 175, y + 7);
+        doc.fillColor(C.coal).fontSize(9).font('Helvetica').text(fmtRunwayShort(sc.full), L + 310, y + 7);
+        doc.fillColor(sc.r3 ? C.red : C.green).fontSize(9).font('Helvetica-Bold')
+          .text(sc.r3 ? 'Yes' : 'No', L + 400, y + 7);
+        y += 24;
       });
 
-      // Liquidity line status pill
-      ty += 8;
-      doc.rect(LEFT, ty, 180, 28).fill(ll30 < 6 ? '#450a0a' : ll30 < 12 ? '#431407' : '#052e16');
-      doc.fillColor(llWarnColor).fontSize(9).font('Helvetica-Bold')
-        .text(`Liquidity Line Status: ${llWarnLabel}`, LEFT + 12, ty + 9);
+      ftr(doc, 1);
 
-      // Opening paragraph
-      ty += 50;
-      doc.rect(LEFT, ty, W, 1).fill('#334155');
-      ty += 14;
-      doc.fillColor('#94a3b8').fontSize(9).font('Helvetica')
-        .text(
-          'This is a stress test, not a prediction. It models how your finances behave if income stops or falls short — across a range of scenarios — so you can see your exposure before making a major move.',
-          LEFT, ty, { width: W, lineGap: 2 }
-        );
-      ty += 40;
-      doc.rect(LEFT, ty, W, 1).fill('#334155');
-      ty += 14;
-      doc.fillColor('#475569').fontSize(8).font('Helvetica')
-        .text(
-          'Not financial, tax, or legal advice. This simulation is educational and based on your inputs plus estimated U.S. averages. Consult a qualified financial professional before major decisions.',
-          LEFT, ty, { width: W, lineGap: 2 }
-        );
+      // ════════════════════════════════════════════════════════════════════
+      // PAGE 2 — INCOME STRENGTH & STABILITY
+      // ════════════════════════════════════════════════════════════════════
+      doc.addPage(); hdr(doc, date); y = 42;
+      y = secHead(doc, 2, 'Income Strength & Stability',
+        'Your current income picture and how it compares to the outflow structure that would be required after a transition.', y);
 
-      // ═══════════════════════════════════════════════════════════════════════
-      // PAGE 2 — PLAIN ENGLISH EXPLAINER
-      // ═══════════════════════════════════════════════════════════════════════
-      doc.addPage();
-      pageHeader(doc, reportDate);
-      y = 50;
-      y = sectionHead(doc, 'Understanding This Report', 'What each term means and why it matters.', y);
-
-      const concepts = [
-        {
-          title: 'Monthly Burn',
-          body: 'What your household costs each month when you\'re not receiving employment income. This includes loan payments, living expenses, healthcare, self-employment taxes, and business operating costs — minus any partner income that continues. It does not include your revenue target.'
-        },
-        {
-          title: 'Runway',
-          body: 'How many months your saved capital would last if it had to cover the full gap between your burn and your revenue. When burn exactly equals revenue, runway is unlimited. When burn exceeds revenue, your savings are depleted month by month.'
-        },
-        {
-          title: 'Liquidity & the Liquidity Line',
-          body: 'Liquidity means how quickly you can access money without penalties. The Liquidity Line is your Tier 1 + Tier 2 capital — cash and brokerage accounts. This is the primary safety buffer. Once it\'s gone, you either become cash-flow positive or enter Tier 3 (restricted) territory.'
-        },
-        {
-          title: 'The Tier System',
-          body: 'Tier 1 (fully liquid): Cash, checking, savings, HYSA — no delay, no penalty.\nTier 2 (semi-liquid): Taxable brokerage accounts — accessible but may trigger capital gains taxes.\nTier 3 (restricted/last resort): Retirement accounts and home equity. Early access triggers income taxes plus penalties. This report never frames Tier 3 as a plan — only as an emergency extension.'
-        },
-        {
-          title: 'Why Retirement Assets Are Not Primary Runway',
-          body: 'Accessing a 401(k) or Traditional IRA before age 59½ typically costs income taxes (20-40% depending on bracket) plus a 10% early withdrawal penalty. More importantly, every dollar withdrawn loses years of compounding. The model shows you when Tier 3 would be required — not to encourage it, but to name the risk clearly.'
-        },
-        {
-          title: 'Debt Payments vs. Living Expenses',
-          body: 'Debt payments are contractual minimums — mortgage payments, car loans, student loans, credit card minimums. Missing them damages credit or triggers default. Living expenses are everything else your household spends — food, utilities, childcare, subscriptions. If you pay living expenses with a credit card, they are still living expenses; the minimum credit card payment is the debt obligation.'
-        },
+      // Income table
+      const incomeRows = [
+        { label: 'Your monthly take-home income (current)', val: fmtM(sim.currentSalary ?? 0) },
+        ...(sim.isDualIncome && sim.partnerIncome > 0
+          ? [{ label: 'Partner monthly take-home income', val: fmtM(sim.partnerIncome) }] : []),
+        { label: 'Total household monthly income', val: fmtM(totalIncome) },
+        { label: 'Required monthly outflow (post-transition)', val: fmtM(sim.tmib) },
+        { label: 'Net monthly surplus / (deficit)', val: (netSurplus >= 0 ? '+' : '') + fmtM(netSurplus) },
       ];
-
-      concepts.forEach((c, i) => {
-        const bodyLines = Math.max(2, Math.ceil(c.body.length / 84));
-        const h = bodyLines * 10 + 32;
-        doc.rect(LEFT, y, W, h).fill(i % 2 === 0 ? C.light : C.mid);
-        doc.fillColor(C.navy).fontSize(10).font('Helvetica-Bold').text(c.title, LEFT + 12, y + 10, { width: W - 24 });
-        doc.fillColor(C.coal).fontSize(8.5).font('Helvetica').text(c.body, LEFT + 12, y + 24, { width: W - 24, lineGap: 1.5 });
-        y += h + 5;
+      incomeRows.forEach((row, i) => {
+        const isTotal = row.label.startsWith('Total') || row.label.startsWith('Net');
+        const bg = isTotal ? C.mid : i % 2 === 0 ? C.light : C.white;
+        doc.rect(L, y, W, 26).fill(bg);
+        doc.fillColor(C.coal).fontSize(9).font(isTotal ? 'Helvetica-Bold' : 'Helvetica').text(row.label, L + 10, y + 8, { width: 340 });
+        doc.fillColor(isTotal && netSurplus < 0 && row.label.startsWith('Net') ? C.red : C.navy)
+          .fontSize(isTotal ? 10 : 9).font('Helvetica-Bold').text(row.val, L, y + 8, { width: W - 10, align: 'right' });
+        y += 26;
       });
+      y += 10;
 
-      pageFooter(doc, 2, TOTAL);
+      // Income vs Outflow bar
+      doc.fillColor(C.muted).fontSize(8).font('Helvetica-Bold').text('INCOME VS. MONTHLY OUTFLOW', L, y); y += 12;
+      const maxBar = Math.max(totalIncome, sim.tmib, 1);
+      const incomeBarW = Math.round((totalIncome / maxBar) * W);
+      const outflowBarW = Math.round((sim.tmib / maxBar) * W);
 
-      // ═══════════════════════════════════════════════════════════════════════
-      // PAGE 3 — BURN BREAKDOWN
-      // ═══════════════════════════════════════════════════════════════════════
-      doc.addPage();
-      pageHeader(doc, reportDate);
-      y = 50;
-      y = sectionHead(doc, 'Monthly Burn Breakdown', 'Every component of what your life costs during transition.', y);
+      doc.rect(L, y, incomeBarW, 18).fill(C.navy);
+      doc.fillColor(C.white).fontSize(7.5).font('Helvetica').text(`Income ${fmtM(totalIncome)}`, L + 6, y + 5);
+      y += 22;
+      doc.rect(L, y, outflowBarW, 18).fill(sim.tmib > totalIncome ? C.red : C.muted);
+      doc.fillColor(C.white).fontSize(7.5).font('Helvetica').text(`Outflow ${fmtM(sim.tmib)}`, L + 6, y + 5);
+      y += 30;
 
-      let rowEven = false;
-      y = groupHead(doc, 'Required Fixed Obligations', y);
-      y = burnRow(doc, 'Debt payments (required minimums)', sim.monthlyDebtPayments, y, rowEven = !rowEven);
-      y = burnRow(doc, 'Household living costs', sim.livingExpenses, y, rowEven = !rowEven);
-      const fixedSub = (sim.monthlyDebtPayments ?? 0) + (sim.livingExpenses ?? 0);
-      doc.rect(LEFT, y, W, 22).fill(C.mid);
-      doc.fillColor(C.muted).fontSize(8).font('Helvetica-Bold').text('FIXED SUBTOTAL', LEFT + 10, y + 7);
-      doc.fillColor(C.navy).fontSize(10).font('Times-Bold').text(fmtM(fixedSub), LEFT, y + 7, { width: W - 10, align: 'right' });
-      y += 22 + 3;
-
-      y = groupHead(doc, 'Transition Adjustments', y);
-      y = burnRow(doc, 'Additional healthcare cost', hc, y, rowEven = !rowEven);
-      if (sim.isDualIncome && sim.partnerIncome > 0) {
-        y = burnRow(doc, 'Partner income offset', sim.partnerIncome, y, rowEven = !rowEven, true);
+      // Dependents note
+      if ((sim.dependentChildren ?? 0) > 0) {
+        y = insight(doc, 'Household Dependents',
+          `You have ${sim.dependentChildren} dependent child${(sim.dependentChildren ?? 0) > 1 ? 'ren' : ''} in the household. This is reflected in the healthcare cost estimate. Dependent costs (childcare, education, activities) should be included in your living expenses figure.`, y);
       }
-      y += 3;
 
-      y = groupHead(doc, 'Business + Taxes', y);
-      y = burnRow(doc, 'Business operating cost', sim.businessCostBaseline, y, rowEven = !rowEven);
-      y = burnRow(doc, 'Self-employment tax reserve (28%)', sim.selfEmploymentTax, y, rowEven = !rowEven);
-      y += 3;
+      // Paragraph
+      const incomeVerb = totalIncome > sim.tmib * 1.1 ? 'exceeds' : totalIncome >= sim.tmib * 0.9 ? 'roughly matches' : 'falls below';
+      const incomeP = `Today, your household income ${incomeVerb} your required monthly outflow structure. ${netSurplus >= 0 ? `The ${fmtM(netSurplus)}/month surplus shows financial capacity that could be directed toward savings before a transition.` : `The ${fmtM(Math.abs(netSurplus))}/month shortfall means the transition would require drawing from savings from day one even before accounting for ramp delays.`}`;
+      y = insight(doc, 'What This Means', incomeP, y);
 
-      // Total row
-      doc.rect(LEFT, y, W, 40).fill(C.navy);
-      doc.fillColor('#94a3b8').fontSize(8).font('Helvetica').text('TRUE MONTHLY BURN', LEFT + 12, y + 8);
-      doc.fillColor(C.white).fontSize(20).font('Times-Bold').text(fmtM(sim.tmib), LEFT, y + 10, { width: W - 12, align: 'right' });
-      y += 52;
+      ftr(doc, 2);
 
-      // Composition bar
-      const burnParts = [
-        { label: 'Loan payments', val: sim.monthlyDebtPayments },
-        { label: 'Living costs', val: sim.livingExpenses },
-        { label: 'Healthcare', val: hc },
-        { label: 'Tax reserve', val: sim.selfEmploymentTax },
-        { label: 'Business', val: sim.businessCostBaseline },
-      ].filter(p => p.val > 0);
-      const totalBurn = burnParts.reduce((a, p) => a + p.val, 0) || 1;
-      const opacities = [1, 0.74, 0.54, 0.36, 0.22];
-      let bx = LEFT;
-      burnParts.forEach((p, i) => {
-        const bw = Math.round((p.val / totalBurn) * W);
-        doc.save().fillOpacity(opacities[i] ?? 0.2).rect(bx, y, bw, 14).fill(C.navy).restore();
-        bx += bw;
+      // ════════════════════════════════════════════════════════════════════
+      // PAGE 3 — MONTHLY OUTFLOW BREAKDOWN
+      // ════════════════════════════════════════════════════════════════════
+      doc.addPage(); hdr(doc, date); y = 42;
+      y = secHead(doc, 3, 'Where Your Money Goes Each Month',
+        'A breakdown of every component of your monthly outflow structure. Percentages reflect share of gross outflow before partner income offset.', y);
+
+      // Column headers
+      y = tableHead(doc, [
+        { label: 'Category', x: L + 8 }, { label: 'Definition', x: L + 165 },
+        { label: 'Monthly Amount', x: L + 355 }, { label: '% of Outflow', x: L + 448 },
+      ], y);
+
+      const definitions = [
+        'Day-to-day household expenses, not including loan payments or healthcare',
+        'Contractual minimum payments — cannot be skipped without credit damage or default',
+        'Post-transition premium cost change versus current employer coverage',
+        'Reserve against self-employment tax obligations (28% of projected revenue)',
+        'Recurring business operating expenses needed to generate revenue',
+      ];
+
+      outflowComponents.forEach((c, i) => {
+        const pct = pcts[i];
+        const h = 36;
+        doc.rect(L, y, W, h).fill(i % 2 === 0 ? C.light : C.mid);
+        doc.fillColor(C.coal).fontSize(9).font('Helvetica-Bold').text(c.label, L + 8, y + 5, { width: 152 });
+        doc.fillColor(C.muted).fontSize(7.5).font('Helvetica').text(definitions[i] ?? '', L + 165, y + 5, { width: 185, lineGap: 1 });
+        doc.fillColor(C.navy).fontSize(10).font('Helvetica-Bold').text(fmtM(c.val), L + 355, y + 12);
+        doc.fillColor(C.navy).fontSize(10).font('Helvetica-Bold').text(`${pct}%`, L + 448, y + 12);
+        y += h;
       });
-      y += 18;
-      bx = LEFT;
-      burnParts.forEach((p, i) => {
-        const pct = Math.round((p.val / totalBurn) * 100);
-        doc.save().fillOpacity(opacities[i] ?? 0.2).rect(bx, y, 8, 8).fill(C.navy).restore();
-        doc.fillColor(C.muted).fontSize(7.5).font('Helvetica').text(`${p.label} ${pct}%`, bx + 11, y + 1);
-        bx += 92;
-      });
-      y += 20;
 
-      // Interpretation callouts
-      const fixedPct = sim.tmib > 0 ? Math.round((fixedSub / sim.tmib) * 100) : 0;
-      const sePct = sim.tmib > 0 ? Math.round((sim.selfEmploymentTax / sim.tmib) * 100) : 0;
-
-      doc.rect(LEFT, y, W, 1).fill(C.border); y += 10;
-      doc.fillColor(C.coal).fontSize(9).font('Helvetica')
-        .text(`Fixed obligations (loan payments + healthcare) make up ${fixedPct}% of burn. These cannot be reduced under stress without structural changes — they are the hardest costs to cut.`, LEFT, y, { width: W, lineGap: 2 });
-      y += 26;
-      if (sePct > 0) {
-        doc.text(`The self-employment tax reserve (${sePct}% of burn) does flex — it scales with revenue and eases naturally in lower-income months. It is not as rigid as debt or insurance.`, LEFT, y, { width: W, lineGap: 2 });
+      // Partner offset row
+      if (partnerOff > 0) {
+        doc.rect(L, y, W, 26).fill(C.mid);
+        doc.fillColor(C.green).fontSize(9).font('Helvetica-Bold').text('Partner Income Offset', L + 8, y + 8, { width: 152 });
+        doc.fillColor(C.muted).fontSize(7.5).font('Helvetica').text('Continuing partner income reduces the net outflow gap', L + 165, y + 8, { width: 185 });
+        doc.fillColor(C.green).fontSize(10).font('Helvetica-Bold').text(`(${fmtM(partnerOff)})`, L + 355, y + 8);
+        doc.fillColor(C.muted).fontSize(8).font('Helvetica').text('offset', L + 448, y + 10);
         y += 26;
       }
 
-      pageFooter(doc, 3, TOTAL);
+      // Net total
+      doc.rect(L, y, W, 32).fill(C.navy);
+      doc.fillColor('#94a3b8').fontSize(7.5).font('Helvetica').text('NET MONTHLY OUTFLOW', L + 10, y + 8);
+      doc.fillColor(C.white).fontSize(16).font('Times-Bold').text(fmtM(sim.tmib), L, y + 8, { width: W - 10, align: 'right' });
+      y += 44;
 
-      // ═══════════════════════════════════════════════════════════════════════
-      // PAGE 4 — LIQUIDITY DEFENSE MAP
-      // ═══════════════════════════════════════════════════════════════════════
-      doc.addPage();
-      pageHeader(doc, reportDate);
-      y = 50;
-      y = sectionHead(doc, 'Liquidity Defense Map', 'Capital organized by accessibility. Under stress, depletion follows this order.', y);
-
-      // Tier table
-      const tierRows = [
-        { tier: 1, tier_label: 'Fully Liquid', label: 'Cash & HYSA', haircut: '100%', raw: sim.cash, counted: tier1Cap, note: 'No penalty, no tax, no delay.' },
-        { tier: 2, tier_label: 'Semi-Liquid', label: 'Brokerage accounts', haircut: '80%', raw: sim.brokerage, counted: tier2Cap, note: 'May trigger capital gains taxes when sold.' },
-        { tier: 3, tier_label: 'Restricted', label: 'Roth IRA (contributions)', haircut: '100%', raw: sim.roth, counted: Math.round(sim.roth), note: 'Accessible but still retirement — treat as emergency.' },
-        { tier: 3, tier_label: 'Restricted', label: 'Traditional IRA / 401(k)', haircut: '50%', raw: sim.traditional, counted: Math.round(sim.traditional * 0.50), note: 'Taxes + 10% early withdrawal penalty. Last Resort.' },
-        { tier: 3, tier_label: 'Restricted', label: 'Home equity', haircut: '30%', raw: sim.realEstate, counted: Math.round(sim.realEstate * 0.30), note: 'Illiquid — 6–10% transaction costs, market timing.' },
-      ];
-
-      // Header
-      doc.rect(LEFT, y, W, 22).fill(C.navy);
-      [['Asset', 80], ['Haircut', 50], ['Declared', 80], ['Counted', 80]].forEach(([h, w], i) => {
-        const xp = [LEFT + 10, LEFT + 210, RIGHT - 170, RIGHT - 86];
-        doc.fillColor(C.white).fontSize(8).font('Helvetica-Bold').text(h as string, xp[i], y + 7);
+      // Composition bar
+      doc.fillColor(C.muted).fontSize(7.5).font('Helvetica-Bold').text('OUTFLOW COMPOSITION', L, y); y += 8;
+      const segsY = y;
+      let bx = L;
+      outflowComponents.forEach(c => {
+        const bw = Math.round((c.val / grossOutflow) * W);
+        doc.save().fillOpacity(c.opacity).rect(bx, y, bw, 14).fill(C.navy).restore();
+        bx += bw;
       });
-      y += 22;
-
-      let lastTier = 0;
-      tierRows.forEach((row, i) => {
-        if (row.raw === 0 && row.tier === 3) return;
-        if (row.tier !== lastTier) {
-          const tierColor = row.tier === 3 ? '#fffbeb' : C.mid;
-          const tierLabel = row.tier === 1 ? 'TIER 1 — FULLY LIQUID (Primary Runway)' : row.tier === 2 ? 'TIER 2 — SEMI-LIQUID' : 'TIER 3 — RESTRICTED / LAST RESORT';
-          doc.rect(LEFT, y, W, 16).fill(tierColor);
-          doc.fillColor(row.tier === 3 ? C.amber : C.muted).fontSize(7).font('Helvetica-Bold').text(tierLabel, LEFT + 10, y + 4);
-          y += 16;
-          lastTier = row.tier;
-        }
-        const bg = i % 2 === 0 ? C.light : C.mid;
-        doc.rect(LEFT, y, W, 36).fill(bg);
-        doc.fillColor(C.coal).fontSize(9.5).font('Helvetica-Bold').text(row.label, LEFT + 10, y + 7, { width: 195 });
-        doc.fillColor(C.muted).fontSize(8).font('Helvetica').text(row.note, LEFT + 10, y + 21, { width: 195 });
-        doc.fillColor(C.muted).fontSize(8).font('Helvetica').text(row.haircut, LEFT + 210, y + 14);
-        doc.fillColor(C.coal).fontSize(9.5).font('Helvetica').text(fmtM(row.raw), RIGHT - 170, y + 14);
-        doc.fillColor(C.navy).fontSize(10).font('Helvetica-Bold').text(fmtM(row.counted), RIGHT - 86, y + 14);
-        y += 36;
+      y += 18;
+      bx = L;
+      outflowComponents.forEach((c, i) => {
+        doc.save().fillOpacity(c.opacity).rect(bx, y, 8, 8).fill(C.navy).restore();
+        doc.fillColor(C.muted).fontSize(7).font('Helvetica').text(`${c.label} ${pcts[i]}%`, bx + 11, y + 1);
+        bx += 96;
       });
-
-      // Liquidity Line subtotal
-      doc.rect(LEFT, y, W, 34).fill('#f0f9ff');
-      doc.rect(LEFT, y, 3, 34).fill(C.blue);
-      doc.fillColor(C.blue).fontSize(8).font('Helvetica-Bold').text('LIQUIDITY LINE (TIER 1+2) — PRIMARY SAFETY BUFFER', LEFT + 12, y + 8);
-      doc.fillColor(C.blue).fontSize(14).font('Times-Bold').text(fmtM(t1t2Cap), LEFT, y + 10, { width: W - 12, align: 'right' });
-      y += 34;
-
-      // Total
-      doc.rect(LEFT, y, W, 38).fill(C.navy);
-      doc.fillColor('#94a3b8').fontSize(8).font('Helvetica').text('TOTAL ACCESSIBLE CAPITAL (ALL TIERS)', LEFT + 12, y + 8);
-      doc.fillColor(C.white).fontSize(18).font('Times-Bold').text(fmtM(sim.accessibleCapital), LEFT, y + 10, { width: W - 12, align: 'right' });
-      y += 50;
-
-      // Tier 3 warning
-      if (tier3Cap > 0) {
-        doc.rect(LEFT, y, W, 36).fill('#fffbeb');
-        doc.rect(LEFT, y, 3, 36).fill(C.amber);
-        doc.fillColor(C.amber).fontSize(9).font('Helvetica-Bold').text('Emergency Zone — Tier 3 Is Not a Plan', LEFT + 12, y + 8, { width: W - 24 });
-        doc.fillColor(C.coal).fontSize(8.5).font('Helvetica').text('Tier 3 is not considered primary runway. Accessing retirement early may cause penalties, taxes, and long-term retirement damage. This report shows when Tier 3 would be required — not to encourage it, but to name the risk.', LEFT + 12, y + 20, { width: W - 24 });
-        y += 44;
-      }
-
-      pageFooter(doc, 4, TOTAL);
-
-      // ═══════════════════════════════════════════════════════════════════════
-      // PAGE 5 — LIQUIDITY LINE RESULT (THE HEADLINE PAGE)
-      // ═══════════════════════════════════════════════════════════════════════
-      doc.addPage();
-      pageHeader(doc, reportDate);
-      y = 50;
-      y = sectionHead(doc, 'Liquidity Line — When Does Tier 1+2 Run Out?',
-        'The Liquidity Line is when your cash and brokerage run dry. After this point, you either become cash-flow positive or enter Tier 3 territory.', y);
-
-      // 4-scenario bars
-      const llScenarios = [
-        { label: 'Expected conditions (revenue at target)', months: llBase },
-        { label: 'Moderate income contraction (−15%)', months: ll15 },
-        { label: 'Severe income contraction (−30%)', months: ll30 },
-        { label: 'Ramp delayed +3 months', months: llRamp3 },
-      ];
-      const maxLL = Math.max(...llScenarios.filter(s => s.months < 999).map(s => s.months), 24);
-
-      llScenarios.forEach((sc, i) => {
-        const pct = sc.months >= 999 ? 1.0 : Math.min(sc.months / (maxLL * 1.15), 1.0);
-        const barW = Math.round(pct * (W - 150));
-        const barColor = sc.months >= 24 ? C.navy : sc.months >= 12 ? C.coal : C.muted;
-        doc.fillColor(C.coal).fontSize(9).font('Helvetica').text(sc.label, LEFT, y, { width: W - 152 });
-        doc.fillColor(C.navy).fontSize(10).font('Times-Bold').text(fmtMoShort(sc.months), RIGHT - 148, y, { width: 148, align: 'right' });
-        y += 13;
-        doc.rect(LEFT, y, W - 150, 10).fill(C.border);
-        doc.rect(LEFT, y, barW, 10).fill(barColor);
-        y += 18;
-      });
-      y += 8;
-
-      // Warning callout based on ll30
-      let warningText: string, warningBg: string, warningBorder: string;
-      if (ll30 < 6) {
-        warningBg = '#fef2f2'; warningBorder = C.red;
-        warningText = `Under a severe income contraction (−30%), your Tier 1+2 capital would be exhausted in ${ll30} months. That's less than 6 months — a very thin cushion. This does not mean don't go — it means the risk profile changes sharply, fast.`;
-      } else if (ll30 < 12) {
-        warningBg = '#fffbeb'; warningBorder = C.amber;
-        warningText = `Under a severe income contraction (−30%), your Tier 1+2 capital lasts ${ll30} months before running out. Under ${12} months is worth taking seriously — a bad quarter in the first year could force difficult decisions.`;
-      } else {
-        warningBg = '#f0fdf4'; warningBorder = C.green;
-        warningText = `Even under a severe income contraction (−30%), your Tier 1+2 capital covers ${ll30 >= 999 ? 'well beyond the model horizon' : `${ll30} months`}. That's a meaningful cushion. The pressure point is comfort, not survival.`;
-      }
-      doc.rect(LEFT, y, W, 48).fill(warningBg);
-      doc.rect(LEFT, y, 3, 48).fill(warningBorder);
-      doc.fillColor(C.coal).fontSize(9.5).font('Helvetica').text(warningText, LEFT + 12, y + 10, { width: W - 24, lineGap: 2 });
-      y += 58;
-
-      // Comparison table
-      doc.rect(LEFT, y, W, 22).fill(C.navy);
-      ['Scenario', 'Liquidity Line', 'Full Runway', 'Tier 3 Required?'].forEach((h, i) => {
-        const xp = [LEFT + 10, LEFT + 200, LEFT + 300, LEFT + 392];
-        doc.fillColor(C.white).fontSize(8).font('Helvetica-Bold').text(h, xp[i], y + 7);
-      });
-      y += 22;
-
-      llScenarios.forEach((sc, i) => {
-        const fullRun = i === 0 ? sim.baseRunway : i === 1 ? sim.runway15Down : i === 2 ? sim.runway30Down : sim.runwayRampDelay;
-        const needsTier3 = sc.months < fullRun && fullRun < 999;
-        const bg = i % 2 === 0 ? C.light : C.mid;
-        doc.rect(LEFT, y, W, 28).fill(bg);
-        doc.fillColor(C.coal).fontSize(9).font('Helvetica').text(sc.label, LEFT + 10, y + 9, { width: 185 });
-        doc.fillColor(C.navy).fontSize(9).font('Helvetica-Bold').text(fmtMoShort(sc.months), LEFT + 200, y + 9);
-        doc.fillColor(C.navy).fontSize(9).font('Helvetica-Bold').text(fmtYrs(fullRun), LEFT + 300, y + 9);
-        doc.fillColor(needsTier3 ? C.red : C.green).fontSize(9).font('Helvetica-Bold').text(needsTier3 ? 'Yes' : 'No', LEFT + 392, y + 9);
-        y += 28;
-      });
-
-      pageFooter(doc, 5, TOTAL);
-
-      // ═══════════════════════════════════════════════════════════════════════
-      // PAGE 6 — REVENUE STRESS + CASH COVERAGE LADDER
-      // ═══════════════════════════════════════════════════════════════════════
-      doc.addPage();
-      pageHeader(doc, reportDate);
-      y = 50;
-      y = sectionHead(doc, 'Revenue Stress Scenarios',
-        'Three revenue scenarios tested against your burn. The ladder below shows your Tier 1+2 capital position at milestone months.', y);
-
-      // 3-scenario summary
-      const stressScenarios = [
-        { label: 'Expected conditions', revMult: 1.00, ll: llBase, full: sim.baseRunway },
-        { label: 'Moderate contraction (−15%)', revMult: 0.85, ll: ll15, full: sim.runway15Down },
-        { label: 'Severe contraction (−30%)', revMult: 0.70, ll: ll30, full: sim.runway30Down },
-      ];
-
-      doc.rect(LEFT, y, W, 22).fill(C.navy);
-      ['Scenario', 'Monthly Revenue', 'Liquidity Line', 'Full Runway'].forEach((h, i) => {
-        const xp = [LEFT + 10, LEFT + 195, LEFT + 290, LEFT + 390];
-        doc.fillColor(C.white).fontSize(8).font('Helvetica-Bold').text(h, xp[i], y + 7);
-      });
-      y += 22;
-
-      stressScenarios.forEach((sc, i) => {
-        const monthlyRev = Math.round(sim.expectedRevenue * sc.revMult * (1 - sim.volatilityPercent / 100));
-        const bg = i % 2 === 0 ? C.light : C.mid;
-        doc.rect(LEFT, y, W, 28).fill(bg);
-        doc.fillColor(C.coal).fontSize(9).font('Helvetica').text(sc.label, LEFT + 10, y + 9, { width: 180 });
-        doc.fillColor(C.coal).fontSize(9).font('Helvetica').text(fmtM(monthlyRev) + '/mo', LEFT + 195, y + 9);
-        doc.fillColor(C.navy).fontSize(9).font('Helvetica-Bold').text(fmtMoShort(sc.ll), LEFT + 290, y + 9);
-        doc.fillColor(C.navy).fontSize(9).font('Helvetica-Bold').text(fmtYrs(sc.full), LEFT + 390, y + 9);
-        y += 28;
-      });
-      y += 14;
-
-      // Cash Coverage Ladder (base case, milestone months)
-      doc.fillColor(C.navy).fontSize(12).font('Times-Bold').text('Cash Coverage Ladder — Base Case', LEFT, y);
-      y += 6;
-      doc.fillColor(C.muted).fontSize(8.5).font('Helvetica').text('Tier 1+2 capital remaining at milestone months under expected conditions.', LEFT, y, { width: W });
-      y += 16;
-
-      const ladder = coverageLadder(sim, 1.00, sim.rampDuration);
-      doc.rect(LEFT, y, W, 20).fill(C.navy);
-      ['Month', 'Revenue', 'Burn', 'Gap', 'Remaining T1+2', 'Status'].forEach((h, i) => {
-        const xp = [LEFT + 6, LEFT + 58, LEFT + 140, LEFT + 218, LEFT + 302, LEFT + 390];
-        doc.fillColor(C.white).fontSize(7.5).font('Helvetica-Bold').text(h, xp[i], y + 6);
-      });
-      y += 20;
-
-      ladder.forEach((row, i) => {
-        const bg = row.inTier3Zone ? '#fef2f2' : i % 2 === 0 ? C.light : C.mid;
-        doc.rect(LEFT, y, W, 20).fill(bg);
-        const statusColor = row.inTier3Zone ? C.red : C.green;
-        const statusText = row.inTier3Zone ? 'Tier 3 Zone' : 'Safe (T1+2)';
-        const xp = [LEFT + 6, LEFT + 58, LEFT + 140, LEFT + 218, LEFT + 302, LEFT + 390];
-        doc.fillColor(C.coal).fontSize(8).font('Helvetica')
-          .text(`${row.month}`, xp[0], y + 6)
-          .text(fmtM(row.revenue), xp[1], y + 6)
-          .text(fmtM(row.burn), xp[2], y + 6)
-          .text(row.gap >= 0 ? fmtM(row.gap) : `(${fmtM(Math.abs(row.gap))})`, xp[3], y + 6);
-        doc.fillColor(row.remainingT1T2 === 0 && row.inTier3Zone ? C.red : C.navy).fontSize(8).font('Helvetica-Bold')
-          .text(fmtM(row.remainingT1T2), xp[4], y + 6);
-        doc.fillColor(statusColor).fontSize(8).font('Helvetica-Bold').text(statusText, xp[5], y + 6);
-        y += 20;
-      });
-
-      pageFooter(doc, 6, TOTAL);
-
-      // ═══════════════════════════════════════════════════════════════════════
-      // PAGE 7 — RAMP TIMING SCENARIOS
-      // ═══════════════════════════════════════════════════════════════════════
-      doc.addPage();
-      pageHeader(doc, reportDate);
-      y = 50;
-      y = sectionHead(doc, 'Ramp Timing Sensitivity',
-        `Your base ramp is ${sim.rampDuration} months. This shows how arriving early or late by up to 3 months shifts your Liquidity Line.`, y);
-
-      doc.rect(LEFT, y, W, 22).fill(C.navy);
-      ['Ramp Delta', 'Months', 'Liquidity Line', 'Full Runway', 'Tier 3?'].forEach((h, i) => {
-        const xp = [LEFT + 10, LEFT + 90, LEFT + 175, LEFT + 285, LEFT + 390];
-        doc.fillColor(C.white).fontSize(8).font('Helvetica-Bold').text(h, xp[i], y + 7);
-      });
-      y += 22;
-
-      rampVariants.forEach((rv, i) => {
-        const bg = rv.delta === 0 ? C.mid : i % 2 === 0 ? C.light : C.mid;
-        const deltaLabel = rv.delta === 0 ? 'Base case' : rv.delta > 0 ? `+${rv.delta} months (late)` : `${rv.delta} months (early)`;
-        const needsTier3 = rv.ll < rv.full && rv.full < 999;
-        doc.rect(LEFT, y, W, 28).fill(bg);
-        if (rv.delta === 0) doc.rect(LEFT, y, 3, 28).fill(C.navy);
-        const xp = [LEFT + 10, LEFT + 90, LEFT + 175, LEFT + 285, LEFT + 390];
-        doc.fillColor(C.coal).fontSize(9).font('Helvetica').text(deltaLabel, xp[0], y + 9);
-        doc.fillColor(C.coal).fontSize(9).font('Helvetica').text(`${rv.rampMonths} mo`, xp[1], y + 9);
-        doc.fillColor(rv.delta === 0 ? C.navy : C.coal).fontSize(rv.delta === 0 ? 10 : 9)
-          .font(rv.delta === 0 ? 'Helvetica-Bold' : 'Helvetica').text(fmtMoShort(rv.ll), xp[2], y + 9);
-        doc.fillColor(C.coal).fontSize(9).font('Helvetica').text(fmtYrs(rv.full), xp[3], y + 9);
-        doc.fillColor(needsTier3 ? C.red : C.green).fontSize(9).font('Helvetica-Bold')
-          .text(needsTier3 ? 'Yes' : 'No', xp[4], y + 9);
-        y += 28;
-      });
-      y += 14;
-
-      // Interpretation
-      const baseLL = rampVariants.find(r => r.delta === 0)?.ll ?? 0;
-      const minus3LL = rampVariants.find(r => r.delta === -3)?.ll ?? 0;
-      const plus3LL = rampVariants.find(r => r.delta === 3)?.ll ?? 0;
-      const rampText = `A 3-month early ramp shifts the Liquidity Line from ${fmtMoShort(baseLL)} to ${fmtMoShort(minus3LL)} — a ${minus3LL >= 999 || baseLL >= 999 ? 'significant' : `${minus3LL - baseLL} month`} improvement. A 3-month late ramp shifts it to ${fmtMoShort(plus3LL)}. Every month of early revenue reduces how long your savings must cover the full gap.`;
-      y = insightBlock(doc, 'What Ramp Timing Means', rampText, y);
-
-      pageFooter(doc, 7, TOTAL);
-
-      // ═══════════════════════════════════════════════════════════════════════
-      // PAGE 8 — HOUSEHOLD SHOCK SCENARIOS
-      // ═══════════════════════════════════════════════════════════════════════
-      doc.addPage();
-      pageHeader(doc, reportDate);
-      y = 50;
-      y = sectionHead(doc, 'Household Shock Scenarios', 'Secondary risks that can compound the transition. Not predictions — edge cases worth knowing.', y);
-
-      // Partner Job Loss
-      doc.fillColor(C.navy).fontSize(12).font('Times-Bold').text('Partner Job Loss', LEFT, y);
       y += 18;
 
-      if (partnerLoss && sim.isDualIncome) {
-        doc.fillColor(C.muted).fontSize(8.5).font('Helvetica')
-          .text(`Partner income of ${fmtM(sim.partnerIncome)}/month is currently offsetting burn. If that stops, your effective burn rises by that amount for the duration of the loss.`, LEFT, y, { width: W, lineGap: 2 });
-        y += 22;
+      ftr(doc, 3);
 
-        doc.rect(LEFT, y, W, 22).fill(C.navy);
-        ['Duration', 'Liquidity Line', 'Full Runway', 'Tier 3 Required?'].forEach((h, i) => {
-          const xp = [LEFT + 10, LEFT + 130, LEFT + 255, LEFT + 380];
-          doc.fillColor(C.white).fontSize(8).font('Helvetica-Bold').text(h, xp[i], y + 7);
-        });
-        y += 22;
+      // ════════════════════════════════════════════════════════════════════
+      // PAGE 4 — DEBT STRUCTURE & EXPOSURE
+      // ════════════════════════════════════════════════════════════════════
+      doc.addPage(); hdr(doc, date); y = 42;
+      y = secHead(doc, 4, 'Debt Structure & Exposure',
+        'Outstanding loan balances are context — they do not directly change your monthly outflow. They reflect structural leverage and long-term risk exposure.', y);
 
-        partnerLoss.forEach((pl, i) => {
-          const needsTier3 = pl.ll < pl.full && pl.full < 999;
-          const bg = i % 2 === 0 ? C.light : C.mid;
-          doc.rect(LEFT, y, W, 28).fill(bg);
-          const xp = [LEFT + 10, LEFT + 130, LEFT + 255, LEFT + 380];
-          doc.fillColor(C.coal).fontSize(9).font('Helvetica').text(`Loss for ${pl.dur} months`, xp[0], y + 9);
-          doc.fillColor(C.navy).fontSize(9).font('Helvetica-Bold').text(fmtMoShort(pl.ll), xp[1], y + 9);
-          doc.fillColor(C.coal).fontSize(9).font('Helvetica').text(fmtYrs(pl.full), xp[2], y + 9);
-          doc.fillColor(needsTier3 ? C.red : C.green).fontSize(9).font('Helvetica-Bold')
-            .text(needsTier3 ? 'Yes' : 'No', xp[3], y + 9);
-          y += 28;
-        });
-        y = insightBlock(doc, 'What this means',
-          `Partner job loss during the transition is exactly the kind of shock that forces Tier 3 territory earlier than planned. If you're dual-income and your position relies on that offset, have a clear conversation about job security before the leap.`, y + 8);
-      } else {
-        doc.rect(LEFT, y, W, 30).fill(C.light);
-        doc.fillColor(C.muted).fontSize(9).font('Helvetica').text('Not applicable — no partner income entered. Partner job loss scenario is only relevant for dual-income households.', LEFT + 12, y + 10, { width: W - 24 });
-        y += 40;
+      doc.rect(L, y, W, 34).fill(C.mid);
+      doc.fillColor(C.muted).fontSize(7.5).font('Helvetica').text('TOTAL OUTSTANDING DEBT BALANCE', L + 10, y + 8);
+      const totalDebtVal = sim.totalDebt ?? 0;
+      const debtColor = totalDebtVal === 0 ? C.green : sim.debtExposureRatio > 0.70 ? C.red : C.coal;
+      doc.fillColor(debtColor).fontSize(18).font('Times-Bold').text(fmtM(totalDebtVal), L, y + 8, { width: W - 10, align: 'right' });
+      y += 46;
+
+      // Debt context note
+      const debtNote = `Your monthly debt payment of ${fmtM(sim.monthlyDebtPayments)} is the required minimum and is included in your monthly outflow. The outstanding balance of ${fmtM(totalDebtVal)} does not affect your month-to-month outflow directly — it is the total you owe across all loans. It affects long-term financial flexibility and the time required to become fully debt-free.`;
+      y = insight(doc, 'How Debt Balances Differ From Debt Payments', debtNote, y);
+
+      // Debt exposure
+      if (totalDebtVal > 0) {
+        const debtRatio = sim.debtExposureRatio;
+        const debtRatioPct = Math.round(debtRatio * 100);
+        y = statRow(doc, [
+          { label: 'Outstanding Debt Balance', val: fmtM(totalDebtVal) },
+          { label: 'Total Accessible Savings', val: fmtM(sim.accessibleCapital) },
+          { label: 'Debt-to-Savings Ratio', val: `${debtRatioPct}%`, color: debtRatioPct > 70 ? C.red : C.coal },
+        ], y);
+        if (debtRatioPct > 70) {
+          doc.rect(L, y, W, 40).fill('#fef2f2');
+          doc.rect(L, y, 3, 40).fill(C.red);
+          doc.fillColor(C.red).fontSize(8.5).font('Helvetica-Bold').text('ELEVATED DEBT EXPOSURE', L + 12, y + 8);
+          doc.fillColor(C.coal).fontSize(9).font('Helvetica').text(`Outstanding debt of ${fmtM(totalDebtVal)} represents ${debtRatioPct}% of your accessible savings — above the 70% elevated threshold. This narrows recovery options under stress.`, L + 12, y + 20, { width: W - 24 });
+          y += 48;
+        }
       }
 
-      // New Child
-      doc.fillColor(C.navy).fontSize(12).font('Times-Bold').text('New Child', LEFT, y);
-      y += 16;
-      doc.fillColor(C.muted).fontSize(8).font('Helvetica')
-        .text('Assumptions used below — adjust with your advisor if different apply.', LEFT, y);
-      y += 12;
+      // Mortgage clarity note
+      doc.rect(L, y, W, 44).fill('#f0f9ff');
+      doc.rect(L, y, 3, 44).fill(C.blue);
+      doc.fillColor(C.blue).fontSize(8).font('Helvetica-Bold').text('MORTGAGE / HOUSING PAYMENT NOTE', L + 12, y + 8);
+      doc.fillColor(C.coal).fontSize(9).font('Helvetica').text('If you pay a mortgage, that monthly payment is recorded under Debt Payments (Required Minimums) and is already in your outflow. It should NOT also appear in your Living Expenses. Each payment belongs in exactly one place.', L + 12, y + 20, { width: W - 24, lineGap: 1.5 });
+      y += 52;
 
-      const childAssumptions = [
-        `One-time cost: ${fmtM(CHILD_ONETIME)} (equipment, setup, medical)`,
-        `Monthly delta: ${fmtM(CHILD_MONTHLY)}/month (childcare, supplies, insurance adjustments)`,
-        'No adjustment to partner income or healthcare assumed',
+      ftr(doc, 4);
+
+      // ════════════════════════════════════════════════════════════════════
+      // PAGE 5 — PRIMARY SAVINGS RUNWAY (DEFINITION PAGE)
+      // ════════════════════════════════════════════════════════════════════
+      doc.addPage(); hdr(doc, date); y = 42;
+      y = secHead(doc, 5, 'Primary Savings Runway',
+        'How long your readily accessible savings can sustain the gap between outflow and revenue.', y);
+
+      // Definitions
+      const defBlocks = [
+        { title: 'Primary Accessible Savings (Cash + Brokerage)', body: `${fmtM(pasCap)} total. This is your first line of defense — money you can access without penalties, taxes, or significant delay. It includes cash, checking, savings, HYSA (counted at 100%) and taxable brokerage accounts (counted at 80% for capital gains exposure).` },
+        { title: 'Restricted or Long-Term Assets (Retirement + Home Equity)', body: `${fmtM(t3Cap)} total. These assets are not considered primary runway. Accessing retirement funds early triggers income taxes and a 10% penalty — permanently reducing long-term compounding. Home equity is slow, costly, and market-dependent. Restricted assets are emergency capital, not a plan.` },
       ];
-      childAssumptions.forEach(a => {
-        doc.rect(LEFT, y, W, 18).fill(C.light);
-        doc.fillColor(C.coal).fontSize(9).font('Helvetica').text(`· ${a}`, LEFT + 10, y + 4, { width: W - 20 });
+      defBlocks.forEach((b, i) => {
+        const h = 60;
+        doc.rect(L, y, W, h).fill(i === 0 ? '#f0f9ff' : '#fffbeb');
+        doc.rect(L, y, 3, h).fill(i === 0 ? C.blue : C.amber);
+        doc.fillColor(i === 0 ? C.blue : C.amber).fontSize(8.5).font('Helvetica-Bold').text(b.title, L + 12, y + 8, { width: W - 24 });
+        doc.fillColor(C.coal).fontSize(9).font('Helvetica').text(b.body, L + 12, y + 22, { width: W - 24, lineGap: 1.5 });
+        y += h + 6;
+      });
+
+      // Tier table
+      y = tableHead(doc, [
+        { label: 'Asset Type', x: L + 8 }, { label: 'Haircut Applied', x: L + 210 },
+        { label: 'Your Amount', x: L + 310 }, { label: 'Counted As', x: L + 420 },
+      ], y);
+      const tierRows = [
+        { label: 'Cash & HYSA', cat: 'Primary', haircut: '100% (no deduction)', raw: sim.cash, counted: t1(sim) },
+        { label: 'Brokerage accounts', cat: 'Primary', haircut: '80% (capital gains)', raw: sim.brokerage, counted: t2(sim) },
+        { label: 'Roth IRA contributions', cat: 'Restricted', haircut: '100% (still retirement)', raw: sim.roth, counted: Math.round(sim.roth) },
+        { label: 'Traditional IRA / 401(k)', cat: 'Restricted', haircut: '50% (taxes + penalty)', raw: sim.traditional, counted: Math.round(sim.traditional * 0.50) },
+        { label: 'Home equity', cat: 'Restricted', haircut: '30% (illiquid, costly)', raw: sim.realEstate, counted: Math.round(sim.realEstate * 0.30) },
+      ].filter(r => r.raw > 0);
+
+      tierRows.forEach((row, i) => {
+        const bg = row.cat === 'Restricted' ? (i % 2 === 0 ? '#fffbeb' : '#fef9c3') : i % 2 === 0 ? C.light : C.mid;
+        doc.rect(L, y, W, 24).fill(bg);
+        const catColor = row.cat === 'Restricted' ? C.amber : C.navy;
+        doc.fillColor(C.coal).fontSize(9).font('Helvetica').text(row.label, L + 8, y + 7, { width: 198 });
+        doc.fillColor(C.muted).fontSize(7.5).font('Helvetica').text(row.haircut, L + 210, y + 7, { width: 96 });
+        doc.fillColor(C.coal).fontSize(9).font('Helvetica').text(fmtM(row.raw), L + 310, y + 7);
+        doc.fillColor(catColor).fontSize(9).font('Helvetica-Bold').text(fmtM(row.counted), L + 420, y + 7);
+        y += 24;
+      });
+
+      // Totals
+      doc.rect(L, y, W, 28).fill('#f0f9ff');
+      doc.fillColor(C.blue).fontSize(9).font('Helvetica-Bold').text('Primary Accessible Savings (Cash + Brokerage)', L + 8, y + 9);
+      doc.fillColor(C.blue).fontSize(12).font('Times-Bold').text(fmtM(pasCap), L, y + 9, { width: W - 10, align: 'right' });
+      y += 28;
+      doc.rect(L, y, W, 28).fill(C.navy);
+      doc.fillColor('#94a3b8').fontSize(8).font('Helvetica').text('Total Accessible Savings (All Tiers)', L + 8, y + 9);
+      doc.fillColor(C.white).fontSize(13).font('Times-Bold').text(fmtM(sim.accessibleCapital), L, y + 9, { width: W - 10, align: 'right' });
+      y += 36;
+
+      // Runway + pressure point
+      doc.fillColor(C.muted).fontSize(8).font('Helvetica-Bold').text('PRIMARY SAVINGS RUNWAY — BASE CASE', L, y); y += 10;
+      doc.fillColor(C.navy).fontSize(22).font('Times-Bold').text(fmtRunway(psrBase), L, y); y += 28;
+      if (pm30 < 999) {
+        doc.fillColor(C.muted).fontSize(9).font('Helvetica')
+          .text(`Financial pressure would begin around ${fmtRunwayShort(pm30)} under severe income contraction (−30%).`, L, y, { width: W });
         y += 18;
+      }
+
+      ftr(doc, 5);
+
+      // ════════════════════════════════════════════════════════════════════
+      // PAGE 6 — STRESS SCENARIO MODELING
+      // ════════════════════════════════════════════════════════════════════
+      doc.addPage(); hdr(doc, date); y = 42;
+      y = secHead(doc, 6, 'Stress Scenario Modeling',
+        'Three revenue outcomes tested against your outflow structure. Your Primary Accessible Savings and total savings runway in each.', y);
+
+      const scenarios = [
+        { name: 'Revenue arrives on time and hits target', tag: 'Base case', psr: psrBase, full: frBase, pm: pmBase, revMult: 1.00, needsT3: t3Cap > 0 && psrBase < frBase },
+        { name: 'Revenue underperforms target by 15%', tag: 'Moderate contraction', psr: psr15, full: fr15, pm: pm15, revMult: 0.85, needsT3: t3Cap > 0 && psr15 < fr15 },
+        { name: 'Revenue materially underperforms by 30%', tag: 'Severe contraction', psr: psr30, full: fr30, pm: pm30, revMult: 0.70, needsT3: t3Cap > 0 && psr30 < fr30 },
+      ];
+
+      scenarios.forEach((sc, i) => {
+        const bg = i === 2 ? '#fef2f2' : i === 1 ? '#fffbeb' : '#f0fdf4';
+        const bc = i === 2 ? C.red : i === 1 ? C.amber : C.green;
+        const h = 90;
+        doc.rect(L, y, W, h).fill(bg);
+        doc.rect(L, y, 3, h).fill(bc);
+        doc.fillColor(C.muted).fontSize(7.5).font('Helvetica-Bold').text(sc.tag.toUpperCase(), L + 12, y + 8);
+        doc.fillColor(C.coal).fontSize(11).font('Helvetica-Bold').text(sc.name, L + 12, y + 20, { width: W - 24 });
+        doc.fillColor(C.muted).fontSize(8).font('Helvetica').text('Primary Savings Runway', L + 12, y + 40);
+        doc.fillColor(bc).fontSize(14).font('Times-Bold').text(fmtRunway(sc.psr), L + 12, y + 52);
+        doc.fillColor(C.muted).fontSize(8).font('Helvetica').text('Full Runway', L + 220, y + 40);
+        doc.fillColor(C.coal).fontSize(14).font('Times-Bold').text(fmtRunway(sc.full), L + 220, y + 52);
+        doc.fillColor(C.muted).fontSize(8).font('Helvetica').text('Restricted assets req\'d?', L + 370, y + 40);
+        doc.fillColor(sc.needsT3 ? C.red : C.green).fontSize(14).font('Times-Bold').text(sc.needsT3 ? 'Yes' : 'No', L + 370, y + 52);
+        if (sc.pm < 999) {
+          doc.fillColor(C.muted).fontSize(8).font('Helvetica').text(`Pressure begins around: ${fmtRunwayShort(sc.pm)}`, L + 12, y + 74, { width: W - 24 });
+        }
+        y += h + 8;
+      });
+
+      y = insight(doc, 'What "Pressure Begins" Means',
+        'Pressure is defined as when your Primary Accessible Savings drops within 6 months of exhaustion under that scenario\'s revenue level. Before that point, the drawdown exists but the timeline is comfortable. After that point, each month carries meaningful urgency.', y);
+
+      ftr(doc, 6);
+
+      // ════════════════════════════════════════════════════════════════════
+      // PAGE 7 — REVENUE TIMING SENSITIVITY
+      // ════════════════════════════════════════════════════════════════════
+      doc.addPage(); hdr(doc, date); y = 42;
+      y = secHead(doc, 7, 'Revenue Timing Sensitivity',
+        `Your base ramp is ${sim.rampDuration} months. This shows how arriving early or late by 3 months changes your Primary Savings Runway.`, y);
+
+      const timingRows = [
+        { label: 'Revenue ramp 3 months early', ramp: Math.max(0, sim.rampDuration - 3), psr: rampEarly3 },
+        { label: `Revenue ramp on time (base — ${sim.rampDuration} months)`, ramp: sim.rampDuration, psr: psrBase },
+        { label: 'Revenue ramp 3 months late', ramp: sim.rampDuration + 3, psr: rampLate3 },
+      ];
+
+      y = tableHead(doc, [
+        { label: 'Scenario', x: L + 8 }, { label: 'Ramp Duration', x: L + 265 },
+        { label: 'Primary Savings Runway', x: L + 365 },
+      ], y);
+      timingRows.forEach((row, i) => {
+        const isBase = i === 1;
+        doc.rect(L, y, W, 28).fill(isBase ? C.mid : C.light);
+        if (isBase) doc.rect(L, y, 3, 28).fill(C.navy);
+        doc.fillColor(C.coal).fontSize(9).font(isBase ? 'Helvetica-Bold' : 'Helvetica').text(row.label, L + 8, y + 9, { width: 254 });
+        doc.fillColor(C.coal).fontSize(9).font('Helvetica').text(`${row.ramp} months`, L + 265, y + 9);
+        doc.fillColor(C.navy).fontSize(9).font('Helvetica-Bold').text(fmtRunway(row.psr), L + 365, y + 9);
+        y += 28;
+      });
+      y += 14;
+
+      const rampDelta = rampLate3 >= 999 ? null : psrBase >= 999 ? null : psrBase - rampLate3;
+      const rampText = rampDelta !== null && rampDelta > 0
+        ? `A 3-month delay in your revenue ramp reduces your Primary Savings Runway by approximately ${rampDelta} months — from ${fmtRunway(psrBase)} to ${fmtRunway(rampLate3)}. Entering the transition with client commitments already secured can eliminate this risk entirely.`
+        : `Your capital position is strong enough that a 3-month ramp delay does not materially change the Primary Savings Runway. Execution timing is still meaningful, but the risk to your financial position is contained.`;
+      y = insight(doc, 'What A 3-Month Delay Means', rampText, y);
+
+      // Fill with interpretation block if there's space
+      y = insight(doc, 'Why Ramp Timing Matters',
+        `During the ramp period, revenue is modeled at 50% of target (averaging the growth curve). Every extra month in the ramp means another month where savings cover the full gap. Entering with known clients, a signed contract, or pre-revenue already flowing shifts this timing favorably and without requiring more capital.`, y);
+
+      ftr(doc, 7);
+
+      // ════════════════════════════════════════════════════════════════════
+      // PAGE 8 — HOUSEHOLD SHOCK SCENARIOS
+      // ════════════════════════════════════════════════════════════════════
+      doc.addPage(); hdr(doc, date); y = 42;
+      y = secHead(doc, 8, 'Household Shock Scenarios',
+        'Secondary events that compound the transition. These are not predictions — they\'re edge cases worth quantifying before making a major move.', y);
+
+      const shockRows = [
+        {
+          name: 'Partner income loss — 6 months',
+          desc: sim.isDualIncome && sim.partnerIncome > 0
+            ? `Partner income of ${fmtM(sim.partnerIncome)}/month stops for 6 months, then resumes. Burn increases by that amount during the loss period.`
+            : 'Not applicable — no partner income entered.',
+          psr: psrPartnerLoss, full: frPartnerLoss,
+          needsT3: t3Cap > 0 && psrPartnerLoss < frPartnerLoss,
+          applicable: sim.isDualIncome && sim.partnerIncome > 0,
+        },
+        {
+          name: 'New child',
+          desc: `Assumptions: ${fmtM(CHILD_ONETIME)} one-time setup cost + ${fmtM(CHILD_MONTHLY)}/month ongoing (childcare, supplies, insurance adjustments). These are estimates — actual costs vary significantly.`,
+          psr: psrNewChild, full: fullRunway(sim, 1.00, undefined, () => CHILD_MONTHLY),
+          needsT3: t3Cap > 0 && psrNewChild < fullRunway(sim, 1.00, undefined, () => CHILD_MONTHLY),
+          applicable: true,
+        },
+        {
+          name: 'Combined — partner loss (6 months) + new child',
+          desc: 'Both shocks occurring simultaneously — the most conservative household stress test.',
+          psr: psrCombined, full: fullRunway(sim, 1.00, undefined, (m) => CHILD_MONTHLY + (m <= 6 && sim.isDualIncome ? (sim.partnerIncome ?? 0) : 0)),
+          needsT3: t3Cap > 0,
+          applicable: sim.isDualIncome,
+        },
+      ];
+
+      shockRows.forEach((sh, i) => {
+        if (!sh.applicable) return;
+        const h = 90;
+        const bg = i % 2 === 0 ? C.light : C.mid;
+        doc.rect(L, y, W, h).fill(bg);
+        doc.fillColor(C.coal).fontSize(10).font('Helvetica-Bold').text(sh.name, L + 10, y + 8, { width: W - 20 });
+        doc.fillColor(C.muted).fontSize(8.5).font('Helvetica').text(sh.desc, L + 10, y + 24, { width: 260, lineGap: 1 });
+        doc.fillColor(C.muted).fontSize(7.5).font('Helvetica').text('Primary Savings Runway', L + 285, y + 14);
+        doc.fillColor(C.navy).fontSize(13).font('Times-Bold').text(fmtRunway(sh.psr), L + 285, y + 26);
+        doc.fillColor(C.muted).fontSize(7.5).font('Helvetica').text('Restricted assets req\'d?', L + 285, y + 50);
+        doc.fillColor(sh.needsT3 ? C.red : C.green).fontSize(11).font('Helvetica-Bold')
+          .text(sh.needsT3 ? 'Yes' : 'No', L + 285, y + 62);
+        y += h + 6;
+      });
+      y += 6;
+
+      y = insight(doc, 'The Pattern Behind Household Shocks',
+        `These scenarios matter because they\'re correlated — difficult personal events tend to cluster. A partner job loss during a transition period is not unusual. A new child changes financial structure for years. The question isn\'t whether these will happen — it\'s whether the runway is wide enough to absorb one if it does.`, y);
+
+      ftr(doc, 8);
+
+      // ════════════════════════════════════════════════════════════════════
+      // PAGE 9 — SAVINGS TIER TIMELINE
+      // ════════════════════════════════════════════════════════════════════
+      doc.addPage(); hdr(doc, date); y = 42;
+      y = secHead(doc, 9, 'Savings Tier Timeline',
+        'Under severe income contraction (−30%), this is the sequence in which savings would be drawn down.', y);
+
+      const stage1End = psr30; // T1+T2 exhausted
+      const stage2End = fr30;  // All capital exhausted
+      const hasStage2 = t3Cap > 0 && stage1End < stage2End;
+
+      const stages = [
+        { label: 'Stage 1 — Primary Accessible Savings', cap: fmtM(pasCap), color: C.blue, bg: '#f0f9ff', border: C.blue,
+          desc: `Cash, HYSA, and brokerage accounts. No penalties. This stage ends around ${fmtRunway(stage1End)} under severe stress.` },
+        ...(hasStage2 ? [{ label: 'Stage 2 — Restricted or Long-Term Assets', cap: fmtM(t3Cap), color: C.amber, bg: '#fffbeb', border: C.amber,
+          desc: `Retirement accounts and home equity. Accessing these early triggers taxes and penalties. This stage begins if Stage 1 is exhausted — around ${fmtRunway(stage1End)}.` }] : []),
+        { label: 'Stage 3 — Total Capital Exhaustion', cap: 'n/a', color: C.red, bg: '#fef2f2', border: C.red,
+          desc: `All savings exhausted. ${stage2End >= 999 ? 'Not reached within the model range under any scenario.' : `Projected around ${fmtRunway(stage2End)} under severe contraction.`}` },
+      ];
+
+      stages.forEach((st, i) => {
+        const h = 64;
+        doc.rect(L, y, W, h).fill(st.bg as string);
+        doc.rect(L, y, 3, h).fill(st.border as string);
+        doc.fillColor(st.color as string).fontSize(10).font('Helvetica-Bold').text(st.label, L + 12, y + 10, { width: W - 24 });
+        if (st.cap !== 'n/a') {
+          doc.fillColor(C.muted).fontSize(8).font('Helvetica').text('Capital in this stage', L + 12, y + 26);
+          doc.fillColor(st.color as string).fontSize(13).font('Times-Bold').text(st.cap, L + 12, y + 36);
+        }
+        doc.fillColor(C.coal).fontSize(9).font('Helvetica').text(st.desc, L + 200, y + 10, { width: W - 212, lineGap: 1.5 });
+        y += h + 8;
+      });
+
+      // Visual timeline
+      y += 8;
+      doc.fillColor(C.muted).fontSize(8).font('Helvetica-Bold').text('TIMELINE UNDER SEVERE CONTRACTION (−30%)', L, y); y += 12;
+      const totalMonthsTimeline = Math.min(Math.max(stage2End < 999 ? stage2End : stage1End < 999 ? stage1End * 2 : 60, 24), 120);
+      const stage1W = stage1End >= 999 ? W : Math.round((stage1End / totalMonthsTimeline) * W);
+      const stage2W = !hasStage2 ? 0 : stage2End >= 999 ? W - stage1W : Math.round(((stage2End - stage1End) / totalMonthsTimeline) * W);
+
+      doc.save().fillOpacity(0.9).rect(L, y, stage1W, 24).fill(C.blue).restore();
+      doc.save().fillOpacity(0.6).rect(L + stage1W, y, stage2W, 24).fill(C.amber).restore();
+      doc.save().fillOpacity(0.4).rect(L + stage1W + stage2W, y, W - stage1W - stage2W, 24).fill(C.red).restore();
+      doc.fillColor(C.white).fontSize(8).font('Helvetica-Bold').text('Stage 1 (Primary)', L + 4, y + 8);
+      if (hasStage2 && stage2W > 40) doc.text('Stage 2 (Restricted)', L + stage1W + 4, y + 8);
+      y += 30;
+      doc.fillColor(C.muted).fontSize(7.5).font('Helvetica')
+        .text(`Stage 1 ends: ${fmtRunway(stage1End)}`, L, y)
+        .text(hasStage2 ? `Stage 2 ends: ${fmtRunway(stage2End)}` : `No Stage 2 reached under this scenario.`, L + 200, y);
+      y += 20;
+
+      ftr(doc, 9);
+
+      // ════════════════════════════════════════════════════════════════════
+      // PAGE 10 — REVENUE VS LIQUIDITY CURVE
+      // ════════════════════════════════════════════════════════════════════
+      doc.addPage(); hdr(doc, date); y = 42;
+      y = secHead(doc, 10, 'Revenue vs. Liquidity Curve',
+        'How your Primary Accessible Savings depletes over time under two revenue scenarios. The gap between lines reflects how much revenue performance changes your position.', y);
+
+      const CHART_MONTHS = 36;
+      const baseData = capitalSeries(sim, 1.00, CHART_MONTHS);
+      const severeData = capitalSeries(sim, 0.70, CHART_MONTHS);
+      const maxCap = pasCap;
+      const chartH = 160, chartW = W - 64;
+      const chartX = L + 60, chartY = y;
+
+      lineChart(doc, baseData, severeData, maxCap, chartX, chartY, chartW, chartH, CHART_MONTHS);
+      y += chartH + 30;
+
+      // Annotation: pressure point
+      if (pm30 < 999 && pm30 <= CHART_MONTHS) {
+        const pmX = chartX + (pm30 / CHART_MONTHS) * chartW;
+        doc.moveTo(pmX, chartY).lineTo(pmX, chartY + chartH).strokeColor(C.red).lineWidth(1).dash(3, { space: 3 }).stroke();
+        doc.undash();
+        doc.fillColor(C.red).fontSize(7.5).font('Helvetica-Bold')
+          .text(`Pressure begins ~${fmtRunwayShort(pm30)}`, pmX - 40, chartY - 12, { width: 80, align: 'center' });
+      }
+
+      // Context
+      y = statRow(doc, [
+        { label: 'Base Case — Primary Savings Runway', val: fmtRunway(psrBase) },
+        { label: 'Severe (−30%) — Primary Savings Runway', val: fmtRunway(psr30) },
+        { label: 'Difference', val: psr30 >= 999 || psrBase >= 999 ? '—' : `${psrBase - psr30} months` },
+      ], y);
+
+      y = insight(doc, 'Reading This Chart',
+        `The upper line (dark) shows your Primary Accessible Savings position under expected revenue. The lower line (gray) shows the same under a 30% revenue shortfall. Where the lower line drops to zero is when Primary Accessible Savings would be exhausted under severe stress — and Restricted assets would be needed if the full runway extends beyond that point.`, y);
+
+      ftr(doc, 10);
+
+      // ════════════════════════════════════════════════════════════════════
+      // PAGE 11 — WHAT MOVES THE NEEDLE
+      // ════════════════════════════════════════════════════════════════════
+      doc.addPage(); hdr(doc, date); y = 42;
+      y = secHead(doc, 11, 'What Moves the Needle',
+        'Ranked levers by impact on your Primary Savings Runway under severe stress (−30%). These are sensitivity results — not prescriptions.', y);
+
+      const l500  = calcBurnLever(500),  l1k = calcBurnLever(1000), l2k = calcBurnLever(2000);
+      const r500  = calcRevLever(500),   r1k = calcRevLever(1000);
+      const llEarly3 = psRunway(sim, 1.00, Math.max(0, sim.rampDuration - 3));
+
+      // Rank levers by impact on psr30
+      const leverImpacts = [
+        { name: 'Reduce Monthly Outflow by $500', delta: calcBurnLever(500) < 999 && psr30 < 999 ? calcBurnLever(500) - psr30 : (calcBurnLever(500) >= 999 ? 999 : 0), what: `Reducing outflow by ${fmtM(500)}/month to ${fmtM(sim.tmib - 500)} raises Primary Savings Runway from ${fmtRunway(psr30)} to ${fmtRunway(calcBurnLever(500))} under severe stress.` },
+        { name: 'Reduce Monthly Outflow by $1,000', delta: calcBurnLever(1000) < 999 && psr30 < 999 ? calcBurnLever(1000) - psr30 : (calcBurnLever(1000) >= 999 ? 999 : 0), what: `Reducing outflow by ${fmtM(1000)}/month to ${fmtM(sim.tmib - 1000)} raises Primary Savings Runway from ${fmtRunway(psr30)} to ${fmtRunway(calcBurnLever(1000))} under severe stress.` },
+        { name: 'Reduce Monthly Outflow by $2,000', delta: calcBurnLever(2000) < 999 && psr30 < 999 ? calcBurnLever(2000) - psr30 : (calcBurnLever(2000) >= 999 ? 999 : 0), what: `Reducing outflow by ${fmtM(2000)}/month to ${fmtM(Math.max(0, sim.tmib - 2000))} raises Primary Savings Runway from ${fmtRunway(psr30)} to ${fmtRunway(calcBurnLever(2000))} under severe stress.` },
+        { name: 'Increase Revenue Target by $500/month', delta: calcRevLever(500) < 999 && psr30 < 999 ? calcRevLever(500) - psr30 : (calcRevLever(500) >= 999 ? 999 : 0), what: `Raising stable revenue target by ${fmtM(500)}/month raises Primary Savings Runway from ${fmtRunway(psr30)} to ${fmtRunway(calcRevLever(500))} under severe stress.` },
+        { name: 'Increase Revenue Target by $1,000/month', delta: calcRevLever(1000) < 999 && psr30 < 999 ? calcRevLever(1000) - psr30 : (calcRevLever(1000) >= 999 ? 999 : 0), what: `Raising stable revenue target by ${fmtM(1000)}/month raises Primary Savings Runway from ${fmtRunway(psr30)} to ${fmtRunway(calcRevLever(1000))} under severe stress.` },
+        { name: 'Revenue ramp 3 months earlier', delta: llEarly3 < 999 && psr30 < 999 ? llEarly3 - psr30 : (llEarly3 >= 999 ? 999 : 0), what: `A 3-month earlier revenue ramp raises Primary Savings Runway from ${fmtRunway(psr30)} to ${fmtRunway(llEarly3)} under severe stress. Each month of earlier revenue reduces capital dependency significantly.` },
+      ].filter(l => l.delta > 0 || l.delta === 999).sort((a, b) => (b.delta === 999 ? 999 : b.delta) - (a.delta === 999 ? 999 : a.delta)).slice(0, 3);
+
+      leverImpacts.forEach((lev, i) => {
+        const deltaStr = lev.delta >= 999 ? 'Unlimited (fully cash-flow positive)' : `+${lev.delta} months`;
+        const h = Math.max(60, Math.ceil(lev.what.length / 78) * 10 + 38);
+        doc.rect(L, y, W, h).fill(i % 2 === 0 ? C.light : C.mid);
+        doc.fillColor(C.muted).fontSize(7.5).font('Helvetica-Bold').text(`LEVER ${i + 1}`, L + 10, y + 8);
+        doc.fillColor(C.navy).fontSize(10).font('Helvetica-Bold').text(lev.name, L + 10, y + 20, { width: 320 });
+        doc.fillColor(C.green).fontSize(13).font('Times-Bold').text(deltaStr, L + 340, y + 18);
+        doc.fillColor(C.coal).fontSize(9).font('Helvetica').text(lev.what, L + 10, y + 36, { width: W - 20, lineGap: 1.5 });
+        y += h + 6;
       });
       y += 8;
 
-      // New child impact vs base
-      const childNeedsTier3 = llNewChild < (llBase < 999 ? llBase : 999) || llNewChild < sim.baseRunway;
-      doc.rect(LEFT, y, W, 50).fill(C.mid);
-      doc.fillColor(C.muted).fontSize(8).font('Helvetica').text('BASE LIQUIDITY LINE', LEFT + 12, y + 8);
-      doc.fillColor(C.muted).fontSize(8).text('WITH NEW CHILD', LEFT + 200, y + 8);
-      doc.fillColor(C.muted).fontSize(8).text('TIER 3 REQUIRED?', LEFT + 360, y + 8);
-      doc.fillColor(C.navy).fontSize(14).font('Times-Bold').text(fmtMoShort(llBase), LEFT + 12, y + 24);
-      doc.fillColor(childNeedsTier3 ? C.red : C.navy).fontSize(14).font('Times-Bold').text(fmtMoShort(llNewChild), LEFT + 200, y + 24);
-      doc.fillColor(childNeedsTier3 ? C.red : C.green).fontSize(14).font('Times-Bold').text(childNeedsTier3 ? 'Yes' : 'No', LEFT + 360, y + 24);
-      y += 58;
-
-      pageFooter(doc, 8, TOTAL);
-
-      // ═══════════════════════════════════════════════════════════════════════
-      // PAGE 9 — WHAT MOVES THE NEEDLE
-      // ═══════════════════════════════════════════════════════════════════════
-      doc.addPage();
-      pageHeader(doc, reportDate);
-      y = 50;
-      y = sectionHead(doc, 'What Moves the Needle',
-        'Sensitivity analysis — how specific changes shift your Liquidity Line. This does not mean you should make these changes. It shows leverage.', y);
-
-      // Burn reduction table
-      doc.fillColor(C.navy).fontSize(12).font('Times-Bold').text('Lever A — Reduce Monthly Burn', LEFT, y);
-      y += 16;
-      doc.rect(LEFT, y, W, 20).fill(C.navy);
-      ['Reduction', 'New Burn', 'LL — Base', 'LL — Severe (−30%)', 'Delta vs Base'].forEach((h, i) => {
-        const xp = [LEFT + 10, LEFT + 100, LEFT + 185, LEFT + 285, LEFT + 390];
-        doc.fillColor(C.white).fontSize(7.5).font('Helvetica-Bold').text(h, xp[i], y + 6);
-      });
-      y += 20;
-
-      [0, 500, 1000, 2000].forEach((adj, i) => {
-        const newBurn = sim.tmib - adj;
-        const llB = adj === 0 ? llBase : calcLLBurnAdj(adj);
-        const llS = adj === 0 ? ll30 : (() => {
-          let cap = t1t2Cap; const vol = 1 - sim.volatilityPercent / 100;
-          for (let m = 1; m <= 300; m++) {
-            const rf = sim.rampDuration > 0 && m <= sim.rampDuration ? 0.50 * (m / sim.rampDuration) : 1.0;
-            cap -= ((sim.tmib - adj) - sim.expectedRevenue * 0.70 * rf * vol);
-            if (cap <= 0) return m;
-          }
-          return 999;
-        })();
-        const delta = llB >= 999 ? '—' : llBase >= 999 ? '—' : `+${llB - llBase} mo`;
-        const bg = i % 2 === 0 ? C.light : C.mid;
-        doc.rect(LEFT, y, W, 24).fill(bg);
-        const xp = [LEFT + 10, LEFT + 100, LEFT + 185, LEFT + 285, LEFT + 390];
-        const label = adj === 0 ? 'No change (base)' : `-${fmtM(adj)}/mo`;
-        doc.fillColor(C.coal).fontSize(9).font('Helvetica').text(label, xp[0], y + 7);
-        doc.fillColor(C.coal).fontSize(9).font('Helvetica').text(fmtM(newBurn), xp[1], y + 7);
-        doc.fillColor(C.navy).fontSize(9).font('Helvetica-Bold').text(fmtMoShort(llB), xp[2], y + 7);
-        doc.fillColor(C.navy).fontSize(9).font('Helvetica-Bold').text(fmtMoShort(llS), xp[3], y + 7);
-        doc.fillColor(adj > 0 ? C.green : C.muted).fontSize(9).font('Helvetica-Bold').text(adj === 0 ? '—' : delta, xp[4], y + 7);
-        y += 24;
-      });
-      y += 14;
-
-      // Revenue increase table
-      doc.fillColor(C.navy).fontSize(12).font('Times-Bold').text('Lever B — Increase Stable Revenue Target', LEFT, y);
-      y += 16;
-      doc.rect(LEFT, y, W, 20).fill(C.navy);
-      ['Increase', 'New Target', 'LL — Base', 'LL — Severe (−30%)', 'Delta vs Base'].forEach((h, i) => {
-        const xp = [LEFT + 10, LEFT + 100, LEFT + 185, LEFT + 285, LEFT + 390];
-        doc.fillColor(C.white).fontSize(7.5).font('Helvetica-Bold').text(h, xp[i], y + 6);
-      });
-      y += 20;
-
-      [0, 500, 1000].forEach((adj, i) => {
-        const newTarget = sim.expectedRevenue + adj;
-        const llB = adj === 0 ? llBase : calcLLRevAdj(adj);
-        const llS = adj === 0 ? ll30 : (() => {
-          let cap = t1t2Cap; const vol = 1 - sim.volatilityPercent / 100;
-          for (let m = 1; m <= 300; m++) {
-            const rf = sim.rampDuration > 0 && m <= sim.rampDuration ? 0.50 * (m / sim.rampDuration) : 1.0;
-            cap -= (sim.tmib - (sim.expectedRevenue + adj) * 0.70 * rf * vol);
-            if (cap <= 0) return m;
-          }
-          return 999;
-        })();
-        const delta = llB >= 999 ? '—' : llBase >= 999 ? '—' : `+${llB - llBase} mo`;
-        const bg = i % 2 === 0 ? C.light : C.mid;
-        doc.rect(LEFT, y, W, 24).fill(bg);
-        const xp = [LEFT + 10, LEFT + 100, LEFT + 185, LEFT + 285, LEFT + 390];
-        const label = adj === 0 ? 'No change (base)' : `+${fmtM(adj)}/mo`;
-        doc.fillColor(C.coal).fontSize(9).font('Helvetica').text(label, xp[0], y + 7);
-        doc.fillColor(C.coal).fontSize(9).font('Helvetica').text(fmtM(newTarget), xp[1], y + 7);
-        doc.fillColor(C.navy).fontSize(9).font('Helvetica-Bold').text(fmtMoShort(llB), xp[2], y + 7);
-        doc.fillColor(C.navy).fontSize(9).font('Helvetica-Bold').text(fmtMoShort(llS), xp[3], y + 7);
-        doc.fillColor(adj > 0 ? C.green : C.muted).fontSize(9).font('Helvetica-Bold').text(adj === 0 ? '—' : delta, xp[4], y + 7);
-        y += 24;
-      });
-      y += 14;
-
-      // Healthcare lever (if significant)
-      if (hc > sim.tmib * 0.12) {
-        doc.fillColor(C.navy).fontSize(12).font('Times-Bold').text('Lever C — Healthcare Cost Reduction', LEFT, y);
-        y += 16;
-        const hcBurnPct = Math.round((hc / sim.tmib) * 100);
-        y = insightBlock(doc, `Healthcare is ${hcBurnPct}% of your burn (${fmtM(hc)}/month)`,
-          `If healthcare cost dropped by ${fmtM(Math.round(hc * 0.40))} (e.g., through partner coverage or income-based ACA subsidies), the Liquidity Line under base conditions would extend by approximately ${Math.round((hc * 0.40) / Math.max(1, sim.tmib - sim.expectedRevenue * 0.85 * (1 - sim.volatilityPercent / 100)) * (ll15 < 999 ? 1 : 0))} months. Healthcare is one of the highest-leverage controllable costs.`, y);
-      }
-
       doc.fillColor(C.muted).fontSize(8).font('Helvetica-Oblique')
-        .text('These are sensitivity results, not recommendations. Context matters. Consult a qualified professional before acting on any of these figures.', LEFT, y, { width: W, lineGap: 2 });
+        .text('These are sensitivity calculations based on your inputs. They show how much each lever moves your position — not whether you should pull it. Financial decisions involve tradeoffs not captured here. Consult a qualified professional before acting.', L, y, { width: W, lineGap: 2 });
 
-      pageFooter(doc, 9, TOTAL);
+      ftr(doc, 11);
 
-      // ═══════════════════════════════════════════════════════════════════════
-      // PAGE 10 — STABILITY THRESHOLDS
-      // ═══════════════════════════════════════════════════════════════════════
-      doc.addPage();
-      pageHeader(doc, reportDate);
-      y = 50;
-      y = sectionHead(doc, 'Stability Thresholds',
-        'To survive a severe income contraction (−30%) without entering Tier 3, at least one of the following conditions must hold. These are thresholds, not advice.', y);
+      // ════════════════════════════════════════════════════════════════════
+      // PAGE 12 — SCENARIO COMPARISON GRID
+      // ════════════════════════════════════════════════════════════════════
+      doc.addPage(); hdr(doc, date); y = 42;
+      y = secHead(doc, 12, 'Scenario Comparison',
+        'All scenarios side by side for quick reference. Primary Savings Runway is the T1+T2 exhaustion point. Full Runway uses all accessible savings.', y);
 
-      const thresholds = [
-        {
-          title: 'Minimum Tier 1+2 Capital Required',
-          current: fmtM(t1t2Cap),
-          target: fmtM(minT1T2For12Mo),
-          met: t1t2Cap >= minT1T2For12Mo,
-          explanation: `Under a −30% revenue scenario, your monthly Tier1+2 drain is ${fmtM(monthlyDrain30)}. To sustain 12 months without touching Tier 3, you'd need ${fmtM(minT1T2For12Mo)} in Tier 1+2. You currently have ${fmtM(t1t2Cap)}.`,
-        },
-        {
-          title: 'Minimum Revenue Target to Sustain 12 Months',
-          current: fmtM(sim.expectedRevenue),
-          target: minRevFor12Mo > 0 ? fmtM(minRevFor12Mo) : 'Already sufficient',
-          met: minRevFor12Mo <= 0 || sim.expectedRevenue >= minRevFor12Mo,
-          explanation: `For your current Tier1+2 capital (${fmtM(t1t2Cap)}) to cover 12 months under −30% stress, you'd need monthly revenue of at least ${minRevFor12Mo > 0 ? fmtM(minRevFor12Mo) : 'less than your current target'}. Your target is ${fmtM(sim.expectedRevenue)}.`,
-        },
-        {
-          title: 'Maximum Sustainable Burn (12-Month Threshold)',
-          current: fmtM(sim.tmib),
-          target: fmtM(maxBurnFor12Mo),
-          met: sim.tmib <= maxBurnFor12Mo,
-          explanation: `Given your current Tier1+2 capital and revenue plan, your burn cannot exceed ${fmtM(maxBurnFor12Mo)}/month to maintain 12 months of liquidity under severe stress. Your current burn is ${fmtM(sim.tmib)}.`,
-        },
+      const cols = [
+        { label: 'Base', psr: psrBase, full: frBase, r3: t3Cap > 0 && psrBase < frBase, pm: pmBase },
+        { label: 'Mild (−15%)', psr: psr15, full: fr15, r3: t3Cap > 0 && psr15 < fr15, pm: pm15 },
+        { label: 'Severe (−30%)', psr: psr30, full: fr30, r3: t3Cap > 0 && psr30 < fr30, pm: pm30 },
+        { label: 'Partner Loss', psr: psrPartnerLoss, full: frPartnerLoss, r3: t3Cap > 0 && psrPartnerLoss < frPartnerLoss, pm: pm30 },
+        { label: 'New Child', psr: psrNewChild, full: 999, r3: t3Cap > 0, pm: pm30 },
       ];
+      const colW = Math.floor(W / cols.length);
 
-      thresholds.forEach((t, i) => {
-        const bg = t.met ? '#f0fdf4' : '#fef2f2';
-        const bc = t.met ? C.green : C.red;
-        const statusLabel = t.met ? 'Met' : 'Gap Exists';
-        const h = Math.max(90, Math.ceil(t.explanation.length / 80) * 10 + 55);
-        doc.rect(LEFT, y, W, h).fill(bg);
-        doc.rect(LEFT, y, 3, h).fill(bc);
-        doc.fillColor(bc).fontSize(8).font('Helvetica-Bold').text(statusLabel.toUpperCase(), LEFT + 12, y + 8);
-        doc.fillColor(C.navy).fontSize(10).font('Helvetica-Bold').text(t.title, LEFT + 60, y + 8);
-        doc.fillColor(C.muted).fontSize(8).font('Helvetica').text('CURRENT', LEFT + 12, y + 26).text('TARGET', LEFT + 130, y + 26);
-        doc.fillColor(C.coal).fontSize(12).font('Times-Bold').text(t.current, LEFT + 12, y + 38);
-        doc.fillColor(bc).fontSize(12).font('Times-Bold').text(t.target, LEFT + 130, y + 38);
-        doc.fillColor(C.coal).fontSize(8.5).font('Helvetica').text(t.explanation, LEFT + 12, y + 56, { width: W - 24, lineGap: 1.5 });
-        y += h + 10;
+      // Header row
+      doc.rect(L, y, W, 26).fill(C.navy);
+      doc.fillColor(C.white).fontSize(7.5).font('Helvetica-Bold').text('Metric', L + 8, y + 8);
+      cols.forEach((col, i) => {
+        doc.fillColor(C.white).fontSize(7.5).font('Helvetica-Bold').text(col.label, L + 100 + i * 80, y + 8, { width: 78, align: 'center' });
       });
+      y += 26;
 
-      pageFooter(doc, 10, TOTAL);
-
-      // ═══════════════════════════════════════════════════════════════════════
-      // PAGE 11 — ADVISOR COMMENTARY
-      // ═══════════════════════════════════════════════════════════════════════
-      doc.addPage();
-      pageHeader(doc, reportDate);
-      y = 50;
-      y = sectionHead(doc, 'What This Means For You', 'A plain-English summary of your structural position.', y);
-
-      const sColor = score >= 70 ? C.green : score >= 50 ? C.amber : C.red;
-      doc.rect(LEFT, y, W, 56).fill(C.mid);
-      doc.fillColor(sColor).fontSize(26).font('Times-Bold').text(`${score}`, LEFT + 16, y + 10);
-      doc.fillColor(C.muted).fontSize(8).font('Helvetica').text('/ 100', LEFT + 56, y + 20);
-      doc.fillColor(sColor).fontSize(11).font('Helvetica-Bold').text(scoreLabel(score), LEFT + 80, y + 14);
-      const bandText = score >= 70 ? 'Structurally stable — meaningful flexibility under normal conditions.'
-        : score >= 50 ? 'Moderately exposed — workable, but limited margin for compounding problems.'
-        : 'Structurally fragile — thin cushion against early income shortfalls.';
-      doc.fillColor(C.coal).fontSize(9).font('Helvetica').text(bandText, LEFT + 80, y + 30, { width: W - 100 });
-      y += 68;
-
-      // Advisory paragraphs
-      const advisorParagraph = score >= 70
-        ? `Your capital and income plan create a defensible position. Under expected conditions, your Liquidity Line holds for ${fmtMoShort(llBase)} — and ${llBase >= 12 ? 'that\'s enough buffer to absorb a slow start without immediately entering Tier 3 territory' : 'though you\'d want that to strengthen before a move this significant'}. The transition is viable as modeled. The primary remaining variable is execution.`
-        : score >= 50
-        ? `The numbers are workable — but not comfortable. Under a severe scenario, your Liquidity Line is ${fmtMoShort(ll30)}. ${ll30 < 12 ? 'That\'s under 12 months, which means a slow ramp or one rough quarter forces difficult decisions early.' : 'You have some buffer, but not enough to absorb multiple things going wrong at once.'} The transition is feasible with discipline.`
-        : `The numbers show real pressure. A Liquidity Line of ${fmtMoShort(ll30)} under severe stress means your breathing room is thin. That doesn't mean this move is wrong — it means the current structure makes it fragile. More Tier 1+2 capital, lower burn, or a confirmed revenue ramp would change that picture materially.`;
-      y = insightBlock(doc, 'Overall Assessment', advisorParagraph, y);
-
-      const retirementNote = tier3Cap > 0 && ll30 < (t1t2Cap > 0 ? t1t2Cap / Math.max(1, monthlyDrain30) : 999)
-        ? `Your Tier 1+2 capital (${fmtM(t1t2Cap)}) runs out at month ${fmtMoShort(ll30)} under severe stress — before your full runway ends. That gap would have to be filled by Tier 3 assets. Accessing retirement funds early permanently reduces long-term compounding. The model shows you this gap not to encourage it, but to make sure you're going in clear-eyed.`
-        : `Your Tier 1+2 capital appears sufficient to carry this transition without needing to touch retirement assets under the modeled scenarios. That is the healthiest position to be in — and worth protecting.`;
-      y = insightBlock(doc, 'Retirement Dependency', retirementNote, y);
-
-      const hcBurnPct2 = sim.tmib > 0 ? Math.round((hc / sim.tmib) * 100) : 0;
-      const bestMove = (hcBurnPct2 >= 15)
-        ? `Healthcare cost (${hcBurnPct2}% of burn, ${fmtM(hc)}/month) is the single highest-leverage controllable cost. Partner coverage or income-based ACA subsidies could materially change your position without touching capital.`
-        : (sim.rampDuration > 6)
-        ? `Entering with client commitments already in hand — or shortening your ramp by even 2 months — would significantly reduce how long your savings must cover the full gap.`
-        : `Adding even $1,000/month to your stable revenue target has outsized impact on the Liquidity Line. Any pre-exit work that validates revenue reduces the dependency on capital.`;
-      y = insightBlock(doc, 'The Single Change That Matters Most', bestMove, y);
-
-      pageFooter(doc, 11, TOTAL);
-
-      // ═══════════════════════════════════════════════════════════════════════
-      // PAGE 12 — APPENDIX: YOUR INPUTS
-      // ═══════════════════════════════════════════════════════════════════════
-      doc.addPage();
-      pageHeader(doc, reportDate);
-      y = 50;
-      y = sectionHead(doc, 'Appendix — Your Inputs', 'Every value used in this simulation. Verify against your own records.', y);
-
-      const inputGroups = [
-        {
-          heading: 'Income Context',
-          rows: [
-            ['Household type', sim.isDualIncome ? 'Dual income' : 'Single income'],
-            ['Your monthly take-home', fmtM(sim.currentSalary ?? 0)],
-            ...(sim.isDualIncome ? [['Partner monthly take-home', fmtM(sim.partnerIncome ?? 0)]] : []),
-          ],
-        },
-        {
-          heading: 'Household Expenses (Non-Debt, Non-Healthcare)',
-          rows: [
-            ['Monthly household living costs', fmtM(sim.livingExpenses)],
-          ],
-        },
-        {
-          heading: 'Debt Payments (Required Minimums)',
-          rows: [
-            ['Monthly debt payments', fmtM(sim.monthlyDebtPayments)],
-            ['Total remaining loan balances', fmtM(sim.totalDebt ?? 0)],
-          ],
-        },
-        {
-          heading: 'Healthcare',
-          rows: [
-            ['Coverage type', sim.healthcareType],
-            ['Adults on plan', `${sim.adultsOnPlan}`],
-            ['Dependent children', `${sim.dependentChildren}`],
-            ['Current payroll deduction', fmtM(sim.currentPayrollHealthcare ?? 0)],
-            ['Healthcare cost delta (monthly)', fmtM(hc)],
-          ],
-        },
-        {
-          heading: 'Liquidity / Capital (with haircuts)',
-          rows: [
-            ['Cash & HYSA (100%)', fmtM(sim.cash)],
-            ['Brokerage (80%)', `${fmtM(sim.brokerage)} → ${fmtM(tier2Cap)} counted`],
-            ['Roth IRA contributions (100%)', fmtM(sim.roth)],
-            ['Traditional IRA / 401(k) (50%)', `${fmtM(sim.traditional)} → ${fmtM(Math.round(sim.traditional * 0.50))} counted`],
-            ['Home equity (30%)', `${fmtM(sim.realEstate)} → ${fmtM(Math.round(sim.realEstate * 0.30))} counted`],
-            ['Liquidity Line (Tier 1+2)', fmtM(t1t2Cap)],
-            ['Total accessible capital', fmtM(sim.accessibleCapital)],
-          ],
-        },
-        {
-          heading: 'Income Plan',
-          rows: [
-            ['Business model', sim.businessModelType.replace(/_/g, ' ')],
-            ['Business operating cost', fmtM(sim.businessCostBaseline)],
-            ['Expected monthly revenue', fmtM(sim.expectedRevenue)],
-            ['Ramp timeline', `${sim.rampDuration} months`],
-            ['Volatility / income variance', `${sim.volatilityPercent}%`],
-            ['SE tax reserve (28% of revenue)', fmtM(sim.selfEmploymentTax)],
-            ['True Monthly Burn', fmtM(sim.tmib)],
-          ],
-        },
+      const gridRows = [
+        { label: 'Primary Savings Runway', vals: cols.map(c => fmtRunwayShort(c.psr)) },
+        { label: 'Full Runway', vals: cols.map(c => fmtRunwayShort(c.full)) },
+        { label: 'Restricted assets req\'d?', vals: cols.map(c => c.r3 ? 'Yes' : 'No'), colors: cols.map(c => c.r3 ? C.red : C.green) },
+        { label: 'Pressure begins', vals: cols.map(c => c.pm >= 999 ? 'None' : fmtRunwayShort(c.pm)) },
       ];
 
-      inputGroups.forEach(grp => {
-        doc.rect(LEFT, y, W, 18).fill(C.navy);
-        doc.fillColor(C.white).fontSize(8).font('Helvetica-Bold').text(grp.heading.toUpperCase(), LEFT + 10, y + 5);
-        y += 18;
-        grp.rows.forEach((row, i) => {
-          const h = 20;
-          doc.rect(LEFT, y, W, h).fill(i % 2 === 0 ? C.light : C.mid);
-          doc.fillColor(C.muted).fontSize(8.5).font('Helvetica').text(row[0], LEFT + 10, y + 5, { width: 260 });
-          doc.fillColor(C.navy).fontSize(8.5).font('Helvetica-Bold').text(row[1], LEFT + 280, y + 5, { width: W - 290 });
-          y += h;
+      gridRows.forEach((row, ri) => {
+        const rowH = 28;
+        doc.rect(L, y, W, rowH).fill(ri % 2 === 0 ? C.light : C.mid);
+        doc.fillColor(C.muted).fontSize(8.5).font('Helvetica-Bold').text(row.label, L + 8, y + 9, { width: 90 });
+        row.vals.forEach((val, ci) => {
+          const color = row.colors ? row.colors[ci] : C.navy;
+          doc.fillColor(color).fontSize(8.5).font('Helvetica-Bold').text(val, L + 100 + ci * 80, y + 9, { width: 78, align: 'center' });
         });
-        y += 6;
+        y += rowH;
+      });
+      y += 16;
+
+      y = insight(doc, 'Reading This Grid',
+        `Each column represents a distinct revenue or household scenario. Primary Savings Runway is when your Primary Accessible Savings (cash + brokerage) runs out. Full Runway extends beyond that if Restricted or Long-Term Assets are drawn. "Restricted assets req\'d?" = Yes means there is a gap between primary savings and full depletion that would require accessing retirement or home equity.`, y);
+
+      ftr(doc, 12);
+
+      // ════════════════════════════════════════════════════════════════════
+      // PAGE 13 — RISK PROFILE SUMMARY
+      // ════════════════════════════════════════════════════════════════════
+      doc.addPage(); hdr(doc, date); y = 42;
+      y = secHead(doc, 13, 'Risk Profile Summary',
+        `Structural Breakpoint Score: ${score}/100 — ${scoreLabel}`, y);
+
+      const riskBlocks = [
+        {
+          num: 1, title: 'Structural Position',
+          body: score >= 70
+            ? `Your financial structure is defensible under expected conditions. Primary Accessible Savings of ${fmtM(pasCap)} supports a runway of ${fmtRunway(psrBase)} at target revenue. The transition is viable as currently modeled.`
+            : score >= 50
+            ? `Your financial structure is workable but tight. Primary Accessible Savings of ${fmtM(pasCap)} provides ${fmtRunway(psrBase)} under expected conditions — but the margin narrows quickly under stress.`
+            : `Your financial structure carries meaningful pressure. Primary Accessible Savings of ${fmtM(pasCap)} may not be sufficient to absorb revenue delays or shortfalls without entering Restricted asset territory early in the transition.`,
+        },
+        {
+          num: 2, title: 'Primary Risk Driver',
+          body: (() => {
+            const fixedPct2 = grossOutflow > 0 ? Math.round(((sim.monthlyDebtPayments ?? 0) / grossOutflow) * 100) : 0;
+            const hcPct = grossOutflow > 0 ? Math.round((hc / grossOutflow) * 100) : 0;
+            if (fixedPct2 > 25) return `Fixed debt payments (${fmtM(sim.monthlyDebtPayments)}/month, ${fixedPct2}% of gross outflow) are the primary structural risk. These cannot be reduced under stress and represent the hardest component to manage during a revenue shortfall.`;
+            if (hcPct > 18) return `Healthcare transition cost (${fmtM(hc)}/month, ${hcPct}% of gross outflow) is the primary structural risk. This is unusually high as a share of outflow and represents the largest controllable cost in the profile.`;
+            if (sim.rampDuration > 8) return `Ramp duration (${sim.rampDuration} months) is the primary structural risk. A long ramp extends the period where savings must cover the full gap, maximizing the capital needed before revenue is reliable.`;
+            return `Revenue volatility (${sim.volatilityPercent}% monthly variance assumption) is the primary structural risk. High income variance means the most favorable months cannot reliably offset the worst months.`;
+          })(),
+        },
+        {
+          num: 3, title: 'Pressure Timeline',
+          body: pm30 >= 999
+            ? `No pressure timeline was identified under any modeled scenario. Your Primary Accessible Savings appear sufficient to cover the transition without reaching a critical depletion point within the model range.`
+            : `Under severe income contraction (−30%), financial pressure is estimated to begin around ${fmtRunway(pm30)}. This is when Primary Accessible Savings would drop within 6 months of exhaustion — the inflection point where each month carries meaningful urgency.`,
+        },
+        {
+          num: 4, title: 'Execution Sensitivity',
+          body: (() => {
+            const rampDeltaMonths = rampLate3 < 999 && psrBase < 999 ? psrBase - rampLate3 : 0;
+            if (rampDeltaMonths > 6) return `This profile is highly sensitive to ramp timing. A 3-month late revenue ramp reduces Primary Savings Runway by approximately ${rampDeltaMonths} months. Entering with pre-existing revenue or signed clients materially reduces this sensitivity.`;
+            if (psr30 < 12) return `This profile is sensitive to revenue shortfalls in the first year. Under severe contraction, Primary Savings Runway drops to ${fmtRunway(psr30)} — leaving limited margin for extended underperformance. Early client acquisition or a confirmed anchor contract would substantially de-risk the first year.`;
+            return `This profile shows moderate execution sensitivity. Revenue arriving on time or slightly early provides comfortable positioning. The primary execution risk is a simultaneous revenue shortfall and unexpected household expense event.`;
+          })(),
+        },
+      ];
+
+      riskBlocks.forEach((block) => {
+        const lines = Math.max(3, Math.ceil(block.body.length / 86));
+        const h = lines * 10 + 38;
+        doc.rect(L, y, W, h).fill(block.num % 2 === 0 ? C.light : C.mid);
+        doc.rect(L, y, 3, h).fill(C.navy);
+        doc.fillColor(C.muted).fontSize(7.5).font('Helvetica-Bold').text(`${block.num}. ${block.title.toUpperCase()}`, L + 12, y + 10);
+        doc.fillColor(C.coal).fontSize(9.5).font('Helvetica').text(block.body, L + 12, y + 24, { width: W - 24, lineGap: 2 });
+        y += h + 8;
       });
 
-      pageFooter(doc, 12, TOTAL);
+      ftr(doc, 13);
 
+      // ════════════════════════════════════════════════════════════════════
+      // PAGE 14 — FINAL SYNTHESIS
+      // ════════════════════════════════════════════════════════════════════
+      doc.addPage(); hdr(doc, date); y = 42;
+      y = secHead(doc, 14, 'What This Means Based on Your Inputs',
+        'A plain-English synthesis. No advice. No prescriptions. Just what the numbers show.', y);
+
+      const synthBlocks = [
+        {
+          title: 'Structural Stability',
+          body: score >= 70
+            ? `Your financial structure supports this transition under expected conditions. Primary Accessible Savings of ${fmtM(pasCap)} provides ${fmtRunway(psrBase)} of Primary Savings Runway at target revenue — enough buffer to absorb a slow start without immediately entering Restricted asset territory.`
+            : score >= 50
+            ? `Your financial structure is workable. The transition is feasible under expected conditions, but there is limited margin if revenue arrives slower or lower than planned. The first 12 months are the highest-risk period.`
+            : `Your financial structure shows meaningful fragility. Primary Accessible Savings may not be sufficient to sustain the transition through a standard ramp period if revenue underperforms. The window between "viable" and "distressed" is narrow.`,
+        },
+        {
+          title: 'What Actually Drives the Risk',
+          body: (() => {
+            const fixedShare = grossOutflow > 0 ? (sim.monthlyDebtPayments ?? 0) / grossOutflow : 0;
+            const hcShare = grossOutflow > 0 ? hc / grossOutflow : 0;
+            const rampRisk = sim.rampDuration > 8;
+            if (fixedShare > 0.25) return `Debt payments (${fmtM(sim.monthlyDebtPayments)}/month) represent ${Math.round(fixedShare * 100)}% of outflow and cannot be reduced without structural change. This creates an inflexible floor that amplifies the impact of any revenue shortfall.`;
+            if (hcShare > 0.18) return `Healthcare transition cost (${fmtM(hc)}/month) represents ${Math.round(hcShare * 100)}% of outflow. This is the highest-leverage controllable cost — alternative coverage or income-based subsidies could materially change the structure.`;
+            if (rampRisk) return `A ${sim.rampDuration}-month revenue ramp is the primary driver. The longer the ramp, the more capital must cover the full gap before revenue becomes reliable. Every month of ramp extension compounds this exposure.`;
+            return `Revenue reliability (${sim.volatilityPercent}% monthly variance) creates the primary risk. With ${sim.volatilityPercent}% variance, the model conservatively discounts monthly revenue — meaning actual results need to be consistently above the volatile baseline to track with projections.`;
+          })(),
+        },
+        {
+          title: 'When Pressure Begins Under Severe Stress',
+          body: pm30 >= 999
+            ? `No meaningful pressure timeline was identified under severe contraction (−30%). Your Primary Accessible Savings appear sufficient to absorb this scenario through the full model range. This is the strongest indicator of financial resilience in this profile.`
+            : `Under severe income contraction (−30%), financial pressure is estimated to begin around ${fmtRunway(pm30)}. That is when Primary Accessible Savings falls within 6 months of exhaustion. If revenue does not recover before that point, decisions about Restricted assets would become relevant.`,
+        },
+        {
+          title: 'Two Highest-Impact Stabilizers',
+          body: (() => {
+            const burns = [calcBurnLever(500) - psr30, calcBurnLever(1000) - psr30, calcRevLever(500) - psr30, calcRevLever(1000) - psr30, llEarly3 - psr30].filter(d => d > 0);
+            const maxDelta = Math.max(...burns, 0);
+            const burnDelta = calcBurnLever(1000) < 999 && psr30 < 999 ? calcBurnLever(1000) - psr30 : null;
+            const revDelta = calcRevLever(1000) < 999 && psr30 < 999 ? calcRevLever(1000) - psr30 : null;
+            const lev1 = burnDelta !== null
+              ? `Reducing outflow by ${fmtM(1000)}/month would extend Primary Savings Runway by approximately ${burnDelta} months under severe stress.`
+              : `Increasing stable revenue by ${fmtM(1000)}/month would extend Primary Savings Runway by approximately ${revDelta ?? '—'} months under severe stress.`;
+            const lev2 = revDelta !== null && revDelta > 0
+              ? `Increasing stable revenue target by ${fmtM(1000)}/month would extend Primary Savings Runway by approximately ${revDelta} months under severe stress.`
+              : `Entering with revenue already flowing or client commitments in hand would eliminate 3 months of ramp exposure — estimated at ${psrBase >= 999 ? 'significant' : `${Math.max(0, rampEarly3 - psrBase)} months`} of additional runway.`;
+            return `First: ${lev1}\n\nSecond: ${lev2}`;
+          })(),
+        },
+      ];
+
+      synthBlocks.forEach(block => {
+        const lines = Math.max(3, Math.ceil(block.body.length / 84));
+        const h = lines * 10 + 38;
+        doc.rect(L, y, W, h).fill(C.light);
+        doc.rect(L, y, 3, h).fill(C.navy);
+        doc.fillColor(C.navy).fontSize(10).font('Helvetica-Bold').text(block.title, L + 12, y + 10);
+        doc.fillColor(C.coal).fontSize(9.5).font('Helvetica').text(block.body, L + 12, y + 26, { width: W - 24, lineGap: 2 });
+        y += h + 8;
+      });
+
+      // Final disclaimer
+      doc.rect(L, y, W, 44).fill(C.mid);
+      doc.rect(L, y, 3, 44).fill(C.muted);
+      doc.fillColor(C.muted).fontSize(8.5).font('Helvetica-Bold').text('IMPORTANT', L + 12, y + 8);
+      doc.fillColor(C.muted).fontSize(8).font('Helvetica').text('This report is a deterministic financial simulation. It is not financial advice, tax advice, or a prediction of future outcomes. All figures depend entirely on your inputs. Consult a qualified financial professional before making major financial or career decisions.', L + 12, y + 20, { width: W - 24, lineGap: 1.5 });
+      y += 52;
+
+      ftr(doc, 14);
       doc.end();
 
     } catch (err) {
-      console.error('PDF generation failed:', err);
-      if (!res.headersSent) res.status(500).json({ message: 'PDF generation failed. Please try again.' });
+      console.error('PDF generation error:', err);
+      if (!res.headersSent) {
+        res.status(500).json({ message: 'PDF generation failed. Please try again.' });
+      }
     }
   });
 
   return httpServer;
 }
-
