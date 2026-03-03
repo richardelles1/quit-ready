@@ -1,5 +1,6 @@
 import { useParams, Link } from "wouter";
 import { Download, AlertTriangle, AlertCircle } from "lucide-react";
+import logoPath from "@assets/626986E9-B8B4-462B-8F52-CB974B10376C_1772581585428.png";
 import Layout from "../components/Layout";
 import { Button } from "@/components/ui/button";
 import { useSimulation, useDownloadSimulationPdf, SimulationResult } from "../hooks/use-simulations";
@@ -10,7 +11,7 @@ import { useToast } from "@/hooks/use-toast";
 const fmt = (n: number) => `$${Math.round(n).toLocaleString('en-US')}`;
 
 function fmtRunway(months: number): string {
-  if (months >= 999) return '24+ years';
+  if (months >= 999) return 'Sustainable Runway';
   if (months <= 0) return 'Less than 1 month';
   const yrs = Math.floor(months / 12);
   const mo = months % 12;
@@ -20,7 +21,7 @@ function fmtRunway(months: number): string {
 }
 
 function fmtRunwayShort(months: number): string {
-  if (months >= 999) return '24+ yrs';
+  if (months >= 999) return 'Sustainable';
   if (months <= 0) return '< 1 mo';
   const yrs = Math.floor(months / 12);
   const mo = months % 12;
@@ -396,7 +397,7 @@ export default function Results() {
 
   // Tier 2 assets clarification sentence (per spec)
   const restrictedClarification = reliesOnRestricted
-    ? `While Tier 1 Liquid Capital depletes in ${psr30 >= 999 ? '24+ years' : fmtRunway(psr30)} under severe stress, total capital depth extends runway to ${fmtRunway(sim.runway30Down)} if Tier 2 Contingent Capital is accessed. This is emergency capital. Not a planned source of transition funding.`
+    ? `Under severe stress, Tier 1 Liquid Capital ${psr30 >= 999 ? 'reaches a sustainable runway position' : `depletes in ${fmtRunway(psr30)}`}. Total capital depth extends to ${fmtRunway(sim.runway30Down)} if Tier 2 Contingent Capital is accessed. Tier 2 is emergency capital, not a planned funding source.`
     : null;
 
   const hcPct = grossOutflow > 0 ? Math.round((hc / grossOutflow) * 100) : 0;
@@ -415,11 +416,9 @@ export default function Results() {
           <div className="mb-10">
             <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-5">
               <div>
-                <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground mb-3">
-                  QuitReady · Financial Position Report
-                </p>
+                <img src={logoPath} alt="QuitReady" className="h-8 w-auto mb-4" />
                 <h1 className="text-3xl sm:text-4xl font-bold font-serif text-foreground leading-tight mb-1">
-                  Structural Breakpoint Analysis
+                  Financial Transition Report
                 </h1>
                 <p className="text-sm text-muted-foreground">
                   Prepared {reportDate} · {marginLabel}
@@ -488,7 +487,7 @@ export default function Results() {
                     Tier 1 Runway, Severe Stress (−30% Revenue)
                   </p>
                   <p className="text-2xl font-bold font-serif text-foreground" data-testid="text-ll-status">
-                    {psr30 >= 999 ? '24+ years' : fmtRunway(psr30)}
+                    {fmtRunway(psr30)}
                   </p>
                   <p className="text-xs text-muted-foreground mt-0.5">
                     Tier 1 Liquid Capital: {fmt(pas)} (Cash + Brokerage)
@@ -503,7 +502,7 @@ export default function Results() {
               </div>
               {psr30 >= 999 && (
                 <p className="text-xs text-muted-foreground leading-relaxed mt-3 pt-3 border-t border-border/40">
-                  This result is very long because the model assumes revenue reaches its target during the ramp period. Once revenue covers the monthly gap, savings stop declining. This does not mean savings alone could fund the transition for 24 years.
+                  Because revenue reaches the modeled target, savings stabilize early in the transition. Capital is not the limiting factor in this scenario.
                 </p>
               )}
             </div>
@@ -514,11 +513,11 @@ export default function Results() {
                 { label: 'Tier 1 Liquid Capital', val: fmt(pas), testid: 'metric-capital' },
                 { label: 'Full Capital Depth', val: fmt(sim.accessibleCapital), testid: 'metric-total-capital' },
                 { label: 'Tier 1 Runway, Base', val: fmtRunway(psrBase), testid: 'metric-base-runway' },
-                { label: 'Risk Position Score', val: `${score} / 100`, testid: 'metric-worst-runway' },
-              ].map((m, i) => (
+                { label: 'Risk Classification', val: getScoreLabel(score), testid: 'metric-risk-class', color: sc.text },
+              ].map((m: any, i) => (
                 <div key={m.label} className={`px-7 py-5 ${i < 3 ? 'border-r border-border' : ''}`} data-testid={m.testid}>
                   <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground/70 mb-1.5">{m.label}</p>
-                  <p className="text-xl font-bold font-serif text-foreground">{m.val}</p>
+                  <p className={`text-xl font-bold font-serif ${m.color ?? 'text-foreground'}`}>{m.val}</p>
                 </div>
               ))}
             </div>
@@ -947,14 +946,9 @@ export default function Results() {
               {/* Block 1: Structural Stability */}
               <div>
                 <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground mb-2">Structural Stability</p>
-                <div className={`flex gap-4 p-5 rounded-lg border ${sc.border} ${sc.bg}`}>
-                  <div className={`shrink-0 w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold border-2 ${sc.border} ${sc.bg} ${sc.text}`}>
-                    {score}
-                  </div>
-                  <div>
-                    <p className={`text-xs font-bold uppercase tracking-wider mb-1.5 ${sc.text}`}>{getScoreLabel(score)}</p>
-                    <p className="text-sm text-muted-foreground leading-relaxed">{advisorSummary}</p>
-                  </div>
+                <div className={`p-5 rounded-lg border ${sc.border} ${sc.bg}`}>
+                  <p className={`text-xs font-bold uppercase tracking-wider mb-2 ${sc.text}`}>{getScoreLabel(score)}</p>
+                  <p className="text-sm text-muted-foreground leading-relaxed">{advisorSummary}</p>
                 </div>
               </div>
 
@@ -991,7 +985,7 @@ export default function Results() {
                   {[
                     'Reduce fixed monthly obligations before the transition date.',
                     'Enter with at least one signed client or confirmed revenue source.',
-                    `Increase Tier 1 Liquid Capital before leaving${pas < sim.tmib * 12 ? ' — current level covers less than 12 months of net gap' : ''}.`,
+                    `Increase Tier 1 Liquid Capital before leaving${pas < sim.tmib * 12 ? ', currently covering less than 12 months of net gap' : ''}.`,
                     'Shorten the revenue ramp by building a client pipeline in advance.',
                     'Ensure partner income is stable and will not be interrupted.',
                   ].map(item => (

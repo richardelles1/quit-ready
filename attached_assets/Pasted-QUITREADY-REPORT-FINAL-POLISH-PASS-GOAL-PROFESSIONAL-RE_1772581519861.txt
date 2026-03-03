@@ -1,0 +1,428 @@
+QUITREADY REPORT FINAL POLISH PASS
+
+GOAL: PROFESSIONAL REPORT QUALITY WITHOUT CHANGING MODEL MATH
+
+This iteration focuses on presentation polish, clarity, layout balance, and interpretability.
+
+Do NOT modify:
+
+• financial calculations
+• scenario math
+• capital calculations
+• runway math
+• scenario modeling logic
+
+Only improve:
+
+• layout
+• spacing
+• labeling
+• interpretation text
+• design hierarchy
+• glossary
+• clarity of metrics
+
+Maintain the existing visual theme, including:
+
+• left emphasis bars on content boxes
+• subtle gradients
+• dark section headers
+• typography and color palette
+
+These elements work well and should remain unchanged.
+
+⸻
+
+GLOBAL LANGUAGE RULES
+
+Follow these writing rules across the entire report.
+	1.	Use plain English.
+	2.	Avoid high finance terminology.
+	3.	Remove all em dashes.
+	4.	Use commas or periods instead.
+	5.	Use short paragraphs.
+	6.	Write explanations as if speaking to a thoughtful but non-financial audience.
+	7.	Do not exaggerate certainty.
+	8.	Maintain a calm advisory tone.
+
+⸻
+
+GLOBAL LAYOUT RULES
+
+The report currently feels cramped in some areas and empty in others.
+
+Improve visual balance.
+
+Apply these rules:
+
+• Increase line spacing slightly in narrative sections
+• Add vertical spacing between sections where appropriate
+• Avoid text hugging headlines
+• Use white space intentionally to create breathing room
+• Expand interpretation boxes slightly if space allows
+• Prevent text from spilling onto new pages unnecessarily
+
+White space should make the report feel calm and professional, not sparse.
+
+⸻
+
+ADD A COVER PAGE
+
+Insert a new first page.
+
+Title:
+
+QuitReady Financial Transition Report
+
+Subtitle:
+
+A financial readiness analysis for transitioning from employment to independent income.
+
+Include:
+
+Prepared for: [User Name]
+Generated: [Date]
+
+Add a simple preview section:
+
+Current Monthly Surplus
+Tier 1 Runway Classification
+Structural Risk Level
+
+Maintain existing visual style.
+
+Use the same gradient and typography system.
+
+⸻
+
+PAGE 1 RESTRUCTURE
+
+Page 1 currently wastes space and contains confusing metrics.
+
+Reduce top metrics from six boxes to four.
+
+New layout:
+
+Top Row
+
+Total Monthly Income
+Total Monthly Outflow
+Monthly Surplus
+
+Second Row
+
+Runway Classification
+
+Replace:
+
+Risk Position Score (numeric)
+
+With:
+
+Risk Classification
+
+Possible labels:
+
+Stable
+Moderate Structural Exposure
+Elevated Risk
+
+This should be derived from the same logic currently used for the score.
+
+Avoid displaying the numeric score.
+
+⸻
+
+REMOVE “24+ YEARS” METRIC
+
+The value 24+ years is technically correct but confusing to users.
+
+Replace everywhere with:
+
+Sustainable Runway
+
+Definition:
+
+Capital is not the limiting factor under the modeled conditions.
+
+Example display:
+
+Tier 1 Runway
+Sustainable Runway
+
+Explanation text:
+
+Because revenue reaches the modeled target, savings stabilize early in the transition. Capital is not the limiting factor in this scenario.
+
+Apply this change everywhere the report previously displayed 24+ years.
+
+⸻
+
+PAGE 1 LAYOUT IMPROVEMENTS
+
+Improve spacing so the page feels balanced.
+
+Fix:
+
+• headline text should not hug the top
+• increase padding around metric boxes
+• expand interpretation box slightly
+• eliminate excess empty space at the bottom
+
+Ensure the page reads naturally from top to bottom.
+
+⸻
+
+PAGE 3 IMPROVEMENT
+
+The NET MONTHLY OUTFLOW section should feel more prominent.
+
+Modify styling:
+
+• white text
+• centered alignment
+• slightly larger font
+• visually aligned with the $6,740 figure
+
+Maintain the dark background bar.
+
+⸻
+
+DEBT PAGE TONE ADJUSTMENT
+
+Current tone feels harsh.
+
+Rename section:
+
+Debt Structure & Financial Commitments
+
+Replace headline:
+
+Elevated Debt Exposure
+
+With:
+
+Debt Load Considerations
+
+Rewrite explanation:
+
+Outstanding debt of $625,000 primarily reflects long term housing financing. While this does not directly change monthly outflow, higher leverage can reduce flexibility if income timing shifts.
+
+The tone should feel informational, not judgmental.
+
+⸻
+
+TIER 1 RUNWAY PAGE STRUCTURE
+
+Currently Tier 1 and Tier 2 explanations appear mixed.
+
+Reorganize into two clear sections.
+
+Section 1:
+
+Tier 1 Liquid Capital
+
+Explain this first.
+
+Section 2:
+
+Tier 2 Contingent Capital
+
+Explain that these assets require taxes, penalties, or borrowing to access.
+
+Clarify:
+
+Tier 2 capital should be considered emergency access, not primary transition funding.
+
+⸻
+
+ASSET TABLE COLOR LOGIC
+
+Current table colors appear inconsistent.
+
+Use color to represent liquidity level.
+
+Suggested mapping:
+
+Liquid cash and HYSA
+Blue
+
+Brokerage accounts
+Light blue
+
+Roth contributions
+Teal
+
+Retirement accounts
+Amber
+
+Home equity
+Neutral gray
+
+Maintain soft gradients so the table remains readable.
+
+⸻
+
+STRESS SCENARIO MODELING IMPROVEMENT
+
+The scenario explanation should be more conversational.
+
+Rewrite “The Scenario That Matters Most” section.
+
+Example structure:
+
+The severe contraction scenario shows how the transition holds up if revenue arrives slower than expected.
+
+In this case liquid savings would last about 1 year and 8 months before Tier 1 capital is exhausted.
+
+This does not immediately break the plan, but it means revenue traction must appear before that window closes.
+
+Write this clearly and calmly.
+
+⸻
+
+REVENUE TIMING PAGE
+
+Replace all runway references that previously showed 24+ years.
+
+Use:
+
+Runway unaffected by ramp timing
+
+Explain:
+
+Because the modeled revenue ramp closes the monthly gap quickly, the timing shift does not materially change the capital runway.
+
+⸻
+
+HOUSEHOLD SHOCK SCENARIOS
+
+The page currently feels compressed.
+
+Add two additional realistic scenarios if space allows.
+
+Possible additions:
+
+Healthcare expense shock
+Unexpected tax payment
+Business launch delay
+Emergency household repair
+
+Keep modeling simple.
+
+Do not add complex financial logic.
+
+⸻
+
+WHAT MOVES THE NEEDLE PAGE
+
+Add one additional insight.
+
+Title:
+
+Revenue Stabilization
+
+Explanation:
+
+Once revenue consistently covers the monthly gap, savings stop declining. Additional income begins rebuilding liquid capital and increases financial safety.
+
+⸻
+
+RISK COMPRESSION TACTICS PAGE
+
+Improve formatting.
+
+Replace paragraph blocks with bullet lists.
+
+Increase line spacing.
+
+Ensure visual breathing room.
+
+⸻
+
+SCENARIO COMPARISON TABLE
+
+Fix header formatting.
+
+Remove quotation marks.
+
+Use:
+
+Moderate Contraction (15%)
+Severe Contraction (30%)
+
+Ensure consistent spacing and column alignment.
+
+⸻
+
+DECISION INTERPRETATION PAGE
+
+Convert interpretation paragraphs into bullet points.
+
+Example structure:
+
+Based on your inputs:
+
+• Household income currently exceeds baseline expenses.
+• Partner income provides a meaningful financial buffer.
+• Liquid savings provide a strong transition runway.
+• Revenue timing risk appears manageable under modeled assumptions.
+
+Keep tone neutral and analytical.
+
+⸻
+
+GLOSSARY PAGE
+
+Ensure a full glossary page exists.
+
+Add definition:
+
+Sustainable Runway
+
+Capital is not the limiting factor under the modeled scenario because revenue stabilizes the financial position before savings are depleted.
+
+Also include definitions for:
+
+Tier 1 Liquid Capital
+Tier 2 Contingent Capital
+Runway
+Capital Depth
+Revenue Ramp
+Stress Scenario
+Structural Gap
+
+Fix any rendering issues at the bottom of the glossary page.
+
+⸻
+
+REPORT AND PDF CONSISTENCY
+
+Currently the report view and the PDF do not match perfectly.
+
+Fix this.
+
+The PDF must be generated from the same layout component used for the report.
+
+There should be one source layout, not separate versions.
+
+The exported PDF should visually match the report exactly.
+
+The PDF is the final output that users download.
+
+⸻
+
+FINAL QUALITY CHECK
+
+Before finishing ensure:
+
+• math is unchanged
+• all runway calculations remain correct
+• no scenario logic changed
+• spacing improvements are applied
+• Sustainable Runway replaces 24+ years everywhere
+• glossary includes Sustainable Runway
+• report and PDF layouts match
+• tone is calm, plain English, and accessible
+
+Proceed with implementation.

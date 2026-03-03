@@ -1,5 +1,6 @@
 import type { Express } from "express";
 import type { Server } from "http";
+import { join } from 'path';
 import { storage } from "./storage";
 import { api } from "@shared/routes";
 import { calculateSimulation } from "./services/simulator";
@@ -17,7 +18,7 @@ const L = 52, W = 508, R = 560, TOTAL = 14;
 const fmtM = (n: number) => `$${Math.round(n).toLocaleString('en-US')}`;
 
 function fmtRunway(months: number): string {
-  if (months >= 999) return '24+ years';
+  if (months >= 999) return 'Sustainable Runway';
   if (months <= 0) return 'Less than 1 month';
   const yrs = Math.floor(months / 12);
   const mo = months % 12;
@@ -27,7 +28,7 @@ function fmtRunway(months: number): string {
 }
 
 function fmtRunwayShort(months: number): string {
-  if (months >= 999) return '24+ yrs';
+  if (months >= 999) return 'Sustainable';
   if (months <= 0) return '< 1 mo';
   const yrs = Math.floor(months / 12);
   const mo = months % 12;
@@ -457,9 +458,46 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       let y = 0;
 
       // ════════════════════════════════════════════════════════════════════
+      // COVER PAGE (unnumbered)
+      // ════════════════════════════════════════════════════════════════════
+      const LOGO_PATH = join(process.cwd(), 'attached_assets', '626986E9-B8B4-462B-8F52-CB974B10376C_1772581585428.png');
+      // White fill
+      doc.rect(0, 0, 612, 792).fill(C.white);
+      // Logo
+      try { doc.image(LOGO_PATH, L, 58, { width: 168 }); } catch (_) { /* skip */ }
+      // Thin rule
+      doc.rect(L, 115, W, 0.75).fill(C.border);
+      // Title
+      doc.fillColor(C.navy).fontSize(24).font('Times-Bold')
+        .text('QuitReady Financial Transition Report', L, 133, { width: W });
+      doc.fillColor(C.muted).fontSize(11).font('Helvetica')
+        .text('A financial readiness analysis for transitioning from employment to independent income.', L, 166, { width: 460, lineGap: 2 });
+      // Rule
+      doc.rect(L, 208, W, 0.75).fill(C.border);
+      // Generated date
+      doc.fillColor(C.muted).fontSize(8).font('Helvetica-Bold').text('GENERATED', L, 224);
+      doc.fillColor(C.navy).fontSize(13).font('Times-Bold').text(date, L, 237);
+      // Preview metrics block
+      const coverY = 290;
+      doc.rect(L, coverY, W, 102).fill(C.mid);
+      doc.rect(L, coverY, 2.5, 102).fill(C.navy);
+      const previewCols = [
+        { label: 'Monthly Surplus / Deficit', val: (_surplusForMargin >= 0 ? '+' : '') + fmtM(_surplusForMargin), x: L },
+        { label: 'Tier 1 Runway', val: fmtRunway(psrBase), x: L + 175 },
+        { label: 'Risk Classification', val: scoreLabel, x: L + 350 },
+      ];
+      previewCols.forEach(({ label, val, x }) => {
+        doc.fillColor(C.muted).fontSize(7.5).font('Helvetica-Bold').text(label.toUpperCase(), x + 12, coverY + 18, { width: 158 });
+        doc.fillColor(C.navy).fontSize(14).font('Times-Bold').text(val, x + 12, coverY + 34, { width: 158 });
+      });
+      // Footer note
+      doc.fillColor(C.muted).fontSize(7.5).font('Helvetica')
+        .text('This report contains 14 pages of detailed financial analysis. Calculations are deterministic and based solely on the inputs provided. This is not financial advice.', L, 680, { width: W, lineGap: 1.5 });
+
+      // ════════════════════════════════════════════════════════════════════
       // PAGE 1. EXECUTIVE SNAPSHOT
       // ════════════════════════════════════════════════════════════════════
-      hdr(doc, date); y = 42;
+      doc.addPage(); hdr(doc, date); y = 42;
       y = secHead(doc, 1, 'Your Financial Position Today',
         'A snapshot of your current income, monthly structure, and projected savings runway.', y);
 
@@ -479,7 +517,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       y = statRow(doc, [
         { label: 'Tier 1 Liquid Capital (Cash + Brokerage)', val: fmtM(pasCap) },
         { label: 'Tier 1 Runway, Base Case', val: fmtRunway(psrBase) },
-        { label: 'Risk Position Score', val: `${score}/100` },
+        { label: 'Risk Classification', val: scoreLabel },
       ], y);
 
       // Identity line
@@ -669,8 +707,8 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       // PAGE 4. DEBT STRUCTURE & EXPOSURE
       // ════════════════════════════════════════════════════════════════════
       doc.addPage(); hdr(doc, date); y = 42;
-      y = secHead(doc, 4, 'Debt Structure & Exposure',
-        'Outstanding loan balances are context. They do not directly change your monthly outflow. They reflect structural leverage and long-term risk exposure.', y);
+      y = secHead(doc, 4, 'Debt Structure & Financial Commitments',
+        'Outstanding loan balances are context. They do not directly change your monthly outflow. They reflect long-term financial commitments and leverage.', y);
 
       doc.rect(L, y, W, 34).fill(C.mid);
       doc.fillColor(C.muted).fontSize(7.5).font('Helvetica').text('TOTAL OUTSTANDING DEBT BALANCE', L + 10, y + 8);
@@ -695,8 +733,8 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
         if (debtRatioPct > 70) {
           doc.rect(L, y, W, 40).fill('#fef2f2');
           doc.rect(L, y, 3, 40).fill(C.red);
-          doc.fillColor(C.red).fontSize(8.5).font('Helvetica-Bold').text('ELEVATED DEBT EXPOSURE', L + 12, y + 8);
-          doc.fillColor(C.coal).fontSize(9).font('Helvetica').text(`Outstanding debt of ${fmtM(totalDebtVal)} represents ${debtRatioPct}% of your total capital, which is above the 70% elevated threshold. This level of leverage narrows recovery options under stress and reduces long-term flexibility.`, L + 12, y + 20, { width: W - 24 });
+          doc.fillColor(C.red).fontSize(8.5).font('Helvetica-Bold').text('DEBT LOAD CONSIDERATIONS', L + 12, y + 8);
+          doc.fillColor(C.coal).fontSize(9).font('Helvetica').text(`Outstanding debt of ${fmtM(totalDebtVal)} primarily reflects long-term financing commitments. While it does not change monthly outflow directly, higher leverage can reduce flexibility if income timing shifts.`, L + 12, y + 20, { width: W - 24 });
           y += 48;
         }
         // Leverage narrative for non-zero debt
@@ -780,7 +818,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       doc.fillColor(C.navy).fontSize(22).font('Times-Bold').text(fmtRunway(psrBase), L, y); y += 28;
       if (psrBase >= 999) {
         doc.fillColor(C.muted).fontSize(8.5).font('Helvetica-Oblique')
-          .text('This result is very long because the model assumes revenue reaches its target during the ramp. Once revenue covers the monthly gap, savings stop declining. This does not mean savings alone could sustain the transition for 24 years.', L, y, { width: W, lineGap: 1.5 });
+          .text('Because revenue reaches the modeled target, savings stabilize early in the transition. Capital is not the limiting factor in this scenario.', L, y, { width: W, lineGap: 1.5 });
         y += 36;
       }
       if (pm30 < 999) {
@@ -1259,6 +1297,10 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
         'Plain-language definitions for every metric and concept used in this report.', y);
 
       const glossaryTerms = [
+        {
+          term: 'Sustainable Runway',
+          def: 'Capital is not the limiting factor under the modeled scenario. Revenue stabilizes the financial position before savings are depleted, so no fixed depletion date applies.',
+        },
         {
           term: 'Tier 1 Liquid Capital',
           def: 'Cash, checking, savings, and taxable brokerage accounts (at 80% for capital gains). Available without penalties or delays. The primary runway source in any transition.',
