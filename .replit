@@ -42,4 +42,6 @@ waitForPort = 5000
 [userenv]
 
 [userenv.shared]
-STRIPE_PRICE_ID_CORRECT = "price_1T7OhEGW49E7KwKe8dG8aBqS"
+
+[agent]
+integrations = ["javascript_stripe:1.0.0"]
