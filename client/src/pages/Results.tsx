@@ -885,6 +885,66 @@ export default function Results() {
               <p className="text-[10px] text-muted-foreground/60 italic pt-4 border-t border-border">
                 Structural sensitivity only. Each lever has tradeoffs not captured in this model. Consult a qualified professional before making significant financial decisions.
               </p>
+
+              <div className="space-y-3 pt-2">
+                {[
+                  {
+                    title: 'CASH FLOW LEVERS',
+                    color: '#1e3a5f',
+                    bullets: [
+                      'Reduce fixed obligations before your transition date.',
+                      'Refinance high-interest debt to lower required minimums.',
+                      'Trim discretionary spending to increase monthly surplus.',
+                      'Convert fixed costs to variable where possible.',
+                    ],
+                  },
+                  {
+                    title: 'REVENUE DE-RISKING LEVERS',
+                    color: '#1d4ed8',
+                    bullets: [
+                      'Secure pre-transition contracts or retainer agreements.',
+                      'Maintain part-time or consulting income during the ramp.',
+                      'Enter with a client pipeline already in progress.',
+                      'Delay the leap to shorten ramp exposure and reduce capital needed.',
+                    ],
+                  },
+                  {
+                    title: 'STRUCTURAL CUSHION LEVERS',
+                    color: '#15803d',
+                    bullets: [
+                      'Increase Tier 1 Liquid Capital before making the transition.',
+                      'Reduce outstanding leverage before the leap date.',
+                      'Shift brokerage holdings to cash to reduce haircut exposure.',
+                    ],
+                  },
+                  {
+                    title: 'RISK COMPRESSION TACTICS',
+                    color: '#b45309',
+                    bullets: [
+                      'Set a 6-month checkpoint with defined revenue thresholds.',
+                      'Define a minimum monthly revenue floor before drawing from savings.',
+                      'Establish a re-entry trigger: the point at which you return to employment.',
+                      'Create a fallback income floor through part-time or contract work.',
+                    ],
+                  },
+                ].map(card => (
+                  <div
+                    key={card.title}
+                    className="border-l-4 rounded-sm p-4 bg-muted/30"
+                    style={{ borderLeftColor: card.color }}
+                  >
+                    <p className="text-[10px] font-bold uppercase tracking-[0.14em] mb-2" style={{ color: card.color }}>{card.title}</p>
+                    <ul className="space-y-1">
+                      {card.bullets.map(b => (
+                        <li key={b} className="text-xs text-muted-foreground flex gap-2">
+                          <span className="shrink-0">•</span>
+                          <span>{b}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                ))}
+              </div>
             </div>
           </SectionCard>
 
@@ -1082,14 +1142,20 @@ export default function Results() {
             <SectionHeader n={11}>Glossary of Key Terms</SectionHeader>
             <div className="px-7 py-6 space-y-4">
               {[
-                { term: "Tier 1 Liquid Capital", def: "Penalty-free, immediately accessible capital (Cash + Brokerage accounts after an 80% liquidity haircut)." },
-                { term: "Tier 1 Runway", def: "The number of months Tier 1 Liquid Capital can sustain the net gap between household outflow and business revenue." },
-                { term: "Tier 2 Contingent Capital", def: "Emergency capital sources (Retirement accounts, Home Equity) that carry high access costs, taxes, or penalties." },
+                { term: "Sustainable Runway", def: "Capital is not the limiting factor under the modeled scenario. Revenue stabilizes the financial position before savings are depleted, so no fixed depletion date applies." },
+                { term: "Tier 1 Liquid Capital", def: "Cash, checking, savings, and taxable brokerage accounts (at 80% for capital gains). Available without penalties or delays. The primary runway source in any transition." },
+                { term: "Tier 1 Runway", def: "Months until Tier 1 Liquid Capital is fully exhausted, given the net monthly gap and revenue ramp. The primary comfort window before Tier 2 access is required." },
+                { term: "Full Capital Depth", def: "Total runway if all tiers are drawn sequentially. Extends beyond Tier 1 Runway when Tier 2 assets exist. Represents maximum runway before all accessible capital is exhausted." },
+                { term: "Tier 2 Contingent Capital", def: "Retirement accounts and home equity. Accessible but carry penalties, taxes, or illiquidity. Counted conservatively. Treated as emergency capital, not planned transition funding." },
                 { term: "Tier 3 Structural Capital", def: "Highly illiquid assets not included in the primary runway model. Examples include private business equity, real estate partnerships, or deferred compensation requiring significant time or cost to access. These assets are intentionally excluded from runway calculations because they cannot reliably fund short-term transitions." },
-                { term: "Net Monthly Outflow", def: "Total household expenses and business operating costs, minus any stable non-business income (like a partner's salary)." },
-                { term: "Structural Breakpoint", def: "The specific month when Tier 1 Liquid Capital is exhausted and the transition requires either revenue break-even or Tier 2 access." }
+                { term: "Net Savings Gap", def: "Monthly shortfall savings and new revenue must cover. Equals gross outflow minus partner income. When revenue covers the full gap, savings stop declining." },
+                { term: "Break-even Revenue", def: "The monthly revenue level at which savings stop declining. When revenue equals the net savings gap, capital drawdown ends." },
+                { term: "Pressure Point", def: "The month Tier 1 Liquid Capital drops within 6 months of exhaustion. Before this, drawdown is manageable. After it, each remaining month requires deliberate action." },
+                { term: "Revenue Ramp", def: "The period revenue is building toward target. Model assumes 50% at midpoint and 100% by end. Shorter ramps reduce capital dependency. Longer ramps increase it." },
+                { term: "Structural Leverage", def: "Ratio of outstanding debt to total accessible capital. Higher leverage narrows recovery options under stress and reduces the buffer available during a transition." },
+                { term: "Structural Breakpoint Score", def: "A 0-to-100 score reflecting position resilience across capital depth, runway, outflow structure, and stress scenarios. Above 70 is stable. Below 50 indicates meaningful fragility." },
               ].map((item) => (
-                <div key={item.term} className="space-y-1">
+                <div key={item.term} className="space-y-1 pb-3 border-b border-border last:border-0 last:pb-0">
                   <p className="text-sm font-bold text-foreground">{item.term}</p>
                   <p className="text-xs text-muted-foreground leading-relaxed">{item.def}</p>
                 </div>

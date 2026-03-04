@@ -166,8 +166,8 @@ function statRow(doc: PDFKit.PDFDocument, items: {label:string; val:string; colo
   items.forEach((item, i) => {
     const x = L + i * w;
     doc.rect(x, y, w - 4, rowH).fill(C.mid);
-    doc.fillColor(C.muted).fontSize(7).font('Helvetica').text(item.label.toUpperCase(), x + 8, y + 8, { width: w - 20 });
-    doc.fillColor(item.color ?? C.navy).fontSize(13).font('Times-Bold').text(item.val, x + 8, y + 22, { width: w - 20 });
+    doc.fillColor(C.muted).fontSize(7).font('Helvetica').text(item.label.toUpperCase(), x, y + 8, { width: w - 4, align: 'center' });
+    doc.fillColor(item.color ?? C.navy).fontSize(13).font('Times-Bold').text(item.val, x, y + 22, { width: w - 4, align: 'center' });
   });
   return y + rowH + 6;
 }
@@ -560,8 +560,8 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
 
       y = statRow(doc, [
         { label: 'Total Monthly Income', val: fmtM(totalIncome) },
-        { label: 'Total Monthly Outflow (all expenses)', val: fmtM(grossOutflowPDF) },
-        { label: 'Monthly Surplus / Deficit', val: (grossSurplus >= 0 ? '+' : '') + fmtM(grossSurplus), color: grossSurplus >= 0 ? C.green : C.red },
+        { label: 'Total Monthly Outflow (all expenses)', val: fmtM(grossOutflowPDF), color: '#C94B4B' },
+        { label: 'Monthly Surplus / Deficit', val: (grossSurplus >= 0 ? '+' : '') + fmtM(grossSurplus), color: grossSurplus >= 0 ? C.green : '#C94B4B' },
       ], y);
 
       // --- Income vs Outflow mini bar chart (T001) ---
@@ -605,9 +605,10 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
 
       // Mini scenario snapshot
       doc.rect(L, y, W, 26).fill(C.navy);
-      [['Scenario', L + 8], ['Tier 1 Runway', L + 172], ['Full Capital Depth', L + 326], ['Tier 2 Required?', L + 434]].forEach(([h, x]) => {
-        doc.fillColor(C.white).fontSize(8).font('Helvetica-Bold').text(h as string, x as number, y + 9);
-      });
+      doc.fillColor(C.white).fontSize(8).font('Helvetica-Bold').text('Scenario', L + 8, y + 9, { width: 160 });
+      doc.fillColor(C.white).fontSize(8).font('Helvetica-Bold').text('Tier 1 Runway', L + 172, y + 9, { width: 146, align: 'center' });
+      doc.fillColor(C.white).fontSize(8).font('Helvetica-Bold').text('Full Capital Depth', L + 326, y + 9, { width: 100, align: 'center' });
+      doc.fillColor(C.white).fontSize(8).font('Helvetica-Bold').text('Tier 2 Required?', L + 434, y + 9, { width: 66, align: 'center' });
       y += 26;
       [
         { label: 'Expected conditions', psr: psrBase, full: frBase, r3: t3Cap > 0 && psrBase < frBase },
@@ -1021,45 +1022,6 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       // Shock grid: fixed 2-col layout per spec.
       // Row 1: Emergency Expense | Unexpected Tax Bill
       // Row 2: Business Launch Delay | Healthcare Cost Increase
-      // Row 3: Partner Income Loss | New Child  (if dual income)
-      //    OR: New Child (single, half-width)   (if single income)
-      // Full-width row: Combined (only if dual income)
-
-      const rowSpacing = 12;
-      const cardH = 98;
-      const cardW = (W / 2) - 4;
-      const gap = 8;
-
-      const drawCard = (sh: { name: string; desc: string; psr: number; needsT3: boolean },
-        cx: number, cy: number, cw: number, even: boolean) => {
-        doc.rect(cx, cy, cw, cardH).fill(even ? C.light : C.mid);
-        // Top-right badge: T2 Req / T1 OK
-        const badgeW = 28;
-        const badgeBg = sh.needsT3 ? '#fef2f2' : '#f0fdf4';
-        doc.rect(cx + cw - badgeW - 6, cy + 6, badgeW, 13).fill(badgeBg);
-        doc.fillColor(sh.needsT3 ? C.red : C.green).fontSize(6.5).font('Helvetica-Bold')
-          .text(sh.needsT3 ? 'T2 Req' : 'T1 OK', cx + cw - badgeW - 6, cy + 9, { width: badgeW, align: 'center' });
-        // Name
-        doc.fillColor(C.coal).fontSize(8).font('Helvetica-Bold')
-          .text(sh.name, cx + 6, cy + 7, { width: cw - badgeW - 18 });
-        // Desc
-        doc.fillColor(C.muted).fontSize(7).font('Helvetica')
-          .text(sh.desc, cx + 6, cy + 22, { width: cw - 12, lineGap: 1 });
-        // "New Tier 1 Runway" label
-        doc.fillColor(C.muted).fontSize(6.5).font('Helvetica-Bold').text('NEW TIER 1 RUNWAY', cx + 6, cy + 56);
-        // Runway value (prominent)
-        const runwayVal = sh.psr >= 999 ? 'Sustainable Runway' : fmtRunwayShort(Math.round(sh.psr));
-        doc.fillColor(C.navy).fontSize(9).font('Helvetica-Bold').text(runwayVal, cx + 6, cy + 65, { width: cw - 12 });
-        // Delta (secondary)
-        if (psrBase < 999 && sh.psr < 999) {
-          const d = Math.round(sh.psr - psrBase);
-          const deltaStr = `Change from base: ${d >= 0 ? '+' : ''}${d} months`;
-          doc.fillColor(d < 0 ? C.red : C.green).fontSize(6.5).font('Helvetica').text(deltaStr, cx + 6, cy + 79, { width: cw - 12 });
-        } else if (psrBase >= 999 && sh.psr < 999) {
-          doc.fillColor(C.muted).fontSize(6.5).font('Helvetica').text('Base was Sustainable', cx + 6, cy + 79, { width: cw - 12 });
-        }
-      };
-
       // Build applicable shock list
       const shockList: { name: string; desc: string; psr: number; needsT3: boolean }[] = [
         { name: 'Emergency Expense', desc: 'A one-time $15,000 emergency expense hitting Tier 1 Liquid Capital immediately.', psr: psrEmergency, needsT3: t3Cap > 0 && psrEmergency < frBase },
@@ -1075,16 +1037,37 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
         ] : []),
       ];
 
-      // Adaptive grid: choose row arrangement by shock count
-      const sn = shockList.length;
-      const rowArrangement: number[] = sn <= 4 ? [2, 2] : sn === 5 ? [3, 2] : sn === 6 ? [3, 3] : [4, 3];
-      let shockIdx = 0;
-      rowArrangement.forEach((perRow, rowIdx) => {
-        const cw = Math.floor((W - (perRow - 1) * gap) / perRow);
-        for (let col = 0; col < perRow && shockIdx < sn; col++, shockIdx++) {
-          drawCard(shockList[shockIdx], L + col * (cw + gap), y, cw, rowIdx % 2 === 0);
+      // Single-column full-width shock cards
+      const shockCardH = 92;
+      shockList.forEach((sh, i) => {
+        doc.rect(L, y, W, shockCardH).fill(i % 2 === 0 ? C.light : C.mid);
+        doc.rect(L, y, 3, shockCardH).fill(C.navy);
+        // Badge
+        const badgeW = 30;
+        const badgeBg = sh.needsT3 ? '#fef2f2' : '#f0fdf4';
+        doc.rect(L + W - badgeW - 8, y + 8, badgeW, 13).fill(badgeBg);
+        doc.fillColor(sh.needsT3 ? C.red : C.green).fontSize(6.5).font('Helvetica-Bold')
+          .text(sh.needsT3 ? 'T2 Req' : 'T1 OK', L + W - badgeW - 8, y + 11, { width: badgeW, align: 'center' });
+        // Name
+        doc.fillColor(C.navy).fontSize(9).font('Helvetica-Bold')
+          .text(sh.name, L + 10, y + 8, { width: W - badgeW - 28 });
+        // Desc
+        doc.fillColor(C.muted).fontSize(7.5).font('Helvetica')
+          .text(sh.desc, L + 10, y + 22, { width: W - 24, lineGap: 1 });
+        // "New Tier 1 Runway" label
+        doc.fillColor(C.muted).fontSize(6.5).font('Helvetica-Bold').text('NEW TIER 1 RUNWAY', L + 10, y + 52);
+        // Runway value
+        const runwayVal = sh.psr >= 999 ? 'Sustainable Runway' : fmtRunwayShort(Math.round(sh.psr));
+        doc.fillColor(C.navy).fontSize(11).font('Times-Bold').text(runwayVal, L + 10, y + 62, { width: W - 24 });
+        // Delta
+        if (psrBase < 999 && sh.psr < 999) {
+          const d = Math.round(sh.psr - psrBase);
+          const deltaStr = `Change from base: ${d >= 0 ? '+' : ''}${d} months`;
+          doc.fillColor(d < 0 ? C.red : C.green).fontSize(7).font('Helvetica').text(deltaStr, L + 10, y + 77, { width: W - 24 });
+        } else if (psrBase >= 999 && sh.psr < 999) {
+          doc.fillColor(C.muted).fontSize(7).font('Helvetica').text('Base was Sustainable', L + 10, y + 77, { width: W - 24 });
         }
-        y += cardH + rowSpacing;
+        y += shockCardH + 6;
       });
       y += 4;
 
@@ -1278,6 +1261,65 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
 
       y = insight(doc, 'Why These Levers Matter',
         `Runway is highly sensitive to the net gap. Small reductions in fixed burn or small increases in steady revenue have a non-linear impact on Tier 1 Runway because they reduce the monthly draw against capital. Focus on the lever that is easiest to execute before the transition date.`, y);
+
+      // Advisory lever category cards
+      const advisoryCards = [
+        {
+          title: 'CASH FLOW LEVERS',
+          color: '#1e3a5f',
+          bullets: [
+            'Reduce fixed obligations before your transition date.',
+            'Refinance high-interest debt to lower required minimums.',
+            'Trim discretionary spending to increase monthly surplus.',
+            'Convert fixed costs to variable where possible.',
+          ],
+        },
+        {
+          title: 'REVENUE DE-RISKING LEVERS',
+          color: '#1d4ed8',
+          bullets: [
+            'Secure pre-transition contracts or retainer agreements.',
+            'Maintain part-time or consulting income during the ramp.',
+            'Enter with a client pipeline already in progress.',
+            'Delay the leap to shorten ramp exposure and reduce capital needed.',
+          ],
+        },
+        {
+          title: 'STRUCTURAL CUSHION LEVERS',
+          color: '#15803d',
+          bullets: [
+            'Increase Tier 1 Liquid Capital before making the transition.',
+            'Reduce outstanding leverage before the leap date.',
+            'Shift brokerage holdings to cash to reduce haircut exposure.',
+          ],
+        },
+        {
+          title: 'RISK COMPRESSION TACTICS',
+          color: '#b45309',
+          bullets: [
+            'Set a 6-month checkpoint with defined revenue thresholds.',
+            'Define a minimum monthly revenue floor before drawing from savings.',
+            'Establish a re-entry trigger: the point at which you return to employment.',
+            'Create a fallback income floor through part-time or contract work.',
+          ],
+        },
+      ];
+
+      if (y > 640) { doc.addPage(); hdr(doc, date); y = 42; }
+
+      advisoryCards.forEach((card, ci) => {
+        const cardBulletH = card.bullets.length * 12;
+        const advCardH = cardBulletH + 38;
+        if (y + advCardH > 750) { doc.addPage(); hdr(doc, date); y = 42; }
+        doc.rect(L, y, W, advCardH).fill(ci % 2 === 0 ? C.light : C.mid);
+        doc.rect(L, y, 3, advCardH).fill(card.color);
+        doc.fillColor(card.color).fontSize(8).font('Helvetica-Bold').text(card.title, L + 10, y + 10, { width: W - 20 });
+        card.bullets.forEach((bullet, bi) => {
+          doc.fillColor(C.coal).fontSize(7.5).font('Helvetica')
+            .text(`  \u2022  ${bullet}`, L + 10, y + 26 + bi * 12, { width: W - 20 });
+        });
+        y += advCardH + 6;
+      });
 
       ftr(doc, 11);
 
