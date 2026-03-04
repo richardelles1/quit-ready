@@ -1176,7 +1176,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       if (pm30 < 999 && pm30 <= CHART_MONTHS) {
         const pmX = chartX + (pm30 / CHART_MONTHS) * chartW;
         const labelX = pm30 > 24 ? pmX - 85 : pmX + 4;
-        doc.moveTo(pmX, chartY).lineTo(pmX, chartY + chartH).strokeColor(C.red).lineWidth(1).dash(3, { space: 3 }).stroke();
+        doc.moveTo(pmX, chartY).lineTo(pmX, chartY + chartH_2).strokeColor(C.red).lineWidth(1).dash(3, { space: 3 }).stroke();
         doc.undash();
         doc.fillColor(C.red).fontSize(7).font('Helvetica-Bold').text('Tier 1 depletion', labelX, chartY - 14, { width: 80 });
         doc.fillColor(C.red).fontSize(7).font('Helvetica').text(`~month ${pm30}`, labelX, chartY - 5, { width: 80 });
