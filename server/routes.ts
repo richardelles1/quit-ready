@@ -337,6 +337,16 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       const doc = new PDFDocument({ margin: 0, size: 'LETTER', autoFirstPage: true });
       res.setHeader('Content-Type', 'application/pdf');
       res.setHeader('Content-Disposition', `attachment; filename="QuitReady_Report_${sim.id}.pdf"`);
+
+      // Prevent unhandled 'error' events from crashing the process when
+      // the client disconnects mid-stream (ERR_STREAM_WRITE_AFTER_END).
+      doc.on('error', (streamErr: Error) => {
+        console.error('PDF stream error (client likely disconnected):', streamErr.message);
+      });
+      res.on('close', () => {
+        try { doc.destroy?.(); } catch (_) {}
+      });
+
       doc.pipe(res);
 
       const date = new Date(sim.createdAt).toLocaleDateString('en-US', { year:'numeric', month:'long', day:'numeric' });
