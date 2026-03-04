@@ -271,7 +271,7 @@ function SavingsCurve({ sim, pas: pasCap }: { sim: SimulationResult; pas: number
         {pm !== null && (
           <div className="flex items-center gap-1.5">
             <div className="w-2 h-2 rounded-full bg-red-500" />
-            <span>Tier 1 depletion point (−30% scenario)</span>
+            <span>Tier 1 depletion point (-30% scenario)</span>
           </div>
         )}
         <span className="text-muted-foreground/40 ml-auto">X: months · Y: Tier 1 Liquid Capital</span>
@@ -376,6 +376,36 @@ export default function Results() {
   const revPlus1k   = calcPrimaryRunway({ ...sim, expectedRevenue: sim.expectedRevenue + 1000 } as SimulationResult, 0.70);
   const burnDelta = burnMinus1k < 999 && sev30 < 999 ? burnMinus1k - sev30 : null;
   const revDelta  = revPlus1k  < 999 && sev30 < 999 ? revPlus1k  - sev30 : null;
+
+  // Lever computations vs base case runway
+  const bL = (adj: number) => calcPrimaryRunway({ ...sim, tmib: Math.max(0, sim.tmib - adj) } as SimulationResult, 1.00);
+  const rL = (rampAdj: number) => calcPrimaryRunway({ ...sim, rampDuration: Math.max(0, sim.rampDuration - rampAdj) } as SimulationResult, 1.00);
+  const leverRows = [
+    { category: 'Burn Reduction', levers: [
+      { desc: 'Reduce burn by $1,000/month', psr: bL(1000) },
+      { desc: 'Reduce burn by $2,000/month', psr: bL(2000) },
+      { desc: 'Reduce burn by $3,000/month', psr: bL(3000) },
+    ]},
+    ...(sim.rampDuration > 0 ? [{ category: 'Revenue Ramp (Earlier Start)', levers: [
+      { desc: 'Revenue begins 3 months earlier', psr: rL(3) },
+      { desc: 'Revenue begins 6 months earlier', psr: rL(6) },
+      { desc: 'Revenue begins 9 months earlier', psr: rL(9) },
+    ]}] : []),
+    { category: 'Supplemental Income', levers: [
+      { desc: 'Add $1,500/month supplemental income', psr: bL(1500) },
+      { desc: 'Add $3,000/month supplemental income', psr: bL(3000) },
+    ]},
+  ];
+  const fmtLeverImpact = (newPsr: number) => {
+    if (psrBase >= 999 && newPsr >= 999) return { runway: 'Sustainable', impact: 'No change', cls: 'text-muted-foreground' };
+    if (newPsr >= 999) return { runway: 'Sustainable', impact: 'Sustainable', cls: 'text-green-600 font-bold' };
+    const d = Math.round(newPsr - psrBase);
+    return {
+      runway: `${Math.round(newPsr)} months`,
+      impact: d === 0 ? 'No change' : `${d > 0 ? '+' : ''}${d} months`,
+      cls: d > 0 ? 'text-green-600 font-bold' : 'text-muted-foreground',
+    };
+  };
 
   // Income totals
   // grossOutflow = all expense components before partner income offset
@@ -500,7 +530,7 @@ export default function Results() {
               <div className="mx-7 mt-4 mb-1 px-5 py-3 bg-muted/30 border border-border rounded-md flex items-center justify-between gap-4">
                 <p className="text-xs text-muted-foreground leading-relaxed">
                   <span className="font-semibold text-foreground">Net savings gap (TMIB):</span>{' '}
-                  {fmt(grossOutflow)} outflow − {fmt(partnerOff)} partner income ={' '}
+                  {fmt(grossOutflow)} outflow - {fmt(partnerOff)} partner income ={' '}
                   <span className="font-semibold text-foreground">{fmt(sim.tmib)}/month</span> that new business revenue and savings must cover post-quit.
                 </p>
                 <span className="text-sm font-bold text-foreground shrink-0 font-serif" data-testid="metric-tmib-net">{fmt(sim.tmib)}</span>
@@ -512,7 +542,7 @@ export default function Results() {
               <div className="flex items-start justify-between gap-4">
                 <div>
                   <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground mb-1">
-                    Tier 1 Runway, Severe Stress (−30% Revenue)
+                    Tier 1 Runway, Severe Stress (-30% Revenue)
                   </p>
                   <p className="text-2xl font-bold font-serif text-foreground" data-testid="text-ll-status">
                     {fmtRunway(psr30)}
@@ -565,7 +595,7 @@ export default function Results() {
                     <div className="space-y-1.5">
                       <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Pressure Window</p>
                       <p className="text-sm text-muted-foreground leading-relaxed">
-                        Under severe revenue contraction (−30%), Tier 1 Liquid Capital would be exhausted in <strong className="text-foreground">{fmtRunway(psr30)}</strong>.
+                        Under severe revenue contraction (-30%), Tier 1 Liquid Capital would be exhausted in <strong className="text-foreground">{fmtRunway(psr30)}</strong>.
                       </p>
                       {t3Total > 0 && sim.runway30Down > psr30 && (
                         <p className="text-sm text-muted-foreground leading-relaxed">
@@ -674,8 +704,8 @@ export default function Results() {
                   <tbody>
                     {[
                       { label: 'Expected conditions', psr: psrBase, full: sim.baseRunway },
-                      { label: 'Moderate contraction (−15%)', psr: psr15, full: sim.runway15Down },
-                      { label: 'Severe contraction (−30%)', psr: psr30, full: sim.runway30Down },
+                      { label: 'Moderate contraction (-15%)', psr: psr15, full: sim.runway15Down },
+                      { label: 'Severe contraction (-30%)', psr: psr30, full: sim.runway30Down },
                       { label: 'Ramp delayed +3 months', psr: psrRampDelay, full: sim.runwayRampDelay },
                     ].map(s => {
                       const needsR = t3Total > 0 && s.psr < s.full;
@@ -718,7 +748,7 @@ export default function Results() {
                 </p>
               </div>
               <p className="text-xs text-muted-foreground leading-relaxed">
-                This chart shows how quickly Tier 1 Liquid Capital declines during the early months of the transition. Under expected conditions, revenue ramps toward its target, which stabilizes savings. Under severe underperformance (−30%), savings continue declining until Tier 1 capital is exhausted{psr30 < 999 ? ` around month ${Math.round(psr30)}` : ''}.
+                This chart shows how quickly Tier 1 Liquid Capital declines during the early months of the transition. Under expected conditions, revenue ramps toward its target, which stabilizes savings. Under severe underperformance (-30%), savings continue declining until Tier 1 capital is exhausted{psr30 < 999 ? ` around month ${Math.round(psr30)}` : ''}.
               </p>
               <p className="text-xs text-muted-foreground leading-relaxed">
                 The difference between these two paths is not savings size. It is revenue timing and reliability.
@@ -813,116 +843,40 @@ export default function Results() {
           {/* ── 7. How to Widen the Runway ───────────────────────────── */}
           <SectionCard className="mb-8">
             <SectionHeader n={7}
-              sub="Four categories of structural options. Each affects Tier 1 Runway under stress. Sensitivity calculations only. No prescriptions.">
+              sub="Computed sensitivity to structural adjustments. Each lever shows New Runway and impact vs. base case. Calculations only — not prescriptions.">
               How to Widen the Runway
             </SectionHeader>
-            <div className="px-6 py-4">
-              {/* Top sensitivity results */}
-              {(burnDelta !== null && burnDelta > 0) || (revDelta !== null && revDelta > 0) || hcPct >= 15 ? (
-                <div className="mb-6">
-                  <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground mb-3">Your Top Sensitivity Results</p>
-                  <div className="space-y-2.5">
-                    {burnDelta !== null && burnDelta > 0 && (
-                      <div className="flex items-start justify-between gap-4 p-3.5 rounded-md border border-border bg-muted/10">
-                        <div className="flex-1">
-                          <p className="text-xs font-semibold text-foreground mb-0.5">Reduce outflow by $1,000/month</p>
-                          <p className="text-xs text-muted-foreground leading-relaxed">
-                            Outflow drops to <strong className="text-foreground">{fmt(sim.tmib - 1000)}/month</strong>. Tier 1 Runway extends from {fmtRunway(sev30)} to {fmtRunway(burnMinus1k)} under severe stress.
-                          </p>
-                          <p className="text-xs text-muted-foreground/70 mt-1 leading-relaxed">
-                            Examples: Consolidating subscriptions, refinancing a loan, or eliminating one recurring fixed obligation.
-                          </p>
-                        </div>
-                        <span className="text-sm font-bold text-green-700 shrink-0">+{burnDelta} mo</span>
-                      </div>
-                    )}
-                    {revDelta !== null && revDelta > 0 && (
-                      <div className="flex items-start justify-between gap-4 p-3.5 rounded-md border border-border bg-muted/10">
-                        <div className="flex-1">
-                          <p className="text-xs font-semibold text-foreground mb-0.5">Increase revenue target by $1,000/month</p>
-                          <p className="text-xs text-muted-foreground leading-relaxed">
-                            Revenue target rises to <strong className="text-foreground">{fmt(sim.expectedRevenue + 1000)}/month</strong>. Tier 1 Runway extends from {fmtRunway(sev30)} to {fmtRunway(revPlus1k)} under severe stress.
-                          </p>
-                          <p className="text-xs text-muted-foreground/70 mt-1 leading-relaxed">
-                            Examples: one small consulting client, two monthly retainer agreements, or one recurring service contract.
-                          </p>
-                        </div>
-                        <span className="text-sm font-bold text-green-700 shrink-0">+{revDelta} mo</span>
-                      </div>
-                    )}
-                    {hcPct >= 15 && (
-                      <div className="flex items-start justify-between gap-4 p-3.5 rounded-md border border-border bg-muted/10">
-                        <div className="flex-1">
-                          <p className="text-xs font-semibold text-foreground mb-0.5">Healthcare: {hcPct}% of gross outflow</p>
-                          <p className="text-xs text-muted-foreground leading-relaxed">
-                            At {fmt(hc)}/month, healthcare is a material outflow component. Partner coverage or income-based ACA subsidies could shift the structure significantly.
-                          </p>
-                        </div>
-                        <span className="text-xs text-muted-foreground shrink-0">High leverage</span>
-                      </div>
-                    )}
+            <div className="px-6 py-5 space-y-6">
+              {leverRows.map(cat => (
+                <div key={cat.category}>
+                  <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground mb-2">{cat.category}</p>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-xs min-w-[400px]">
+                      <thead>
+                        <tr className="border-b border-border">
+                          <th className="text-left py-1.5 font-semibold text-muted-foreground pr-4">Adjustment</th>
+                          <th className="text-right py-1.5 font-semibold text-muted-foreground px-4 whitespace-nowrap">New Runway</th>
+                          <th className="text-right py-1.5 font-semibold text-muted-foreground whitespace-nowrap">Impact</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {cat.levers.map(lv => {
+                          const li = fmtLeverImpact(lv.psr);
+                          return (
+                            <tr key={lv.desc} className="border-b border-border/40 last:border-0">
+                              <td className="py-2.5 text-foreground pr-4">{lv.desc}</td>
+                              <td className="py-2.5 text-right font-semibold text-foreground px-4 whitespace-nowrap">{li.runway}</td>
+                              <td className={`py-2.5 text-right whitespace-nowrap ${li.cls}`}>{li.impact}</td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
                   </div>
                 </div>
-              ) : null}
-
-              {/* Four advisory categories */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                {[
-                  {
-                    title: 'Cash Flow Levers',
-                    color: 'border-l-foreground',
-                    items: [
-                      'Reduce fixed obligations before your transition date.',
-                      'Refinance high-interest debt to lower required minimums.',
-                      'Trim discretionary spending to increase monthly surplus.',
-                      'Convert fixed costs to variable where possible.',
-                    ],
-                  },
-                  {
-                    title: 'Revenue De-Risking Levers',
-                    color: 'border-l-blue-600',
-                    items: [
-                      'Secure pre-transition contracts or retainer agreements.',
-                      'Maintain part-time or consulting income during the ramp.',
-                      'Enter with a client pipeline already in progress.',
-                      'Delay the leap to shorten ramp exposure and reduce capital needed.',
-                    ],
-                  },
-                  {
-                    title: 'Structural Cushion Levers',
-                    color: 'border-l-green-600',
-                    items: [
-                      'Increase Tier 1 Liquid Capital before making the transition.',
-                      'Reduce outstanding leverage before the leap date.',
-                      'Shift brokerage holdings to cash to reduce haircut exposure.',
-                    ],
-                  },
-                  {
-                    title: 'Risk Compression Tactics',
-                    color: 'border-l-amber-600',
-                    items: [
-                      'Set a 6-month checkpoint with defined revenue thresholds.',
-                      'Define a minimum monthly revenue floor before drawing from savings.',
-                      'Establish a re-entry trigger: the point at which you return to employment.',
-                      'Create a fallback income floor through part-time or contract work.',
-                    ],
-                  },
-                ].map(cat => (
-                  <div key={cat.title} className={`p-4 rounded-md border border-border bg-muted/5 border-l-4 ${cat.color}`}>
-                    <p className="text-xs font-bold uppercase tracking-wider text-foreground mb-2.5">{cat.title}</p>
-                    <ul className="space-y-1.5">
-                      {cat.items.map(item => (
-                        <li key={item} className="text-xs text-muted-foreground leading-relaxed flex gap-2">
-                          <span className="text-foreground/30 shrink-0 mt-0.5">&#8226;</span>
-                          <span>{item}</span>
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                ))}
-              </div>
-              <p className="text-[10px] text-muted-foreground/60 italic mt-4 pt-4 border-t border-border">
-                These are structural options, not instructions. Each lever has tradeoffs not captured in this model. Consult a qualified professional before making significant financial or career decisions.
+              ))}
+              <p className="text-[10px] text-muted-foreground/60 italic pt-4 border-t border-border">
+                Structural sensitivity only. Each lever has tradeoffs not captured in this model. Consult a qualified professional before making significant financial decisions.
               </p>
             </div>
           </SectionCard>
@@ -947,8 +901,14 @@ export default function Results() {
                     <p className="text-sm font-bold text-foreground mb-1">{shock.name}</p>
                     <p className="text-xs text-muted-foreground mb-3 flex-1">{shock.desc}</p>
                     <div className="pt-3 border-t border-border mt-auto">
-                      <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-1">New Tier 1 Runway</p>
-                      <p className="text-sm font-bold text-foreground">{fmtRunway(shock.psr)}</p>
+                      <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-1">Tier 1 Runway</p>
+                      <p className="text-sm font-bold text-foreground">
+                        {psrBase >= 999 && shock.psr >= 999
+                          ? 'Sustainable'
+                          : psrBase < 999 && shock.psr < 999
+                          ? `${fmtRunway(psrBase)} \u2192 ${fmtRunway(shock.psr)} (${Math.round(shock.psr - psrBase) >= 0 ? '+' : ''}${Math.round(shock.psr - psrBase)} mo)`
+                          : `${fmtRunway(psrBase)} \u2192 ${fmtRunway(shock.psr)}`}
+                      </p>
                     </div>
                   </div>
                 ))}

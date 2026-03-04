@@ -1,0 +1,105 @@
+Update the report logic and renderer with the following changes.
+
+1. Scenario Table Alignment
+
+In the scenario comparison table:
+
+Expected conditions
+Moderate contraction
+Severe contraction
+
+Center align the following values:
+
+Tier 1 Runway
+Full Capital Depth
+Tier 2 Required
+
+These are headline metrics and should not be right-aligned like accounting tables.
+
+Do NOT change alignment in financial tables such as the outflow breakdown.
+
+---
+
+2. Household Shock Section – Add Runway Impact
+
+Currently the shock scenarios only display the resulting Tier 1 runway.
+
+Update the logic to also calculate and display the change from the base runway.
+
+Base runway = Tier 1 runway under expected conditions.
+
+For each shock scenario compute:
+
+impact_months = shocked_runway - base_runway
+
+Display runway change in this format:
+
+Tier 1 Runway
+10 mo → 7 mo (–3 mo)
+
+Example:
+
+Emergency Expense
+Tier 1 Runway
+10 mo → 7 mo (–3 mo)
+
+This makes the impact of each shock immediately clear.
+
+---
+
+3. Stabilize "How to Widen the Runway" Calculations
+
+Replace the current dynamic lever simulation with fixed scenarios.
+
+Create three lever categories:
+
+Burn Reduction
+Reduce burn by $1,000
+Reduce burn by $2,000
+Reduce burn by $3,000
+
+Revenue Ramp
+Revenue begins 3 months earlier
+Revenue begins 6 months earlier
+Revenue begins 9 months earlier
+
+Supplemental Income
+Add $1,500/month
+Add $3,000/month
+
+For each lever compute:
+
+new_gap = adjusted_outflow - projected_revenue
+new_runway = tier1_liquid_capital / new_gap
+runway_change = new_runway - base_runway
+
+Display results as:
+
+New Runway
+Runway Change
+
+Example:
+
+Burn Reduction – $2,000
+Runway: 10 → 16 months
+Impact: +6 months
+
+Ensure calculations never produce unrealistic values such as hundreds of months.
+
+If new_gap <= 0, display:
+
+"Sustainable Runway"
+
+instead of a numeric value.
+
+---
+
+4. Ensure all calculations are performed in the report logic layer before rendering.
+
+The renderer should receive both:
+
+base_runway
+shocked_runway
+runway_change
+
+so the display does not rely on presentation-level calculations.

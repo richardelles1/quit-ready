@@ -463,6 +463,17 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
         }
         return 999;
       };
+      const calcRampLever = (rampAdj: number) => {
+        if (sim.tmib <= 0) return 999;
+        const newRamp = Math.max(0, sim.rampDuration - rampAdj);
+        let cap = pasCap; const vol = 1 - sim.volatilityPercent / 100;
+        for (let m = 1; m <= 360; m++) {
+          const rf = newRamp > 0 && m <= newRamp ? 0.50 * (m / newRamp) : 1.0;
+          cap -= (sim.tmib - sim.expectedRevenue * rf * vol);
+          if (cap <= 0) return m;
+        }
+        return 999;
+      };
 
       // Score
       const score = sim.structuralBreakpointScore;
@@ -604,10 +615,10 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       ].forEach((sc, i) => {
         doc.rect(L, y, W, 30).fill(i % 2 === 0 ? C.light : C.mid);
         doc.fillColor(C.coal).fontSize(9.5).font('Helvetica').text(sc.label, L + 8, y + 10, { width: 160 });
-        doc.fillColor(C.navy).fontSize(9.5).font('Helvetica-Bold').text(fmtRunwayShort(sc.psr), L + 172, y + 10, { width: 146, align: 'right' });
-        doc.fillColor(C.coal).fontSize(9.5).font('Helvetica').text(fmtRunwayShort(sc.full), L + 326, y + 10, { width: 100, align: 'right' });
+        doc.fillColor(C.navy).fontSize(9.5).font('Helvetica-Bold').text(fmtRunwayShort(sc.psr), L + 172, y + 10, { width: 146, align: 'center' });
+        doc.fillColor(C.coal).fontSize(9.5).font('Helvetica').text(fmtRunwayShort(sc.full), L + 326, y + 10, { width: 100, align: 'center' });
         doc.fillColor(sc.r3 ? C.red : C.green).fontSize(9.5).font('Helvetica-Bold')
-          .text(sc.r3 ? 'Yes' : 'No', L + 434, y + 10, { width: 66, align: 'right' });
+          .text(sc.r3 ? 'Yes' : 'No', L + 434, y + 10, { width: 66, align: 'center' });
         y += 30;
       });
       y += 12;
@@ -1015,40 +1026,63 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       const cardW = (W / 2) - 4;
       const gap = 8;
 
+      const fmtImpactCard = (base: number, shocked: number): string => {
+        const bStr = base >= 999 ? 'Sust.' : `${Math.round(base)} mo`;
+        const sStr = shocked >= 999 ? 'Sust.' : `${Math.round(shocked)} mo`;
+        if (base >= 999 && shocked >= 999) return sStr;
+        if (base < 999 && shocked < 999) {
+          const d = Math.round(shocked - base);
+          return `${bStr} > ${sStr} (${d >= 0 ? '+' : ''}${d} mo)`;
+        }
+        return `${bStr} > ${sStr}`;
+      };
       const drawCard = (sh: { name: string; desc: string; psr: number; needsT3: boolean },
         cx: number, cy: number, cw: number, even: boolean) => {
         doc.rect(cx, cy, cw, cardH).fill(even ? C.light : C.mid);
-        doc.fillColor(C.coal).fontSize(9).font('Helvetica-Bold').text(sh.name, cx + 8, cy + 8, { width: cw - 16 });
-        doc.fillColor(C.muted).fontSize(7.5).font('Helvetica').text(sh.desc, cx + 8, cy + 22, { width: cw - 16, lineGap: 1 });
-        doc.fillColor(C.muted).fontSize(7).font('Helvetica').text('Tier 1 Runway', cx + 8, cy + 58);
-        doc.fillColor(C.navy).fontSize(10).font('Helvetica-Bold').text(fmtRunwayShort(sh.psr), cx + 8, cy + 68);
-        doc.fillColor(C.muted).fontSize(7).font('Helvetica').text('Tier 2 Required?', cx + cw - 70, cy + 58);
-        doc.fillColor(sh.needsT3 ? C.red : C.green).fontSize(9).font('Helvetica-Bold')
-          .text(sh.needsT3 ? 'Yes' : 'No', cx + cw - 70, cy + 68);
+        // Top-right badge: T2 Req / T1 OK
+        const badgeW = 28;
+        const badgeBg = sh.needsT3 ? '#fef2f2' : '#f0fdf4';
+        doc.rect(cx + cw - badgeW - 6, cy + 6, badgeW, 13).fill(badgeBg);
+        doc.fillColor(sh.needsT3 ? C.red : C.green).fontSize(6.5).font('Helvetica-Bold')
+          .text(sh.needsT3 ? 'T2 Req' : 'T1 OK', cx + cw - badgeW - 6, cy + 9, { width: badgeW, align: 'center' });
+        // Name (constrained so it doesn't collide with badge)
+        doc.fillColor(C.coal).fontSize(8).font('Helvetica-Bold')
+          .text(sh.name, cx + 6, cy + 7, { width: cw - badgeW - 18 });
+        // Desc
+        doc.fillColor(C.muted).fontSize(7).font('Helvetica')
+          .text(sh.desc, cx + 6, cy + 22, { width: cw - 12, lineGap: 1 });
+        // Tier 1 Runway label + value
+        doc.fillColor(C.muted).fontSize(7).font('Helvetica').text('Tier 1 Runway', cx + 6, cy + 57);
+        doc.fillColor(C.navy).fontSize(8).font('Helvetica-Bold')
+          .text(fmtImpactCard(psrBase, sh.psr), cx + 6, cy + 67, { width: cw - 12 });
       };
 
-      // Row 1: Emergency | Tax Bill
-      drawCard({ name: 'Emergency Expense', desc: 'A one-time $15,000 emergency expense hitting Tier 1 Liquid Capital immediately.', psr: psrEmergency, needsT3: t3Cap > 0 && psrEmergency < frBase }, L, y, cardW, true);
-      drawCard({ name: 'Unexpected Tax Bill', desc: 'A one-time $10,000 tax obligation hitting Tier 1 Liquid Capital immediately.', psr: psrTaxBill, needsT3: t3Cap > 0 && psrTaxBill < frBase }, L + cardW + gap, y, cardW, true);
-      y += cardH + rowSpacing;
+      // Build applicable shock list
+      const shockList: { name: string; desc: string; psr: number; needsT3: boolean }[] = [
+        { name: 'Emergency Expense', desc: 'A one-time $15,000 emergency expense hitting Tier 1 Liquid Capital immediately.', psr: psrEmergency, needsT3: t3Cap > 0 && psrEmergency < frBase },
+        { name: 'Unexpected Tax Bill', desc: 'A one-time $10,000 tax obligation hitting Tier 1 Liquid Capital immediately.', psr: psrTaxBill, needsT3: t3Cap > 0 && psrTaxBill < frBase },
+        { name: 'Business Launch Delay', desc: 'A 3-month delay in reaching the revenue ramp target.', psr: psrRampDelay, needsT3: t3Cap > 0 && psrRampDelay < frRamp3 },
+        { name: 'Healthcare Cost Increase', desc: 'An unexpected $500/month increase in healthcare premiums or medical outflow.', psr: psrHealthcareShock, needsT3: t3Cap > 0 && psrHealthcareShock < frBase },
+        ...(sim.isDualIncome && sim.partnerIncome > 0 ? [
+          { name: 'Partner Income Loss', desc: `Partner income of ${fmtM(sim.partnerIncome)}/month stops for 6 months then resumes. Burn increases by that amount during the loss period.`, psr: psrPartnerLoss, needsT3: t3Cap > 0 && psrPartnerLoss < frPartnerLoss },
+        ] : []),
+        { name: 'New Child', desc: `${fmtM(CHILD_ONETIME)} one-time setup + ${fmtM(CHILD_MONTHLY)}/month ongoing. Estimates only. Actual costs vary.`, psr: psrNewChild, needsT3: t3Cap > 0 && psrNewChild < fullRunway(sim, 1.00, undefined, () => CHILD_MONTHLY) },
+        ...(sim.isDualIncome && sim.partnerIncome > 0 ? [
+          { name: 'Combined: Partner Loss + New Child', desc: 'Both shocks simultaneously. The most conservative household stress scenario.', psr: psrCombined, needsT3: t3Cap > 0 },
+        ] : []),
+      ];
 
-      // Row 2: Launch Delay | Healthcare
-      drawCard({ name: 'Business Launch Delay', desc: 'A 3-month delay in reaching the revenue ramp target.', psr: psrRampDelay, needsT3: t3Cap > 0 && psrRampDelay < frRamp3 }, L, y, cardW, false);
-      drawCard({ name: 'Healthcare Cost Increase', desc: 'An unexpected $500/month increase in healthcare premiums or medical outflow.', psr: psrHealthcareShock, needsT3: t3Cap > 0 && psrHealthcareShock < frBase }, L + cardW + gap, y, cardW, false);
-      y += cardH + rowSpacing;
-
-      // Row 3: Partner Loss | New Child (dual), or New Child alone (single)
-      if (sim.isDualIncome && sim.partnerIncome > 0) {
-        drawCard({ name: 'Partner Income Loss', desc: `Partner income of ${fmtM(sim.partnerIncome)}/month stops for 6 months, then resumes. Burn increases by that amount during the loss period.`, psr: psrPartnerLoss, needsT3: t3Cap > 0 && psrPartnerLoss < frPartnerLoss }, L, y, cardW, true);
-        drawCard({ name: 'New Child', desc: `${fmtM(CHILD_ONETIME)} one-time setup + ${fmtM(CHILD_MONTHLY)}/month ongoing (childcare, supplies, insurance). Estimates only. Actual costs vary.`, psr: psrNewChild, needsT3: t3Cap > 0 && psrNewChild < fullRunway(sim, 1.00, undefined, () => CHILD_MONTHLY) }, L + cardW + gap, y, cardW, true);
+      // Adaptive grid: choose row arrangement by shock count
+      const sn = shockList.length;
+      const rowArrangement: number[] = sn <= 4 ? [2, 2] : sn === 5 ? [3, 2] : sn === 6 ? [3, 3] : [4, 3];
+      let shockIdx = 0;
+      rowArrangement.forEach((perRow, rowIdx) => {
+        const cw = Math.floor((W - (perRow - 1) * gap) / perRow);
+        for (let col = 0; col < perRow && shockIdx < sn; col++, shockIdx++) {
+          drawCard(shockList[shockIdx], L + col * (cw + gap), y, cw, rowIdx % 2 === 0);
+        }
         y += cardH + rowSpacing;
-        // Full-width: Combined
-        drawCard({ name: 'Combined: Partner Income Loss + New Child', desc: 'Both shocks occurring simultaneously. Partner income lost for 6 months while new child costs begin. The most conservative household stress test.', psr: psrCombined, needsT3: t3Cap > 0 }, L, y, W, false);
-        y += cardH + rowSpacing;
-      } else {
-        drawCard({ name: 'New Child', desc: `${fmtM(CHILD_ONETIME)} one-time setup + ${fmtM(CHILD_MONTHLY)}/month ongoing (childcare, supplies, insurance). Estimates only. Actual costs vary.`, psr: psrNewChild, needsT3: t3Cap > 0 && psrNewChild < fullRunway(sim, 1.00, undefined, () => CHILD_MONTHLY) }, L, y, cardW, true);
-        y += cardH + rowSpacing;
-      }
+      });
       y += 4;
 
       y = insight(doc, 'The Pattern Behind Household Shocks',
@@ -1169,43 +1203,65 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       y = secHead(doc, 11, 'How to Widen the Runway',
         'Strategic adjustments to your monthly outflow or revenue targets that would materially extend your Tier 1 Runway.', y);
 
-      const levers = [
-        { 
-          title: 'Burn Reduction (-$1,000)', 
-          impact: calcBurnLever(1000) - psrBase,
-          psr: calcBurnLever(1000),
-          desc: 'Reducing monthly living expenses or debt by $1,000.'
+      // Lever helper: format runway + impact for table display
+      const leverImpact = (newPsr: number) => {
+        const newR = newPsr >= 999 ? 'Sustainable' : `${Math.round(newPsr)} mo`;
+        if (psrBase >= 999 && newPsr >= 999) return { runway: newR, impact: 'No change', color: C.muted };
+        if (newPsr >= 999) return { runway: newR, impact: `Sustainable`, color: C.green };
+        const d = Math.round(newPsr - psrBase);
+        return {
+          runway: newR,
+          impact: d === 0 ? 'No change' : `${d > 0 ? '+' : ''}${d} mo`,
+          color: d > 0 ? C.green : d < 0 ? C.red : C.muted,
+        };
+      };
+
+      const leverCategories = [
+        {
+          name: 'Burn Reduction',
+          rows: [
+            { desc: 'Reduce burn by $1,000/month', psr: calcBurnLever(1000) },
+            { desc: 'Reduce burn by $2,000/month', psr: calcBurnLever(2000) },
+            { desc: 'Reduce burn by $3,000/month', psr: calcBurnLever(3000) },
+          ],
         },
-        { 
-          title: 'Burn Reduction (-$2,000)', 
-          impact: calcBurnLever(2000) - psrBase,
-          psr: calcBurnLever(2000),
-          desc: 'Aggressive $2,000 monthly outflow reduction.'
-        },
-        { 
-          title: 'Revenue Acceleration (+$1,000)', 
-          impact: calcRevLever(1000) - psrBase,
-          psr: calcRevLever(1000),
-          desc: 'Increasing target monthly revenue by $1,000.'
+        ...(sim.rampDuration > 0 ? [{
+          name: 'Revenue Ramp (Earlier Start)',
+          rows: [
+            { desc: 'Revenue begins 3 months earlier', psr: calcRampLever(3) },
+            { desc: 'Revenue begins 6 months earlier', psr: calcRampLever(6) },
+            { desc: 'Revenue begins 9 months earlier', psr: calcRampLever(9) },
+          ],
+        }] : []),
+        {
+          name: 'Supplemental Income',
+          rows: [
+            { desc: 'Add $1,500/month supplemental income', psr: calcBurnLever(1500) },
+            { desc: 'Add $3,000/month supplemental income', psr: calcBurnLever(3000) },
+          ],
         },
       ];
 
-      const leverW = (W / 3) - 4;
-      levers.forEach((lv, i) => {
-        const lx = L + i * (leverW + 6);
-        doc.rect(lx, y, leverW, 70).fill(C.mid);
-        doc.rect(lx, y, 3, 70).fill(C.navy);
-        doc.fillColor(C.navy).fontSize(8).font('Helvetica-Bold').text(lv.title, lx + 8, y + 8, { width: leverW - 16 });
-        
-        const impactTxt = lv.impact <= 0 ? 'No change' : `+${lv.impact} months`;
-        doc.fillColor(C.green).fontSize(10).font('Helvetica-Bold').text(impactTxt, lx + 8, y + 20);
-        
-        doc.fillColor(C.muted).fontSize(7).font('Helvetica').text(lv.desc, lx + 8, y + 34, { width: leverW - 16, lineGap: 1 });
+      leverCategories.forEach(cat => {
+        // Category header
+        doc.rect(L, y, W, 22).fill(C.navy);
+        doc.fillColor(C.white).fontSize(8).font('Helvetica-Bold').text(cat.name, L + 8, y + 7);
+        doc.fillColor('#94a3b8').fontSize(7.5).font('Helvetica-Bold').text('New Runway', L + 330, y + 7, { width: 88, align: 'right' });
+        doc.fillColor('#94a3b8').fontSize(7.5).font('Helvetica-Bold').text('Impact', L + 425, y + 7, { width: 75, align: 'right' });
+        y += 22;
+        cat.rows.forEach((lv, i) => {
+          const li = leverImpact(lv.psr);
+          doc.rect(L, y, W, 26).fill(i % 2 === 0 ? C.light : C.mid);
+          doc.fillColor(C.coal).fontSize(9).font('Helvetica').text(lv.desc, L + 8, y + 8, { width: 318 });
+          doc.fillColor(C.navy).fontSize(9).font('Helvetica-Bold').text(li.runway, L + 330, y + 8, { width: 88, align: 'right' });
+          doc.fillColor(li.color).fontSize(9).font('Helvetica-Bold').text(li.impact, L + 425, y + 8, { width: 75, align: 'right' });
+          y += 26;
+        });
+        y += 8;
       });
-      y += 86;
 
       y = insight(doc, 'Why These Levers Matter',
-        `Runway is highly sensitive to the net gap. Small reductions in fixed burn or small increases in steady revenue have a non-linear impact on the Tier 1 Runway because they reduce the monthly draw against capital. Focus on the lever that is easiest to execute before the transition date.`, y);
+        `Runway is highly sensitive to the net gap. Small reductions in fixed burn or small increases in steady revenue have a non-linear impact on Tier 1 Runway because they reduce the monthly draw against capital. Focus on the lever that is easiest to execute before the transition date.`, y);
 
       ftr(doc, 11);
 
