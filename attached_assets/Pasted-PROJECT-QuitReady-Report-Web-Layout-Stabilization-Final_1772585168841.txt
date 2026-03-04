@@ -1,0 +1,356 @@
+PROJECT: QuitReady Report & Web Layout Stabilization (Final Pass)
+
+OBJECTIVE
+
+Implement a stable, professional layout system for QuitReady that:
+
+• Produces a premium, full-feeling PDF report
+• Produces a professional web report that mirrors the structure and styling of the PDF
+• Displays correctly on desktop and mobile
+• Eliminates layout drift between PDF and web
+• Fixes whitespace, spacing, alignment, and typography issues
+• Ensures shock scenarios behave correctly for both single and partnered users
+
+The PDF remains the visual reference.  
+The web report should follow the same section order and visual hierarchy, but be responsive and mobile friendly.
+
+--------------------------------------------------
+
+GLOBAL DESIGN SYSTEM
+
+Create shared design tokens used by BOTH the PDF and web report.
+
+Typography
+
+Title: 30px  
+Section Header: 20px  
+Subheader: 16px  
+Body: 13px  
+Metric Numbers: 24px  
+Table Header: 12px  
+
+Font hierarchy must be consistent across the entire report.
+
+Spacing system
+
+XS: 6px  
+SM: 10px  
+MD: 16px  
+LG: 28px  
+XL: 44px  
+
+Rules:
+
+• No section should touch the next section without at least MD spacing.
+• Major sections use LG spacing.
+• Page headers use XL spacing from first content element.
+
+Content container (web)
+
+Max width: 1100px  
+Centered horizontally
+
+Mobile breakpoint
+
+768px
+
+--------------------------------------------------
+
+PDF LAYOUT (PRINT CANONICAL)
+
+The PDF is the polished export version.  
+All web layout decisions should visually echo this structure.
+
+--------------------------------------------------
+
+COVER PAGE
+
+Full-page cover.
+
+Background: deep navy.
+
+Top white header bar  
+Bottom white footer bar
+
+Centered content:
+
+QuitReady  
+Financial Transition Report
+
+Subtitle:
+
+A financial readiness analysis for transitioning from employment to independent income.
+
+Prepared for: [User Name]  
+Generated: [Date]
+
+Large faint "Q" logo watermark behind title.
+
+REMOVE the word "Stable" or any classification from the cover page.
+
+Cover page must contain NO metrics or charts.
+
+--------------------------------------------------
+
+PAGE 1 — FINANCIAL POSITION SUMMARY
+
+Current page wastes space and misaligns metrics.
+
+Replace with a structured grid.
+
+Row 1 (three metrics)
+
+Total Monthly Income  
+Total Monthly Outflow  
+Monthly Surplus / Deficit
+
+Row 2 (two metrics)
+
+Tier 1 Liquid Capital  
+Tier 1 Runway
+
+Metrics must:
+
+• be horizontally aligned
+• have equal widths
+• use Metric Numbers typography
+
+Risk classification should NOT appear in a metric box.
+
+Place it as a labeled line under the grid:
+
+Risk Classification  
+Structurally Stable
+
+Interpretation text should follow and expand slightly to reduce white space.
+
+--------------------------------------------------
+
+TABLE SPACING & ALIGNMENT
+
+All tables must follow these rules:
+
+• Table header margin-bottom: MD
+• Row padding: SM
+• Alternating row shading for readability
+• Left-align labels
+• Right-align numeric values
+
+Headers must NEVER wrap to multiple lines.
+
+--------------------------------------------------
+
+NET MONTHLY OUTFLOW ROW (PAGE 3)
+
+This row must be visually dominant.
+
+Style:
+
+Background: dark navy  
+Text: white  
+Centered label  
+Large centered dollar value
+
+Format:
+
+NET MONTHLY OUTFLOW  
+$11,620
+
+Spacing above and below: LG.
+
+--------------------------------------------------
+
+RUNWAY EXPLANATION PAGE
+
+Separate explanations clearly.
+
+Section 1
+
+Tier 1 Runway  
+Explain primary liquid capital and months available.
+
+Section 2
+
+Tier 2 Emergency Capital  
+Explain retirement and home equity as secondary reserves.
+
+Do not place Tier 2 text directly under Tier 1 explanation.
+
+Add spacing between sections: LG.
+
+--------------------------------------------------
+
+HOUSEHOLD SHOCK SCENARIOS
+
+Shock scenarios must be consistent across all users.
+
+Always include baseline shocks:
+
+• Emergency Expense
+• Unexpected Tax Bill
+• Business Launch Delay
+• Healthcare Cost Increase
+• New Child
+
+If partner income exists:
+
+Add:
+
+• Partner Income Loss
+
+If partner income does not exist:
+
+Remove ONLY the partner-loss scenario.
+
+All other shocks remain.
+
+Each shock must appear as its own card block with spacing between blocks.
+
+--------------------------------------------------
+
+ENCODING FIX
+
+Remove malformed characters such as:
+
+("30%)  
+("15%)
+
+Replace everywhere with:
+
+(30%)  
+(15%)
+
+Scan the entire report output.
+
+--------------------------------------------------
+
+SCENARIO COMPARISON TABLE
+
+Rename columns to:
+
+Base  
+Moderate Contraction (15%)  
+Severe Contraction (30%)  
+Partner Loss  
+New Child
+
+If partner income is zero, hide the Partner Loss column but keep the rest.
+
+Ensure all columns have equal width.
+
+--------------------------------------------------
+
+INTERPRETATION PAGE
+
+Convert narrative paragraphs into bullet insights.
+
+Example structure:
+
+Your position today:
+
+• Income currently falls below monthly outflow
+• Liquid capital supports approximately 6 months of Tier 1 runway
+• Debt payments represent a fixed structural obligation
+• Revenue timing is the primary determinant of success
+
+Spacing between bullets: SM.
+
+--------------------------------------------------
+
+DISCLAIMER PAGE
+
+Create a final standalone page titled:
+
+Important Notice
+
+Place all disclaimer text there only once.
+
+Remove any duplicate disclaimers from other pages.
+
+--------------------------------------------------
+
+WEB REPORT LAYOUT
+
+The web report should mirror the PDF’s section structure while remaining responsive.
+
+Section order must match the PDF exactly:
+
+1. Financial Position Summary  
+2. Income Strength  
+3. Monthly Outflow  
+4. Debt Structure  
+5. Tier Runway  
+6. Stress Scenarios  
+7. Revenue Timing  
+8. Household Shocks  
+9. Savings Timeline  
+10. Revenue vs Liquidity  
+11. Runway Expansion Options  
+12. Scenario Comparison  
+13. Decision Interpretation  
+14. Glossary
+
+--------------------------------------------------
+
+WEB SPACING RULES
+
+Each section must have:
+
+Margin-top: XL  
+Margin-bottom: LG
+
+Metric cards spacing: MD
+
+Charts margin-top: LG
+
+No section should appear visually cramped.
+
+--------------------------------------------------
+
+MOBILE BEHAVIOR
+
+On screens below 768px:
+
+Metric grids stack vertically.
+
+Tables convert to stacked cards:
+
+Example:
+
+Category  
+Amount  
+Percent
+
+Each row becomes a card.
+
+Charts scale to container width.
+
+Text must remain readable without horizontal scrolling.
+
+--------------------------------------------------
+
+GLOSSARY
+
+Glossary must appear in BOTH:
+
+• PDF
+• Web report
+
+In the web report it appears as the final section.
+
+--------------------------------------------------
+
+FINAL VALIDATION
+
+Verify the following before completion:
+
+• PDF pages feel visually full and balanced
+• Cover page contains no metrics
+• Web report follows the same section order as the PDF
+• Web report is readable on mobile
+• Spacing between sections is consistent
+• Tier explanations are separated
+• Shock scenarios adapt correctly to partner status
+• Encoding errors removed
+• Glossary visible in both formats
+• No large unused whitespace blocks

@@ -251,7 +251,7 @@ function lineChart(doc: PDFKit.PDFDocument, base: number[], severe: number[], ma
   doc.rect(cx + cw - 120, cy + 6, 10, 4).fill(C.navy);
   doc.fillColor(C.navy).fontSize(7).font('Helvetica').text('Base case', cx + cw - 107, cy + 4);
   doc.rect(cx + cw - 120, cy + 16, 10, 4).fill(C.muted);
-  doc.fillColor(C.muted).fontSize(7).font('Helvetica').text('Severe (−30%)', cx + cw - 107, cy + 14);
+  doc.fillColor(C.muted).fontSize(7).font('Helvetica').text('Severe (-30%)', cx + cw - 107, cy + 14);
 }
 
 // ─── Route registration ────────────────────────────────────────────────────
@@ -362,6 +362,39 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
 
       const rampEarly3 = psRunway(sim, 1.00, Math.max(0, sim.rampDuration - 3));
       const rampLate3  = psRunway(sim, 1.00, sim.rampDuration + 3);
+
+      // --- Baseline Shocks (T001) ---
+      // Emergency Expense: $15,000 one-time hit
+      const psrEmergency = (() => {
+        if (sim.tmib <= 0) return 999;
+        let cap = pasCap - 15000;
+        const vol = 1 - sim.volatilityPercent / 100;
+        for (let m = 1; m <= 360; m++) {
+          const rf = sim.rampDuration > 0 && m <= sim.rampDuration ? 0.50 * (m / sim.rampDuration) : 1.0;
+          cap -= (sim.tmib - sim.expectedRevenue * rf * vol);
+          if (cap <= 0) return m;
+        }
+        return 999;
+      })();
+
+      // Unexpected Tax Bill: $10,000 one-time hit
+      const psrTaxBill = (() => {
+        if (sim.tmib <= 0) return 999;
+        let cap = pasCap - 10000;
+        const vol = 1 - sim.volatilityPercent / 100;
+        for (let m = 1; m <= 360; m++) {
+          const rf = sim.rampDuration > 0 && m <= sim.rampDuration ? 0.50 * (m / sim.rampDuration) : 1.0;
+          cap -= (sim.tmib - sim.expectedRevenue * rf * vol);
+          if (cap <= 0) return m;
+        }
+        return 999;
+      })();
+
+      // Business Launch Delay (+3 months)
+      const psrRampDelay = psRunway(sim, 1.00, sim.rampDuration + 3);
+
+      // Healthcare Cost Increase (+$500/month)
+      const psrHealthcareShock = psRunway(sim, 1.00, undefined, () => 500);
 
       // Partner loss (6 months)
       const psrPartnerLoss = sim.isDualIncome && sim.partnerIncome > 0
@@ -488,11 +521,6 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       // Generated date
       doc.fillColor('#94a3b8').fontSize(9).font('Helvetica-Bold').text('GENERATED', 52, 280, { width: 508, align: 'center' });
       doc.fillColor(C.white).fontSize(13).font('Times-Bold').text(date, 52, 295, { width: 508, align: 'center' });
-      // Classification badge centered
-      const badgeBg = score >= 70 ? '#15803d' : score >= 50 ? '#b45309' : '#dc2626';
-      doc.rect(206, 340, 200, 36).fill(badgeBg);
-      doc.fillColor(C.white).fontSize(11).font('Helvetica-Bold')
-        .text(scoreLabel, 206, 352, { width: 200, align: 'center' });
 
       // ════════════════════════════════════════════════════════════════════
       // PAGE 1. EXECUTIVE SNAPSHOT
@@ -517,8 +545,12 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       y = statRow(doc, [
         { label: 'Tier 1 Liquid Capital (Cash + Brokerage)', val: fmtM(pasCap) },
         { label: 'Tier 1 Runway, Base Case', val: fmtRunway(psrBase) },
-        { label: 'Risk Classification', val: scoreLabel },
       ], y);
+
+      // Risk Classification line (T001)
+      doc.fillColor(C.muted).fontSize(7).font('Helvetica').text('RISK CLASSIFICATION', L, y);
+      doc.fillColor(C.navy).fontSize(13).font('Times-Bold').text(scoreLabel, L, y + 10);
+      y += 32;
 
       // Identity line
       const identityLine = `${marginLabel}. Based on your current income and monthly outflow structure.`;
@@ -537,8 +569,8 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       y += 22;
       [
         { label: 'Expected conditions', psr: psrBase, full: frBase, r3: t3Cap > 0 && psrBase < frBase },
-        { label: 'Moderate contraction (−15%)', psr: psr15, full: fr15, r3: t3Cap > 0 && psr15 < fr15 },
-        { label: 'Severe contraction (−30%)', psr: psr30, full: fr30, r3: t3Cap > 0 && psr30 < fr30 },
+        { label: 'Moderate contraction (-15%)', psr: psr15, full: fr15, r3: t3Cap > 0 && psr15 < fr15 },
+        { label: 'Severe contraction (-30%)', psr: psr30, full: fr30, r3: t3Cap > 0 && psr30 < fr30 },
       ].forEach((sc, i) => {
         doc.rect(L, y, W, 24).fill(i % 2 === 0 ? C.light : C.mid);
         doc.fillColor(C.coal).fontSize(9).font('Helvetica').text(sc.label, L + 8, y + 7, { width: 165 });
@@ -823,7 +855,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       }
       if (pm30 < 999) {
         doc.fillColor(C.muted).fontSize(9).font('Helvetica')
-          .text(`Under severe contraction (−30%), Tier 1 Liquid Capital would be exhausted in ${fmtRunway(psr30)}. Financial pressure begins around ${fmtRunwayShort(pm30)}.`, L, y, { width: W });
+          .text(`Under severe contraction (-30%), Tier 1 Liquid Capital would be exhausted in ${fmtRunway(psr30)}. Financial pressure begins around ${fmtRunwayShort(pm30)}.`, L, y, { width: W });
         y += 18;
       }
 
@@ -890,7 +922,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       y += 4;
 
       y = insight(doc, 'The Scenario That Matters Most',
-        'The severe contraction (−30%) scenario is the one that reveals real structural exposure. If Tier 1 Runway holds above 12 months under that scenario, the position is defensible. If it falls below 6 months, the transition requires strengthening before proceeding. Pressure begins when Tier 1 Liquid Capital drops within 6 months of exhaustion under that revenue level.', y);
+        'The severe contraction (-30%) scenario is the one that reveals real structural exposure. If Tier 1 Runway holds above 12 months under that scenario, the position is defensible. If it falls below 6 months, the transition requires strengthening before proceeding. Pressure begins when Tier 1 Liquid Capital drops within 6 months of exhaustion under that revenue level.', y);
 
       ftr(doc, 6);
 
@@ -943,6 +975,34 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
 
       const shockRows = [
         {
+          name: 'Emergency Expense',
+          desc: 'A one-time $15,000 emergency expense hitting Tier 1 Liquid Capital immediately.',
+          psr: psrEmergency, full: fullRunway(sim, 1.00), // simplistic full runway for now or compute it
+          needsT3: t3Cap > 0 && psrEmergency < frBase,
+          applicable: true,
+        },
+        {
+          name: 'Unexpected Tax Bill',
+          desc: 'A one-time $10,000 tax obligation hitting Tier 1 Liquid Capital immediately.',
+          psr: psrTaxBill, full: fullRunway(sim, 1.00),
+          needsT3: t3Cap > 0 && psrTaxBill < frBase,
+          applicable: true,
+        },
+        {
+          name: 'Business Launch Delay',
+          desc: 'A 3-month delay in reaching the revenue ramp target.',
+          psr: psrRampDelay, full: frRamp3,
+          needsT3: t3Cap > 0 && psrRampDelay < frRamp3,
+          applicable: true,
+        },
+        {
+          name: 'Healthcare Cost Increase',
+          desc: 'An unexpected $500/month increase in healthcare premiums or medical outflow.',
+          psr: psrHealthcareShock, full: fullRunway(sim, 1.00, undefined, () => 500),
+          needsT3: t3Cap > 0 && psrHealthcareShock < frBase,
+          applicable: true,
+        },
+        {
           name: 'Partner income loss (6 months)',
           desc: sim.isDualIncome && sim.partnerIncome > 0
             ? `Partner income of ${fmtM(sim.partnerIncome)}/month stops for 6 months, then resumes. Burn increases by that amount during the loss period.`
@@ -993,7 +1053,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       // ════════════════════════════════════════════════════════════════════
       doc.addPage(); hdr(doc, date); y = 42;
       y = secHead(doc, 9, 'Savings Tier Timeline',
-        'Under severe income contraction (−30%), this is the sequence in which savings would be drawn down.', y);
+        'Under severe income contraction (-30%), this is the sequence in which savings would be drawn down.', y);
 
       const stage1End = psr30; // T1+T2 exhausted
       const stage2End = fr30;  // All capital exhausted
@@ -1023,7 +1083,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
 
       // Visual timeline
       y += 8;
-      doc.fillColor(C.muted).fontSize(8).font('Helvetica-Bold').text('TIMELINE UNDER SEVERE CONTRACTION (−30%)', L, y); y += 12;
+      doc.fillColor(C.muted).fontSize(8).font('Helvetica-Bold').text('TIMELINE UNDER SEVERE CONTRACTION (-30%)', L, y); y += 12;
       const totalMonthsTimeline = Math.min(Math.max(stage2End < 999 ? stage2End : stage1End < 999 ? stage1End * 2 : 60, 24), 120);
       const stage1W = stage1End >= 999 ? W : Math.round((stage1End / totalMonthsTimeline) * W);
       const stage2W = !hasStage2 ? 0 : stage2End >= 999 ? W - stage1W : Math.round(((stage2End - stage1End) / totalMonthsTimeline) * W);
@@ -1078,7 +1138,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       // Context stats
       y = statRow(doc, [
         { label: 'Base Case, Tier 1 Runway', val: fmtRunway(psrBase) },
-        { label: 'Severe (−30%), Tier 1 Runway', val: fmtRunway(psr30) },
+        { label: 'Severe (-30%), Tier 1 Runway', val: fmtRunway(psr30) },
         { label: 'Difference', val: psr30 >= 999 || psrBase >= 999 ? 'N/A' : `${psrBase - psr30} months` },
       ], y);
 
@@ -1197,8 +1257,8 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
 
       const cols = [
         { label: 'Base', psr: psrBase, full: frBase, r3: t3Cap > 0 && psrBase < frBase, pm: pmBase },
-        { label: 'Mild (−15%)', psr: psr15, full: fr15, r3: t3Cap > 0 && psr15 < fr15, pm: pm15 },
-        { label: 'Severe (−30%)', psr: psr30, full: fr30, r3: t3Cap > 0 && psr30 < fr30, pm: pm30 },
+        { label: 'Mild (-15%)', psr: psr15, full: fr15, r3: t3Cap > 0 && psr15 < fr15, pm: pm15 },
+        { label: 'Severe (-30%)', psr: psr30, full: fr30, r3: t3Cap > 0 && psr30 < fr30, pm: pm30 },
         { label: 'Partner Loss', psr: psrPartnerLoss, full: frPartnerLoss, r3: t3Cap > 0 && psrPartnerLoss < frPartnerLoss, pm: pm30 },
         { label: 'New Child', psr: psrNewChild, full: 999, r3: t3Cap > 0, pm: pm30 },
       ];
@@ -1268,8 +1328,8 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
           body: pm30 >= 999
             ? `No pressure point was identified within the model range. Tier 1 Liquid Capital remains solvent across all modeled scenarios. If revenue reaches target and ramp timing holds, this position does not encounter a critical depletion threshold.`
             : t3Cap > 0 && psr30 < frBase
-            ? `Under severe revenue contraction (−30%), Tier 1 Liquid Capital would be exhausted in ${fmtRunway(psr30)}. At that point, the transition could only continue by accessing retirement accounts or home equity. Those assets extend the total theoretical runway to ${fmtRunway(fr30)}, but they represent emergency capital rather than primary transition funding.`
-            : `Under severe revenue contraction (−30%), Tier 1 Liquid Capital would be exhausted in ${fmtRunway(psr30)}. Pressure begins around ${fmtRunwayShort(pm30)}, when the depletion window narrows within 6 months of exhaustion.`,
+            ? `Under severe revenue contraction (-30%), Tier 1 Liquid Capital would be exhausted in ${fmtRunway(psr30)}. At that point, the transition could only continue by accessing retirement accounts or home equity. Those assets extend the total theoretical runway to ${fmtRunway(fr30)}, but they represent emergency capital rather than primary transition funding.`
+            : `Under severe revenue contraction (-30%), Tier 1 Liquid Capital would be exhausted in ${fmtRunway(psr30)}. Pressure begins around ${fmtRunwayShort(pm30)}, when the depletion window narrows within 6 months of exhaustion.`,
         },
         {
           num: 4, title: 'What Would Improve the Position',

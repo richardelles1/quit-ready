@@ -407,6 +407,15 @@ export default function Results() {
     ? `Shortening your ramp timeline or entering with a signed client commitment would reduce the capital gap significantly. each month of earlier revenue eliminates one month of full-burden drawdown.`
     : `Increasing stable revenue by ${fmt(1000)}/month would extend your Tier 1 Runway by approximately ${revDelta ? `${revDelta} months` : 'a meaningful amount'} under severe stress.`;
 
+  // Shock runways
+  const pasCap = sim.cash + Math.round(sim.brokerage * 0.80);
+  const psrEmergency = calcRunwayClient(pasCap - 15000, sim.tmib, sim.expectedRevenue, sim.rampDuration, sim.volatilityPercent);
+  const psrTaxBill = calcRunwayClient(pasCap - 10000, sim.tmib, sim.expectedRevenue, sim.rampDuration, sim.volatilityPercent);
+  const psrRampDelay3 = calcRunwayClient(pasCap, sim.tmib, sim.expectedRevenue, sim.rampDuration + 3, sim.volatilityPercent);
+  const psrHealthcare = calcRunwayClient(pasCap, sim.tmib + 500, sim.expectedRevenue, sim.rampDuration, sim.volatilityPercent);
+  const psrNewChild = calcRunwayClient(pasCap, sim.tmib + 1000, sim.expectedRevenue, sim.rampDuration, sim.volatilityPercent);
+  const psrPartnerLoss = sim.isDualIncome ? calcRunwayClient(pasCap, sim.tmib + partnerOff, sim.expectedRevenue, sim.rampDuration, sim.volatilityPercent) : null;
+
   return (
     <Layout>
       <div className="flex-1 bg-muted/20 py-12">
@@ -434,10 +443,10 @@ export default function Results() {
           </div>
 
           {/* ── 1. Executive Snapshot ─────────────────────────────────── */}
-          <SectionCard className="mb-6">
+          <SectionCard className="mb-8">
             <SectionHeader n={1}>Executive Snapshot: Your Financial Position Today</SectionHeader>
             {/* Top 3 income/outflow tiles */}
-            <div className="grid grid-cols-3 border-b border-border">
+            <div className="grid grid-cols-1 sm:grid-cols-3 border-b border-border">
               {[
                 {
                   label: 'Total Monthly Income',
@@ -459,7 +468,7 @@ export default function Results() {
                   sub: grossSurplus >= 0 ? 'Household income exceeds total outflow' : 'Total outflow exceeds household income',
                 },
               ].map((m, i) => (
-                <div key={m.label} className={`px-7 py-6 ${i < 2 ? 'border-r border-border' : ''}`} data-testid={m.testid}>
+                <div key={m.label} className={`px-7 py-6 border-b sm:border-b-0 ${i < 2 ? 'sm:border-r' : 'border-b-0'} border-border`} data-testid={m.testid}>
                   <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground/70 mb-2">{m.label}</p>
                   <p className={`text-2xl font-bold font-serif ${m.color ?? 'text-foreground'}`}>{m.val}</p>
                   {m.sub && <p className="text-xs text-muted-foreground/60 mt-1 leading-tight">{m.sub}</p>}
@@ -508,8 +517,8 @@ export default function Results() {
             </div>
 
             {/* Second row: 2 key metrics */}
-            <div className="grid grid-cols-2 border-t border-border">
-              <div className="px-7 py-5 border-r border-border" data-testid="metric-capital">
+            <div className="grid grid-cols-1 sm:grid-cols-2 border-t border-border">
+              <div className="px-7 py-5 border-b sm:border-b-0 sm:border-r border-border" data-testid="metric-capital">
                 <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground/70 mb-1.5">Tier 1 Liquid Capital</p>
                 <p className="text-xl font-bold font-serif text-foreground">{fmt(pas)}</p>
                 <p className="text-xs text-muted-foreground/60 mt-0.5">Cash + Brokerage (penalty-free)</p>
@@ -523,7 +532,7 @@ export default function Results() {
           </SectionCard>
 
           {/* ── 2. Structural Assessment ──────────────────────────────── */}
-          <SectionCard className="mb-6">
+          <SectionCard className="mb-8">
             <SectionHeader n={2}>Structural Assessment</SectionHeader>
             <div className="p-6">
               <div className="mb-6">
@@ -574,7 +583,7 @@ export default function Results() {
           </SectionCard>
 
           {/* ── 3. Monthly Outflow Breakdown ─────────────────────────── */}
-          <SectionCard className="mb-6">
+          <SectionCard className="mb-8">
             <SectionHeader n={3}
               sub="Gross outflow components before partner income offset. Percentages sum to exactly 100%.">
               Where Your Money Goes Each Month
@@ -621,7 +630,7 @@ export default function Results() {
           </SectionCard>
 
           {/* ── 4. Tier 1 Runway Scenarios ──────────────────── */}
-          <SectionCard className="mb-6">
+          <SectionCard className="mb-8">
             <SectionHeader n={4}
               sub="How long Tier 1 Liquid Capital (cash + brokerage) would last before running out, in each scenario. Revenue stress reduces income; outflow stays constant.">
               Stress Scenario Modeling
@@ -634,7 +643,7 @@ export default function Results() {
             </div>
             <div className="border-t border-border px-6 pb-4 pt-4">
               <div className="overflow-x-auto">
-                <table className="w-full text-sm" data-testid="table-scenarios">
+                <table className="w-full text-sm min-w-[500px]" data-testid="table-scenarios">
                   <thead>
                     <tr className="border-b border-border">
                       <th className="text-left py-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Scenario</th>
@@ -674,7 +683,7 @@ export default function Results() {
           </SectionCard>
 
           {/* ── 5. Revenue vs. Savings Curve ──────────────────────────── */}
-          <SectionCard className="mb-6">
+          <SectionCard className="mb-8">
             <SectionHeader n={5}
               sub="How Tier 1 Liquid Capital depletes over 36 months under base and severe scenarios.">
               Revenue vs. Savings Curve
@@ -699,7 +708,7 @@ export default function Results() {
           </SectionCard>
 
           {/* ── 6. Savings Tier Structure ─────────────────────────────── */}
-          <SectionCard className="mb-6">
+          <SectionCard className="mb-8">
             <SectionHeader n={6}
               sub="Your savings are layered by accessibility. Under stress, depletion follows this order. Tier 2 Contingent Capital is emergency capital. Not primary runway.">
               Savings Tier Structure
@@ -778,7 +787,7 @@ export default function Results() {
           </SectionCard>
 
           {/* ── 7. How to Widen the Runway ───────────────────────────── */}
-          <SectionCard className="mb-6">
+          <SectionCard className="mb-8">
             <SectionHeader n={7}
               sub="Four categories of structural options. Each affects Tier 1 Runway under stress. Sensitivity calculations only. No prescriptions.">
               How to Widen the Runway
@@ -894,35 +903,80 @@ export default function Results() {
             </div>
           </SectionCard>
 
-          {/* ── 8. Scenario Comparison Grid ──────────────────────────── */}
-          <SectionCard className="mb-6">
+          {/* ── 8. Household Shock Scenarios ───────────────────────── */}
+          <SectionCard className="mb-8">
             <SectionHeader n={8}
+              sub="Single-event household shocks and their immediate impact on Tier 1 Runway. These are independent of revenue performance.">
+              Household Shock Scenarios
+            </SectionHeader>
+            <div className="px-6 py-5">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                {[
+                  { name: 'Emergency Expense', desc: '$15,000 one-time capital hit', psr: psrEmergency },
+                  { name: 'Unexpected Tax Bill', desc: '$10,000 one-time capital hit', psr: psrTaxBill },
+                  { name: 'Healthcare Cost Increase', desc: '+$500/month recurring cost', psr: psrHealthcare },
+                  { name: 'Business Launch Delay', desc: '+3 months to revenue ramp', psr: psrRampDelay3 },
+                  { name: 'New Child in Household', desc: '+$1,000/month recurring cost', psr: psrNewChild },
+                  ...(psrPartnerLoss !== null ? [{ name: 'Partner Income Loss', desc: 'Loss of all partner income', psr: psrPartnerLoss }] : []),
+                ].map(shock => (
+                  <div key={shock.name} className="p-4 rounded-lg border border-border bg-muted/5 flex flex-col h-full">
+                    <p className="text-sm font-bold text-foreground mb-1">{shock.name}</p>
+                    <p className="text-xs text-muted-foreground mb-3 flex-1">{shock.desc}</p>
+                    <div className="pt-3 border-t border-border mt-auto">
+                      <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-1">New Tier 1 Runway</p>
+                      <p className="text-sm font-bold text-foreground">{fmtRunway(shock.psr)}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </SectionCard>
+
+          {/* ── 9. Scenario Comparison ───────────────────────────── */}
+          <SectionCard className="mb-8">
+            <SectionHeader n={9}
               sub="All scenarios side by side. Tier 1 Runway = when cash + brokerage runs out. Full Capital Depth uses all accessible savings including restricted assets.">
               Scenario Comparison
             </SectionHeader>
             <div className="px-6 py-4 overflow-x-auto">
-              <table className="w-full text-xs">
+              <table className="w-full text-xs min-w-[600px]">
                 <thead>
                   <tr className="border-b border-border">
                     <th className="text-left py-2 font-semibold uppercase tracking-wider text-muted-foreground pr-3">Metric</th>
-                    {['Base Case', 'Moderate (15%)', 'Severe (30%)', '+3mo Ramp'].map(c => (
+                    {['Base', 'Moderate (15%)', 'Severe (30%)', '+3mo Ramp', ...(sim.isDualIncome ? ['Partner Loss'] : []), 'New Child'].map(c => (
                       <th key={c} className="text-center py-2 font-semibold uppercase tracking-wider text-muted-foreground px-2">{c}</th>
                     ))}
                   </tr>
                 </thead>
                 <tbody>
                   {[
-                    { label: 'Tier 1 Runway', vals: [fmtRunway(psrBase), fmtRunway(psr15), fmtRunway(psr30), fmtRunway(psrRampDelay)] },
-                    { label: 'Full Capital Depth', vals: [fmtRunway(sim.baseRunway), fmtRunway(sim.runway15Down), fmtRunway(sim.runway30Down), fmtRunway(sim.runwayRampDelay)] },
-                    { label: 'Tier 2 Required?', vals: [psrBase, psr15, psr30, psrRampDelay].map((p, i) => {
-                      const full = [sim.baseRunway, sim.runway15Down, sim.runway30Down, sim.runwayRampDelay][i];
-                      return t3Total > 0 && p < full ? 'Yes' : 'No';
-                    }) },
+                    { 
+                      label: 'Tier 1 Runway', 
+                      vals: [
+                        fmtRunway(psrBase), 
+                        fmtRunway(psr15), 
+                        fmtRunway(psr30), 
+                        fmtRunway(psrRampDelay),
+                        ...(psrPartnerLoss !== null ? [fmtRunway(psrPartnerLoss)] : []),
+                        fmtRunway(psrNewChild)
+                      ] 
+                    },
+                    { 
+                      label: 'Full Capital Depth', 
+                      vals: [
+                        fmtRunway(sim.baseRunway), 
+                        fmtRunway(sim.runway15Down), 
+                        fmtRunway(sim.runway30Down), 
+                        fmtRunway(sim.runwayRampDelay),
+                        ...(sim.isDualIncome ? [fmtRunway(calcRunwayClient(sim.accessibleCapital, sim.tmib + partnerOff, sim.expectedRevenue, sim.rampDuration, sim.volatilityPercent))] : []),
+                        fmtRunway(calcRunwayClient(sim.accessibleCapital, sim.tmib + 1000, sim.expectedRevenue, sim.rampDuration, sim.volatilityPercent))
+                      ] 
+                    },
                   ].map((row, ri) => (
                     <tr key={row.label} className={`border-b border-border last:border-0 ${ri % 2 === 0 ? '' : 'bg-muted/10'}`}>
                       <td className="py-3 text-muted-foreground font-medium pr-3">{row.label}</td>
                       {row.vals.map((val, ci) => (
-                        <td key={ci} className={`py-3 text-center font-semibold ${val === 'Yes' ? 'text-red-700' : val === 'No' ? 'text-green-700' : 'text-foreground'}`}>
+                        <td key={ci} className="py-3 text-center font-semibold text-foreground">
                           {val}
                         </td>
                       ))}
@@ -933,9 +987,9 @@ export default function Results() {
             </div>
           </SectionCard>
 
-          {/* ── 9. Decision Interpretation ───────────────────────────── */}
-          <SectionCard className="mb-6">
-            <SectionHeader n={9}>Decision Interpretation</SectionHeader>
+          {/* ── 10. Decision Interpretation ───────────────────────────── */}
+          <SectionCard className="mb-8">
+            <SectionHeader n={10}>Decision Interpretation</SectionHeader>
             <div className="px-7 py-6 space-y-6">
 
               {/* Classification badge */}
