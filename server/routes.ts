@@ -579,7 +579,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
 
       // Outflow bar
       doc.fillColor(C.muted).fontSize(7).font('Helvetica-Bold').text('MONTHLY OUTFLOW', L, y + 5);
-      doc.rect(L + 80, y, outflowW, chartH_1).fill(C.red);
+      doc.rect(L + 80, y, outflowW, chartH_1).fill('#8B3A3A');
       doc.fillColor(C.coal).fontSize(8).font('Helvetica-Bold').text(fmtM(grossOutflowPDF), L + 85 + outflowW, y + 5);
       y += chartH_1 + 16;
       doc.rect(L, y, W, 1).fill(C.border); y += 16;
@@ -594,14 +594,31 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       doc.fillColor(C.navy).fontSize(13).font('Times-Bold').text(scoreLabel, L, y + 10);
       y += 32;
 
-      // Identity line
-      const identityLine = `${marginLabel}. Based on your current income and monthly outflow structure.`;
-      const marginBg = score >= 70 ? '#f0fdf4' : score >= 50 ? '#fffbeb' : '#fef2f2';
-      const marginBorder = score >= 70 ? C.green : score >= 50 ? C.amber : C.red;
-      doc.rect(L, y, W, 36).fill(marginBg);
-      doc.rect(L, y, 3, 36).fill(marginBorder);
-      doc.fillColor(C.coal).fontSize(10).font('Times-Roman').text(identityLine, L + 12, y + 12, { width: W - 24 });
-      y += 46;
+      // Score bracket bar — 4 cells spanning full W, active cell highlighted navy
+      {
+        const bands = [
+          { range: '0 – 49',  label: 'Structurally Fragile',   min: 0,  max: 49 },
+          { range: '50 – 69', label: 'Moderately Exposed',     min: 50, max: 69 },
+          { range: '70 – 85', label: 'Structurally Stable',    min: 70, max: 85 },
+          { range: '86 – 100',label: 'Strong Buffer Position',  min: 86, max: 100 },
+        ];
+        const cellW = Math.floor(W / 4);
+        const bracketH = 46;
+        doc.rect(L, y, W, bracketH).fill(C.light);
+        bands.forEach((band, bi) => {
+          const cx = L + bi * cellW;
+          const cw = bi === 3 ? W - 3 * cellW : cellW;
+          const isActive = score >= band.min && score <= band.max;
+          doc.rect(cx, y, cw, bracketH).fill(isActive ? C.navy : C.light);
+          if (bi > 0) doc.rect(cx, y, 1, bracketH).fill(C.border);
+          const txtColor = isActive ? C.white : C.muted;
+          doc.fillColor(txtColor).fontSize(7).font('Helvetica-Bold')
+            .text(band.range, cx + 4, y + 10, { width: cw - 8, align: 'center' });
+          doc.fillColor(isActive ? C.white : C.coal).fontSize(8).font(isActive ? 'Helvetica-Bold' : 'Helvetica')
+            .text(band.label, cx + 4, y + 24, { width: cw - 8, align: 'center' });
+        });
+        y += bracketH + 10;
+      }
 
       // Mini scenario snapshot
       doc.rect(L, y, W, 26).fill(C.navy);
@@ -754,7 +771,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
 
       // Net total
       doc.rect(L, y, W, 32).fill(C.navy);
-      doc.fillColor('#94a3b8').fontSize(7.5).font('Helvetica').text('NET MONTHLY OUTFLOW', L + 10, y + 8);
+      doc.fillColor(C.white).fontSize(9).font('Helvetica-Bold').text('NET MONTHLY OUTFLOW', L + 10, y + 11);
       doc.fillColor(C.white).fontSize(16).font('Times-Bold').text(fmtM(sim.tmib), L, y + 8, { width: W - 10, align: 'right' });
       y += 44;
 
@@ -894,32 +911,38 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       });
 
       // Totals
-      doc.rect(L, y, W, 28).fill('#f0f9ff');
-      doc.fillColor(C.blue).fontSize(9).font('Helvetica-Bold').text('Tier 1 Liquid Capital (Cash + Brokerage)', L + 8, y + 9);
-      doc.fillColor(C.blue).fontSize(12).font('Times-Bold').text(fmtM(pasCap), L, y + 9, { width: W - 10, align: 'right' });
+      doc.rect(L, y, W, 28).fill(C.navy);
+      doc.fillColor(C.white).fontSize(9).font('Helvetica-Bold').text('Tier 1 Liquid Capital (Cash + Brokerage)', L + 8, y + 9);
+      doc.fillColor(C.white).fontSize(12).font('Times-Bold').text(fmtM(pasCap), L, y + 9, { width: W - 10, align: 'right' });
       y += 28;
       doc.rect(L, y, W, 28).fill(C.navy);
       doc.fillColor('#94a3b8').fontSize(8).font('Helvetica').text('Full Capital Depth (All Tiers)', L + 8, y + 9);
       doc.fillColor(C.white).fontSize(13).font('Times-Bold').text(fmtM(sim.accessibleCapital), L, y + 9, { width: W - 10, align: 'right' });
       y += 36;
 
-      // Runway + pressure point
-      y += 6;
-      doc.rect(L, y, W, 1).fill(C.border); y += 12;
-      doc.fillColor(C.muted).fontSize(8).font('Helvetica-Bold').text('TIER 1 RUNWAY, BASE CASE', L, y); y += 12;
-      doc.fillColor(C.navy).fontSize(22).font('Times-Bold').text(fmtRunway(psrBase), L, y); y += 32;
-      if (psrBase >= 999) {
-        doc.fillColor(C.muted).fontSize(8.5).font('Helvetica-Oblique')
-          .text('Because revenue reaches the modeled target, savings stabilize early in the transition. Capital is not the limiting factor in this scenario.', L, y, { width: W, lineGap: 1.5 });
-        y += 38;
-      }
-      if (pm30 < 999) {
-        doc.fillColor(C.muted).fontSize(9).font('Helvetica')
-          .text(`Under severe contraction (-30%), Tier 1 Liquid Capital would be exhausted in ${fmtRunway(psr30)}. Financial pressure begins around month ${Math.round(pm30)} (${fmtRunwayShort(pm30)}).`, L, y, { width: W, lineGap: 1.5 });
-        y += 28;
-        doc.fillColor(C.muted).fontSize(7.5).font('Helvetica-Oblique')
-          .text('Pressure indicates the point where Tier 1 liquid capital falls below the modeled burn requirement and contingency capital may begin to be accessed.', L, y, { width: W, lineGap: 1 });
-        y += 22;
+      // Runway + pressure point — wrapped in blue full-width card
+      y += 10;
+      {
+        const hasPressure = pm30 < 999;
+        const hasSustain = psrBase >= 999;
+        const cardH = hasSustain ? 70 : hasPressure ? 120 : 58;
+        doc.rect(L, y, W, cardH).fill('#f0f9ff');
+        doc.rect(L, y, 3, cardH).fill(C.navy);
+        doc.fillColor(C.muted).fontSize(8).font('Helvetica-Bold')
+          .text('TIER 1 RUNWAY, BASE CASE', L + 12, y + 12);
+        doc.fillColor(C.navy).fontSize(22).font('Times-Bold')
+          .text(fmtRunway(psrBase), L + 12, y + 24);
+        if (hasSustain) {
+          doc.fillColor(C.muted).fontSize(8.5).font('Helvetica-Oblique')
+            .text('Revenue reaches the modeled target. Savings stabilize early. Capital is not the limiting factor.', L + 12, y + 52, { width: W - 28, lineGap: 1 });
+        }
+        if (hasPressure) {
+          doc.fillColor(C.muted).fontSize(8.5).font('Helvetica')
+            .text(`Under severe contraction (-30%), Tier 1 capital exhausted in ${fmtRunway(psr30)}. Pressure begins around month ${Math.round(pm30)} (${fmtRunwayShort(pm30)}).`, L + 12, y + 56, { width: W - 28, lineGap: 1.5 });
+          doc.fillColor(C.muted).fontSize(7).font('Helvetica-Oblique')
+            .text('Pressure is the point where Tier 1 capital falls below the modeled burn requirement and contingency capital may begin to be accessed.', L + 12, y + 86, { width: W - 28, lineGap: 1 });
+        }
+        y += cardH + 10;
       }
 
       ftr(doc, 5);
@@ -968,18 +991,18 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       scenarios.forEach((sc, i) => {
         const bg = i === 2 ? '#fef2f2' : i === 1 ? '#fffbeb' : '#f0fdf4';
         const bc = i === 2 ? C.red : i === 1 ? C.amber : C.green;
-        const h = 115;
+        const h = 132;
         doc.rect(L, y, W, h).fill(bg);
         doc.rect(L, y, 3, h).fill(bc);
-        doc.fillColor(C.muted).fontSize(7.5).font('Helvetica-Bold').text(sc.tag.toUpperCase(), L + 12, y + 8);
-        doc.fillColor(C.coal).fontSize(10).font('Helvetica-Bold').text(sc.name, L + 12, y + 20, { width: W - 24 });
-        doc.fillColor(C.muted).fontSize(8).font('Helvetica').text('Tier 1 Runway', L + 12, y + 38);
-        doc.fillColor(bc).fontSize(13).font('Times-Bold').text(fmtRunway(sc.psr), L + 12, y + 48);
-        doc.fillColor(C.muted).fontSize(8).font('Helvetica').text('Full Capital Depth', L + 200, y + 38);
-        doc.fillColor(C.coal).fontSize(13).font('Times-Bold').text(fmtRunway(sc.full), L + 200, y + 48);
-        doc.fillColor(C.muted).fontSize(8).font('Helvetica').text('Tier 2 Required?', L + 370, y + 38);
-        doc.fillColor(sc.needsT3 ? C.red : C.green).fontSize(13).font('Times-Bold').text(sc.needsT3 ? 'Yes' : 'No', L + 370, y + 48);
-        doc.fillColor(C.coal).fontSize(8.5).font('Helvetica').text(sc.interp, L + 12, y + 70, { width: W - 24, lineGap: 1.5 });
+        doc.fillColor(C.muted).fontSize(7.5).font('Helvetica-Bold').text(sc.tag.toUpperCase(), L + 12, y + 10);
+        doc.fillColor(C.coal).fontSize(10).font('Helvetica-Bold').text(sc.name, L + 12, y + 22, { width: W - 24 });
+        doc.fillColor(C.muted).fontSize(8).font('Helvetica').text('Tier 1 Runway', L + 12, y + 44);
+        doc.fillColor(bc).fontSize(13).font('Times-Bold').text(fmtRunway(sc.psr), L + 12, y + 55);
+        doc.fillColor(C.muted).fontSize(8).font('Helvetica').text('Full Capital Depth', L + 200, y + 44);
+        doc.fillColor(C.coal).fontSize(13).font('Times-Bold').text(fmtRunway(sc.full), L + 200, y + 55);
+        doc.fillColor(C.muted).fontSize(8).font('Helvetica').text('Tier 2 Required?', L + 368, y + 44, { width: 132, align: 'center' });
+        doc.fillColor(sc.needsT3 ? C.red : C.green).fontSize(13).font('Times-Bold').text(sc.needsT3 ? 'Yes' : 'No', L + 368, y + 55, { width: 132, align: 'center' });
+        doc.fillColor(C.coal).fontSize(8.5).font('Helvetica').text(sc.interp, L + 12, y + 84, { width: W - 24, lineGap: 1.5 });
         y += h + 6;
       });
       y += 4;
@@ -1059,15 +1082,15 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       const leftW = Math.round(W * 0.58);   // name + desc zone
       const rightX = L + Math.round(W * 0.62); // runway data zone start
       const rightW = Math.round(W * 0.33);  // runway data zone width
-      const badgeW = 30;
+      const badgeW = 46;
       shockList.forEach((sh, i) => {
         doc.rect(L, y, W, shockCardH).fill(i % 2 === 0 ? C.light : C.mid);
         doc.rect(L, y, 3, shockCardH).fill(C.navy);
         // Badge — top-right corner
         const badgeBg = sh.needsT3 ? '#fef2f2' : '#f0fdf4';
         doc.rect(L + W - badgeW - 8, y + 8, badgeW, 13).fill(badgeBg);
-        doc.fillColor(sh.needsT3 ? C.red : C.green).fontSize(6.5).font('Helvetica-Bold')
-          .text(sh.needsT3 ? 'T2 Req' : 'T1 OK', L + W - badgeW - 8, y + 11, { width: badgeW, align: 'center' });
+        doc.fillColor(sh.needsT3 ? C.red : C.green).fontSize(6).font('Helvetica-Bold')
+          .text(sh.needsT3 ? 'Tier 2 Req' : 'Tier 1 OK', L + W - badgeW - 8, y + 11, { width: badgeW, align: 'center' });
         // Left zone: name + desc
         doc.fillColor(C.navy).fontSize(9).font('Helvetica-Bold')
           .text(sh.name, L + 10, y + 9, { width: leftW - badgeW - 18 });
@@ -1229,14 +1252,16 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
           { lead: 'The gap between lines:', body: ' Reflects the cost of revenue timing risk — not the size of savings.' },
           { lead: 'Key watch point:', body: psr30 < 999 ? ` If the lower line hits $0 before month 24, the transition requires structural strengthening. (Current: month ${Math.round(psr30)}.)` : ' Lower line stays positive through the modeled range — revenue timing risk is well-contained.' },
         ];
-        const blockH = 110;
+        const blockH = 136;
         doc.rect(L, y, W, blockH).fill(C.light);
         doc.rect(L, y, 3, blockH).fill(C.navy);
         doc.fillColor(C.muted).fontSize(7).font('Helvetica-Bold').text('READING THIS CHART', L + 10, y + 8);
         blockBullets.forEach((bl, bi) => {
-          const by = y + 22 + bi * 21;
-          doc.fillColor(C.navy).fontSize(8.5).font('Helvetica-Bold').text(`\u2022  ${bl.lead}`, L + 10, by, { continued: true });
-          doc.fillColor(C.coal).font('Helvetica').text(bl.body, { width: W - 24 });
+          const by = y + 22 + bi * 28;
+          doc.fillColor(C.navy).fontSize(8.5).font('Helvetica-Bold')
+            .text(`\u2022  ${bl.lead}`, L + 10, by, { width: W - 24 });
+          doc.fillColor(C.coal).fontSize(8).font('Helvetica')
+            .text(bl.body.trim(), L + 18, by + 12, { width: W - 32 });
         });
         y += blockH + 8;
       }
