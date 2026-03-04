@@ -1390,6 +1390,15 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
         },
       ];
 
+      // Section header above advisory cards
+      y += 8;
+      doc.rect(L, y, W, 1).fill(C.border); y += 12;
+      doc.fillColor(C.muted).fontSize(7).font('Helvetica-Bold').text('STRUCTURAL LAUNCH FACTORS', L, y); y += 9;
+      doc.fillColor(C.navy).fontSize(13).font('Times-Bold').text('Common Factors in Transition Outcomes', L, y); y += 20;
+      doc.fillColor(C.muted).fontSize(8.5).font('Helvetica')
+        .text('The following patterns appear consistently across successful and unsuccessful financial transitions. Each area represents a structural lever, not a behavioral suggestion.', L, y, { width: W, lineGap: 1 });
+      y += 28;
+
       // Ensure enough room for 2×2 grid; add page if needed
       const advCardH = 82;
       const advCardW = Math.floor((W - 8) / 2);
@@ -1424,44 +1433,45 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       y = secHead(doc, 12, 'Scenario Comparison',
         'All scenarios side by side for quick reference. Tier 1 Runway is the T1+T2 exhaustion point. Full Capital Depth uses all accessible savings.', y);
 
-      const cols = [
-        { label: 'Base', psr: psrBase, full: frBase, r3: t3Cap > 0 && psrBase < frBase, pm: pmBase },
-        { label: 'Moderate Contraction (-15%)', psr: psr15, full: fr15, r3: t3Cap > 0 && psr15 < fr15, pm: pm15 },
-        { label: 'Severe Contraction (-30%)', psr: psr30, full: fr30, r3: t3Cap > 0 && psr30 < fr30, pm: pm30 },
-        { label: 'Partner Loss', psr: psrPartnerLoss, full: frPartnerLoss, r3: t3Cap > 0 && psrPartnerLoss < frPartnerLoss, pm: pm30 },
-        { label: 'New Child', psr: psrNewChild, full: 999, r3: t3Cap > 0, pm: pm30 },
-      ];
-      const colW = Math.floor(W / cols.length);
+      // Flipped axes: scenarios = rows, metrics = columns
+      // Column x positions and widths
+      const scLabelX = L + 8,   scLabelW = 128;
+      const m1X = L + 148,      m1W = 90;   // Tier 1 Runway
+      const m2X = L + 238,      m2W = 90;   // Full Capital Depth
+      const m3X = L + 328,      m3W = 74;   // Tier 2 Req?
+      const m4X = L + 402,      m4W = 98;   // Pressure Begins
 
       // Header row
-      doc.rect(L, y, W, 26).fill(C.navy);
-      doc.fillColor(C.white).fontSize(7.5).font('Helvetica-Bold').text('Metric', L + 8, y + 8);
-      cols.forEach((col, i) => {
-        doc.fillColor(C.white).fontSize(7.5).font('Helvetica-Bold').text(col.label, L + 100 + i * 80, y + 8, { width: 78, align: 'center' });
-      });
-      y += 26;
+      doc.rect(L, y, W, 28).fill(C.navy);
+      doc.fillColor(C.white).fontSize(7.5).font('Helvetica-Bold').text('Scenario', scLabelX, y + 10, { width: scLabelW });
+      doc.fillColor(C.white).fontSize(7.5).font('Helvetica-Bold').text('Tier 1 Runway', m1X, y + 10, { width: m1W, align: 'center' });
+      doc.fillColor(C.white).fontSize(7.5).font('Helvetica-Bold').text('Full Capital Depth', m2X, y + 10, { width: m2W, align: 'center' });
+      doc.fillColor(C.white).fontSize(7.5).font('Helvetica-Bold').text('Tier 2 Req?', m3X, y + 10, { width: m3W, align: 'center' });
+      doc.fillColor(C.white).fontSize(7.5).font('Helvetica-Bold').text('Pressure Begins', m4X, y + 10, { width: m4W, align: 'center' });
+      y += 28;
 
-      const gridRows = [
-        { label: 'Tier 1 Runway', vals: cols.map(c => fmtRunway(c.psr)) },
-        { label: 'Full Capital Depth', vals: cols.map(c => fmtRunway(c.full)) },
-        { label: 'Tier 2 Required?', vals: cols.map(c => c.r3 ? 'Yes' : 'No'), colors: cols.map(c => c.r3 ? C.red : C.green) },
-        { label: 'Pressure begins', vals: cols.map(c => c.pm >= 999 ? 'None' : fmtRunway(c.pm)) },
+      const scenarioRows = [
+        { label: 'Base Case',                  psr: psrBase,        full: frBase,        r3: t3Cap > 0 && psrBase < frBase,        pm: pmBase },
+        { label: 'Moderate Contraction (-15%)', psr: psr15,          full: fr15,          r3: t3Cap > 0 && psr15 < fr15,          pm: pm15 },
+        { label: 'Severe Contraction (-30%)',   psr: psr30,          full: fr30,          r3: t3Cap > 0 && psr30 < fr30,          pm: pm30 },
+        { label: 'Partner Income Loss',         psr: psrPartnerLoss, full: frPartnerLoss, r3: t3Cap > 0 && psrPartnerLoss < frPartnerLoss, pm: pm30 },
+        { label: 'New Child Scenario',          psr: psrNewChild,    full: 999,           r3: t3Cap > 0,                          pm: pm30 },
       ];
 
-      gridRows.forEach((row, ri) => {
-        const rowH = 28;
+      scenarioRows.forEach((sc, ri) => {
+        const rowH = 36;
         doc.rect(L, y, W, rowH).fill(ri % 2 === 0 ? C.light : C.mid);
-        doc.fillColor(C.muted).fontSize(8.5).font('Helvetica-Bold').text(row.label, L + 8, y + 9, { width: 90 });
-        row.vals.forEach((val, ci) => {
-          const color = row.colors ? row.colors[ci] : C.navy;
-          doc.fillColor(color).fontSize(8.5).font('Helvetica-Bold').text(val, L + 100 + ci * 80, y + 9, { width: 78, align: 'center' });
-        });
+        doc.fillColor(C.coal).fontSize(9).font('Helvetica-Bold').text(sc.label, scLabelX, y + 12, { width: scLabelW });
+        doc.fillColor(C.navy).fontSize(9).font('Helvetica-Bold').text(fmtRunwayShort(sc.psr), m1X, y + 12, { width: m1W, align: 'center' });
+        doc.fillColor(C.coal).fontSize(9).font('Helvetica').text(fmtRunwayShort(sc.full), m2X, y + 12, { width: m2W, align: 'center' });
+        doc.fillColor(sc.r3 ? C.red : C.green).fontSize(9).font('Helvetica-Bold').text(sc.r3 ? 'Yes' : 'No', m3X, y + 12, { width: m3W, align: 'center' });
+        doc.fillColor(C.muted).fontSize(9).font('Helvetica').text(sc.pm >= 999 ? '—' : fmtRunwayShort(sc.pm), m4X, y + 12, { width: m4W, align: 'center' });
         y += rowH;
       });
-      y += 16;
+      y += 14;
 
       y = insight(doc, 'Reading This Grid',
-        `Each column represents a distinct revenue or household scenario. "Base Case" reflects expected conditions: sustainable under current assumptions, but if no revenue recovery occurs it will eventually rely on Tier 2 capital. Tier 1 Runway is when your Tier 1 Liquid Capital (cash + brokerage) runs out. Full Capital Depth extends beyond that if Tier 2 Contingent Capital is drawn. Pressure begins is the point where Tier 1 liquid capital falls below the modeled burn requirement and contingency capital may begin to be accessed.`, y);
+        `Each row represents a distinct revenue or household scenario. Tier 1 Runway is when your penalty-free capital (cash and brokerage) runs out. Full Capital Depth extends beyond that if Tier 2 Contingent Capital is drawn. Tier 2 Required indicates whether the position must access retirement accounts or home equity to sustain the transition. Pressure Begins marks the point where Tier 1 capital drops within 6 months of exhaustion and each remaining month requires deliberate action.`, y);
 
       ftr(doc, 12);
 
@@ -1592,7 +1602,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
         },
         {
           term: 'Tier 3 Structural Capital',
-          def: 'Highly illiquid assets not included in the primary runway model. Examples include private business equity, real estate partnerships, or deferred compensation requiring significant time or cost to access. These assets are intentionally excluded from runway calculations because they cannot reliably fund short-term transitions.',
+          def: 'Private equity, real estate partnerships, and deferred compensation. These assets are highly illiquid and excluded from runway modeling. They cannot reliably fund short-term transitions.',
         },
         {
           term: 'Tier 1 Runway',
