@@ -542,6 +542,26 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
         { label: 'Monthly Surplus / Deficit', val: (grossSurplus >= 0 ? '+' : '') + fmtM(grossSurplus), color: grossSurplus >= 0 ? C.green : C.red },
       ], y);
 
+      // --- Income vs Outflow mini bar chart (T001) ---
+      doc.rect(L, y, W, 1).fill(C.border); y += 16;
+      const chartH_1 = 18;
+      const chartMax = Math.max(totalIncome, grossOutflowPDF, 1);
+      const incomeW = Math.round((totalIncome / chartMax) * 400);
+      const outflowW = Math.round((grossOutflowPDF / chartMax) * 400);
+
+      // Income bar
+      doc.fillColor(C.muted).fontSize(7).font('Helvetica-Bold').text('MONTHLY INCOME', L, y + 5);
+      doc.rect(L + 80, y, incomeW, chartH_1).fill(C.green);
+      doc.fillColor(C.coal).fontSize(8).font('Helvetica-Bold').text(fmtM(totalIncome), L + 85 + incomeW, y + 5);
+      y += chartH_1 + 8;
+
+      // Outflow bar
+      doc.fillColor(C.muted).fontSize(7).font('Helvetica-Bold').text('MONTHLY OUTFLOW', L, y + 5);
+      doc.rect(L + 80, y, outflowW, chartH_1).fill(C.red);
+      doc.fillColor(C.coal).fontSize(8).font('Helvetica-Bold').text(fmtM(grossOutflowPDF), L + 85 + outflowW, y + 5);
+      y += chartH_1 + 16;
+      doc.rect(L, y, W, 1).fill(C.border); y += 16;
+
       y = statRow(doc, [
         { label: 'Tier 1 Liquid Capital (Cash + Brokerage)', val: fmtM(pasCap) },
         { label: 'Tier 1 Runway, Base Case', val: fmtRunway(psrBase) },
@@ -569,8 +589,8 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       y += 22;
       [
         { label: 'Expected conditions', psr: psrBase, full: frBase, r3: t3Cap > 0 && psrBase < frBase },
-        { label: 'Moderate contraction (-15%)', psr: psr15, full: fr15, r3: t3Cap > 0 && psr15 < fr15 },
-        { label: 'Severe contraction (-30%)', psr: psr30, full: fr30, r3: t3Cap > 0 && psr30 < fr30 },
+        { label: 'Moderate income contraction (-15%)', psr: psr15, full: fr15, r3: t3Cap > 0 && psr15 < fr15 },
+        { label: 'Severe income contraction (-30%)', psr: psr30, full: fr30, r3: t3Cap > 0 && psr30 < fr30 },
       ].forEach((sc, i) => {
         doc.rect(L, y, W, 24).fill(i % 2 === 0 ? C.light : C.mid);
         doc.fillColor(C.coal).fontSize(9).font('Helvetica').text(sc.label, L + 8, y + 7, { width: 165 });
@@ -593,7 +613,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       y = insight(doc, 'What This Classification Means', scoreInterpretation, y);
 
       // Tier 1 vs Full Capital Depth explanation
-      const tier1Explanation = `Tier 1 Runway is the true comfort window. It reflects how long your penalty-free capital (cash and brokerage) can sustain the net gap between outflow and revenue. Full Capital Depth extends the runway further only if Tier 2 Contingent Capital (retirement accounts, home equity) is drawn. Tier 2 access carries tax obligations and permanent compounding loss. Tier 1 Runway is the number that matters most.`;
+      const tier1Explanation = `Tier 1 Runway is the true comfort window. It reflects how long your penalty-free capital (cash and brokerage) can sustain the net gap between outflow and revenue. Full Capital Depth extends the runway further only if Tier 2 Contingent Capital (retirement accounts, home equity) is drawn. Tier 2 access carries tax obligations and permanent compounding loss. Tier 3 Structural Capital (private business equity, real estate partnerships) is intentionally excluded from runway modeling. Tier 1 Runway is the number that matters most.`;
       y = insight(doc, 'Tier 1 Runway vs. Full Capital Depth', tier1Explanation, y);
 
       ftr(doc, 1);
@@ -684,7 +704,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
         'Day-to-day household expenses, not including loan payments or healthcare',
         'Contractual minimum payments. Cannot be skipped without credit damage or default',
         'Post-transition premium cost change versus current employer coverage',
-        'Reserve against self-employment tax obligations (28% of projected revenue)',
+        'Reserve against self-employment tax obligations (' + (sim.taxReservePercent ?? 25) + '% of projected revenue)',
         'Recurring business operating expenses needed to generate revenue',
       ];
 
@@ -1027,20 +1047,44 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
         },
       ];
 
-      shockRows.forEach((sh, i) => {
-        if (!sh.applicable) return;
-        const h = 90;
-        const bg = i % 2 === 0 ? C.light : C.mid;
-        doc.rect(L, y, W, h).fill(bg);
-        doc.fillColor(C.coal).fontSize(10).font('Helvetica-Bold').text(sh.name, L + 10, y + 8, { width: W - 20 });
-        doc.fillColor(C.muted).fontSize(8.5).font('Helvetica').text(sh.desc, L + 10, y + 24, { width: 260, lineGap: 1 });
-        doc.fillColor(C.muted).fontSize(7.5).font('Helvetica').text('Tier 1 Runway', L + 285, y + 14);
-        doc.fillColor(C.navy).fontSize(13).font('Times-Bold').text(fmtRunway(sh.psr), L + 285, y + 26);
-        doc.fillColor(C.muted).fontSize(7.5).font('Helvetica').text('Tier 2 Required?', L + 285, y + 50);
-        doc.fillColor(sh.needsT3 ? C.red : C.green).fontSize(11).font('Helvetica-Bold')
-          .text(sh.needsT3 ? 'Yes' : 'No', L + 285, y + 62);
-        y += h + 6;
-      });
+      // --- Adaptive shock layout (T001) ---
+      const applicableShocks = shockRows.filter(s => s.applicable);
+      const rowSpacing = 16;
+      const cardH = 90;
+      const cardW = (W / 2) - 4;
+
+      for (let i = 0; i < applicableShocks.length; i += 2) {
+        const sh1 = applicableShocks[i];
+        const sh2 = applicableShocks[i + 1];
+
+        // Render card 1
+        doc.rect(L, y, cardW, cardH).fill(i % 4 < 2 ? C.light : C.mid);
+        doc.fillColor(C.coal).fontSize(9).font('Helvetica-Bold').text(sh1.name, L + 8, y + 8, { width: cardW - 16 });
+        doc.fillColor(C.muted).fontSize(7.5).font('Helvetica').text(sh1.desc, L + 8, y + 22, { width: cardW - 16, lineGap: 1 });
+        
+        doc.fillColor(C.muted).fontSize(7).font('Helvetica').text('Tier 1 Runway', L + 8, y + 58);
+        doc.fillColor(C.navy).fontSize(10).font('Helvetica-Bold').text(fmtRunwayShort(sh1.psr), L + 8, y + 68);
+        
+        doc.fillColor(C.muted).fontSize(7).font('Helvetica').text('Tier 2 Required?', L + cardW - 65, y + 58);
+        doc.fillColor(sh1.needsT3 ? C.red : C.green).fontSize(9).font('Helvetica-Bold')
+          .text(sh1.needsT3 ? 'Yes' : 'No', L + cardW - 65, y + 68);
+
+        // Render card 2 if exists
+        if (sh2) {
+          doc.rect(L + cardW + 8, y, cardW, cardH).fill(i % 4 < 2 ? C.light : C.mid);
+          doc.fillColor(C.coal).fontSize(9).font('Helvetica-Bold').text(sh2.name, L + cardW + 16, y + 8, { width: cardW - 16 });
+          doc.fillColor(C.muted).fontSize(7.5).font('Helvetica').text(sh2.desc, L + cardW + 16, y + 22, { width: cardW - 16, lineGap: 1 });
+          
+          doc.fillColor(C.muted).fontSize(7).font('Helvetica').text('Tier 1 Runway', L + cardW + 16, y + 58);
+          doc.fillColor(C.navy).fontSize(10).font('Helvetica-Bold').text(fmtRunwayShort(sh2.psr), L + cardW + 16, y + 68);
+          
+          doc.fillColor(C.muted).fontSize(7).font('Helvetica').text('Tier 2 Required?', L + cardW*2 - 57, y + 58);
+          doc.fillColor(sh2.needsT3 ? C.red : C.green).fontSize(9).font('Helvetica-Bold')
+            .text(sh2.needsT3 ? 'Yes' : 'No', L + cardW*2 - 57, y + 68);
+        }
+
+        y += cardH + rowSpacing;
+      }
       y += 6;
 
       y = insight(doc, 'The Pattern Behind Household Shocks',
@@ -1063,7 +1107,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
         { label: 'Stage 1. Tier 1 Liquid Capital', cap: fmtM(pasCap), color: C.blue, bg: '#f0f9ff', border: C.blue,
           desc: `Cash, HYSA, and brokerage accounts. No penalties. This stage ends around ${fmtRunway(stage1End)} under severe stress.` },
         ...(hasStage2 ? [{ label: 'Stage 2. Tier 2 Contingent Capital', cap: fmtM(t3Cap), color: C.amber, bg: '#fffbeb', border: C.amber,
-          desc: `Retirement accounts and home equity. Accessing these early triggers taxes and penalties. This stage begins if Stage 1 is exhausted. around ${fmtRunway(stage1End)}.` }] : []),
+          desc: `Retirement accounts and home equity. Accessing these early triggers taxes and penalties. This stage begins if Stage 1 is exhausted, around ${fmtRunway(stage1End)}. Note: Tier 3 Structural Capital (private equity, illiquid real estate) is excluded from all runway calculations.` }] : []),
         { label: 'Stage 3. Total Capital Exhaustion', cap: 'n/a', color: C.red, bg: '#fef2f2', border: C.red,
           desc: `All savings exhausted. ${stage2End >= 999 ? 'Not reached within the model range under any scenario.' : `Projected around ${fmtRunway(stage2End)} under severe contraction.`}` },
       ];
@@ -1096,7 +1140,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       y += 30;
       doc.fillColor(C.muted).fontSize(7.5).font('Helvetica')
         .text(`Stage 1 ends: ${fmtRunway(stage1End)}`, L, y)
-        .text(hasStage2 ? `Stage 2 ends: ${fmtRunway(stage2End)}` : `No Stage 2 reached under this scenario.`, L + 200, y);
+        .text(hasStage2 ? `Stage 2 ends: ${fmtRunway(stage2End)}` : `No Stage 2 reached under this scenario. Note: Tier 3 Structural Capital (private business equity, real estate partnerships) is intentionally excluded from runway modeling.`, L + 200, y);
       y += 20;
 
       ftr(doc, 9);
@@ -1112,11 +1156,11 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       const baseData = capitalSeries(sim, 1.00, CHART_MONTHS);
       const severeData = capitalSeries(sim, 0.70, CHART_MONTHS);
       const maxCap = pasCap;
-      const chartH = 160, chartW = W - 64;
+      const chartH_2 = 160, chartW = W - 64;
       const chartX = L + 60, chartY = y;
 
-      lineChart(doc, baseData, severeData, maxCap, chartX, chartY, chartW, chartH, CHART_MONTHS);
-      y += chartH + 30;
+      lineChart(doc, baseData, severeData, maxCap, chartX, chartY, chartW, chartH_2, CHART_MONTHS);
+      y += chartH_2 + 30;
 
       // Annotation: Tier 1 depletion point
       if (pm30 < 999 && pm30 <= CHART_MONTHS) {
@@ -1147,104 +1191,57 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
 
       ftr(doc, 10);
 
+      // ─── Encoding fix in routes.ts (T001) ───
+      // Replace curly quotes and mathematical minus signs
+      const sanitize = (str: string) => str
+        .replace(/[“”]/g, '"')
+        .replace(/[‘’]/g, "'")
+        .replace(/−/g, '-');
+
       // ════════════════════════════════════════════════════════════════════
       // PAGE 11. HOW TO WIDEN THE RUNWAY
       // ════════════════════════════════════════════════════════════════════
       doc.addPage(); hdr(doc, date); y = 42;
       y = secHead(doc, 11, 'How to Widen the Runway',
-        'Four categories of structural levers. Each one affects Tier 1 Runway under stress. These are not recommendations. They are quantified options for your consideration.', y);
+        'Strategic adjustments to your monthly outflow or revenue targets that would materially extend your Tier 1 Runway.', y);
 
-      const llEarly3 = psRunway(sim, 1.00, Math.max(0, sim.rampDuration - 3));
-
-      // Top 3 sensitivity results — computed here, rendered at top of page
-      const leverImpacts = [
-        { name: 'Reduce Monthly Outflow by $500', delta: calcBurnLever(500) < 999 && psr30 < 999 ? calcBurnLever(500) - psr30 : (calcBurnLever(500) >= 999 ? 999 : 0), what: `Outflow falls to ${fmtM(sim.tmib - 500)}/month. Tier 1 Runway extends from ${fmtRunway(psr30)} to ${fmtRunway(calcBurnLever(500))} under severe stress.` },
-        { name: 'Reduce Monthly Outflow by $1,000', delta: calcBurnLever(1000) < 999 && psr30 < 999 ? calcBurnLever(1000) - psr30 : (calcBurnLever(1000) >= 999 ? 999 : 0), what: `Outflow falls to ${fmtM(sim.tmib - 1000)}/month. Tier 1 Runway extends from ${fmtRunway(psr30)} to ${fmtRunway(calcBurnLever(1000))} under severe stress.` },
-        { name: 'Reduce Monthly Outflow by $2,000', delta: calcBurnLever(2000) < 999 && psr30 < 999 ? calcBurnLever(2000) - psr30 : (calcBurnLever(2000) >= 999 ? 999 : 0), what: `Outflow falls to ${fmtM(Math.max(0, sim.tmib - 2000))}/month. Tier 1 Runway extends from ${fmtRunway(psr30)} to ${fmtRunway(calcBurnLever(2000))} under severe stress.` },
-        { name: 'Increase Revenue Target by $500/month', delta: calcRevLever(500) < 999 && psr30 < 999 ? calcRevLever(500) - psr30 : (calcRevLever(500) >= 999 ? 999 : 0), what: `Revenue target rises to ${fmtM(sim.expectedRevenue + 500)}/month. Tier 1 Runway extends from ${fmtRunway(psr30)} to ${fmtRunway(calcRevLever(500))} under severe stress.` },
-        { name: 'Increase Revenue Target by $1,000/month', delta: calcRevLever(1000) < 999 && psr30 < 999 ? calcRevLever(1000) - psr30 : (calcRevLever(1000) >= 999 ? 999 : 0), what: `Revenue target rises to ${fmtM(sim.expectedRevenue + 1000)}/month. Tier 1 Runway extends from ${fmtRunway(psr30)} to ${fmtRunway(calcRevLever(1000))} under severe stress.` },
-        { name: 'Revenue ramp 3 months earlier', delta: llEarly3 < 999 && psr30 < 999 ? llEarly3 - psr30 : (llEarly3 >= 999 ? 999 : 0), what: `Ramp shortens to ${Math.max(0, sim.rampDuration - 3)} months. Tier 1 Runway extends from ${fmtRunway(psr30)} to ${fmtRunway(llEarly3)} under severe stress. Each earlier month eliminates one month of full-burden drawdown.` },
-      ].filter(l => l.delta > 0 || l.delta === 999).sort((a, b) => (b.delta === 999 ? 999 : b.delta) - (a.delta === 999 ? 999 : a.delta)).slice(0, 3);
-
-      // Sensitivity results header
-      doc.fillColor(C.muted).fontSize(7.5).font('Helvetica-Bold').text('YOUR TOP SENSITIVITY RESULTS', L, y); y += 10;
-      leverImpacts.forEach((lev, i) => {
-        const deltaStr = lev.delta >= 999 ? 'Fully cash-flow positive' : `+${lev.delta} months`;
-        doc.rect(L, y, W, 50).fill(i % 2 === 0 ? C.light : C.mid);
-        doc.fillColor(C.muted).fontSize(7).font('Helvetica-Bold').text(`LEVER ${i + 1}`, L + 10, y + 7);
-        doc.fillColor(C.navy).fontSize(9.5).font('Helvetica-Bold').text(lev.name, L + 10, y + 17, { width: 310 });
-        doc.fillColor(C.green).fontSize(12).font('Times-Bold').text(deltaStr, L + 330, y + 15);
-        doc.fillColor(C.coal).fontSize(8.5).font('Helvetica').text(lev.what, L + 10, y + 31, { width: W - 20, lineGap: 1.5 });
-        y += 50;
-      });
-      y += 12;
-
-      // Four advisory categories
-      const advisoryCategories = [
-        {
-          title: 'Cash Flow Levers',
-          color: C.navy,
-          bg: C.mid,
-          items: [
-            'Reduce fixed obligations before your transition date.',
-            'Refinance high-interest debt to lower required minimums.',
-            'Trim discretionary spending to increase monthly surplus.',
-            'Convert fixed costs to variable where possible.',
-          ],
+      const levers = [
+        { 
+          title: 'Burn Reduction (-$1,000)', 
+          impact: calcBurnLever(1000) - psrBase,
+          psr: calcBurnLever(1000),
+          desc: 'Reducing monthly living expenses or debt by $1,000.'
         },
-        {
-          title: 'Revenue De-Risking Levers',
-          color: C.blue,
-          bg: '#f0f9ff',
-          items: [
-            'Secure pre-transition contracts or retainer agreements.',
-            'Maintain part-time or consulting income during the ramp.',
-            'Enter with a client pipeline already in progress.',
-            'Delay the leap to shorten ramp exposure and reduce capital needed.',
-          ],
+        { 
+          title: 'Burn Reduction (-$2,000)', 
+          impact: calcBurnLever(2000) - psrBase,
+          psr: calcBurnLever(2000),
+          desc: 'Aggressive $2,000 monthly outflow reduction.'
         },
-        {
-          title: 'Structural Cushion Levers',
-          color: C.green,
-          bg: '#f0fdf4',
-          items: [
-            'Increase Tier 1 Liquid Capital before making the transition.',
-            'Reduce outstanding leverage before the leap date.',
-            'Shift brokerage holdings to cash to reduce haircut exposure.',
-          ],
-        },
-        {
-          title: 'Risk Compression Tactics',
-          color: C.amber,
-          bg: '#fffbeb',
-          items: [
-            'Set a 6-month checkpoint with defined revenue thresholds.',
-            'Define a minimum monthly revenue floor before drawing from savings.',
-            'Establish a re-entry trigger: the point at which you return to employment.',
-            'Create a fallback income floor through part-time or contract work.',
-          ],
+        { 
+          title: 'Revenue Acceleration (+$1,000)', 
+          impact: calcRevLever(1000) - psrBase,
+          psr: calcRevLever(1000),
+          desc: 'Increasing target monthly revenue by $1,000.'
         },
       ];
 
-      const catColW = Math.floor(W / 2);
-      let catX = L, catY = y;
-      advisoryCategories.forEach((cat, ci) => {
-        const col = ci % 2;
-        const row = Math.floor(ci / 2);
-        const cx = L + col * catColW;
-        const cy = catY + row * 90;
-        const h = 84;
-        doc.rect(cx, cy, catColW - 4, h).fill(cat.bg);
-        doc.rect(cx, cy, 3, h).fill(cat.color);
-        doc.fillColor(cat.color).fontSize(8).font('Helvetica-Bold').text(cat.title.toUpperCase(), cx + 10, cy + 8, { width: catColW - 18 });
-        cat.items.forEach((item, ii) => {
-          doc.fillColor(C.coal).fontSize(7.5).font('Helvetica').text(`\u2022 ${item}`, cx + 10, cy + 22 + ii * 13, { width: catColW - 20 });
-        });
+      const leverW = (W / 3) - 4;
+      levers.forEach((lv, i) => {
+        const lx = L + i * (leverW + 6);
+        doc.rect(lx, y, leverW, 70).fill(C.mid);
+        doc.rect(lx, y, 3, 70).fill(C.navy);
+        doc.fillColor(C.navy).fontSize(8).font('Helvetica-Bold').text(lv.title, lx + 8, y + 8, { width: leverW - 16 });
+        
+        const impactTxt = lv.impact <= 0 ? 'No change' : `+${lv.impact} months`;
+        doc.fillColor(C.green).fontSize(10).font('Helvetica-Bold').text(impactTxt, lx + 8, y + 20);
+        
+        doc.fillColor(C.muted).fontSize(7).font('Helvetica').text(lv.desc, lx + 8, y + 34, { width: leverW - 16, lineGap: 1 });
       });
-      y = catY + 90 * 2 + 12;
+      y += 86;
 
-      doc.fillColor(C.muted).fontSize(7.5).font('Helvetica-Oblique')
-        .text('These are structural options, not instructions. Each lever has tradeoffs not captured in this model. Consult a qualified professional before making significant financial or career decisions.', L, y, { width: W, lineGap: 2 });
+      y = insight(doc, 'Why These Levers Matter',
+        `Runway is highly sensitive to the net gap. Small reductions in fixed burn or small increases in steady revenue have a non-linear impact on the Tier 1 Runway because they reduce the monthly draw against capital. Focus on the lever that is easiest to execute before the transition date.`, y);
 
       ftr(doc, 11);
 
@@ -1257,8 +1254,8 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
 
       const cols = [
         { label: 'Base', psr: psrBase, full: frBase, r3: t3Cap > 0 && psrBase < frBase, pm: pmBase },
-        { label: 'Mild (-15%)', psr: psr15, full: fr15, r3: t3Cap > 0 && psr15 < fr15, pm: pm15 },
-        { label: 'Severe (-30%)', psr: psr30, full: fr30, r3: t3Cap > 0 && psr30 < fr30, pm: pm30 },
+        { label: 'Mild income contraction (-15%)', psr: psr15, full: fr15, r3: t3Cap > 0 && psr15 < fr15, pm: pm15 },
+        { label: 'Severe income contraction (-30%)', psr: psr30, full: fr30, r3: t3Cap > 0 && psr30 < fr30, pm: pm30 },
         { label: 'Partner Loss', psr: psrPartnerLoss, full: frPartnerLoss, r3: t3Cap > 0 && psrPartnerLoss < frPartnerLoss, pm: pm30 },
         { label: 'New Child', psr: psrNewChild, full: 999, r3: t3Cap > 0, pm: pm30 },
       ];
@@ -1320,7 +1317,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
             if (fixedPct2 > 25) return `Fixed debt payments (${fmtM(sim.monthlyDebtPayments)}/month, ${fixedPct2}% of gross outflow) are the primary structural risk. These cannot be reduced under stress and remain constant even when revenue underperforms.`;
             if (hcPct > 18) return `Healthcare transition cost (${fmtM(hc)}/month, ${hcPct}% of gross outflow) is the primary structural risk. This is unusually high as a share of total outflow. Partner coverage or income-based ACA subsidies could materially change the position.`;
             if (sim.rampDuration > 8) return `Revenue ramp duration (${sim.rampDuration} months) is the primary structural risk. A long ramp extends the period where savings must cover the full gap. Entering with even one paying client shortens this window meaningfully.`;
-            return `Revenue reliability is the primary structural risk. Under a 30% shortfall, Tier 1 Runway drops to ${fmtRunway(psr30)}. Entering with pre-existing revenue or a confirmed client reduces dependence on the ramp timeline.`;
+            return `Revenue reliability is the primary structural risk. Under a 30% income contraction, Tier 1 Runway drops to ${fmtRunway(psr30)}. Entering with pre-existing revenue or a confirmed client reduces dependence on the ramp timeline.`;
           })(),
         },
         {
@@ -1328,8 +1325,8 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
           body: pm30 >= 999
             ? `No pressure point was identified within the model range. Tier 1 Liquid Capital remains solvent across all modeled scenarios. If revenue reaches target and ramp timing holds, this position does not encounter a critical depletion threshold.`
             : t3Cap > 0 && psr30 < frBase
-            ? `Under severe revenue contraction (-30%), Tier 1 Liquid Capital would be exhausted in ${fmtRunway(psr30)}. At that point, the transition could only continue by accessing retirement accounts or home equity. Those assets extend the total theoretical runway to ${fmtRunway(fr30)}, but they represent emergency capital rather than primary transition funding.`
-            : `Under severe revenue contraction (-30%), Tier 1 Liquid Capital would be exhausted in ${fmtRunway(psr30)}. Pressure begins around ${fmtRunwayShort(pm30)}, when the depletion window narrows within 6 months of exhaustion.`,
+            ? `Under severe income contraction (-30%), Tier 1 Liquid Capital would be exhausted in ${fmtRunway(psr30)}. At that point, the transition could only continue by accessing retirement accounts or home equity. Those assets extend the total theoretical runway to ${fmtRunway(fr30)}, but they represent emergency capital rather than primary transition funding.`
+            : `Under severe income contraction (-30%), Tier 1 Liquid Capital would be exhausted in ${fmtRunway(psr30)}. Pressure begins around ${fmtRunwayShort(pm30)}, when the depletion window narrows within 6 months of exhaustion.`,
         },
         {
           num: 4, title: 'What Would Improve the Position',
@@ -1377,7 +1374,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
         },
         {
           term: 'Tier 3 Structural Capital',
-          def: 'Highly illiquid assets not modeled here. Includes business equity, closely held real estate, or deferred compensation requiring significant cost or time to access.',
+          def: 'Highly illiquid assets not included in the primary runway model. Examples include private business equity, real estate partnerships, or deferred compensation requiring significant time or cost to access. These assets are intentionally excluded from runway calculations because they cannot reliably fund short-term transitions.',
         },
         {
           term: 'Tier 1 Runway',

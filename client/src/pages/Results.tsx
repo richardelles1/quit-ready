@@ -1,3 +1,4 @@
+import React from "react";
 import { useParams, Link } from "wouter";
 import { Download, AlertTriangle, AlertCircle } from "lucide-react";
 import logoPath from "@assets/626986E9-B8B4-462B-8F52-CB974B10376C_1772581585428.png";
@@ -128,7 +129,7 @@ function OutflowCompositionBar({ sim, hc }: { sim: SimulationResult; hc: number 
     { label: 'Living Expenses', val: sim.livingExpenses, opacity: 'opacity-100' },
     { label: 'Debt Payments', val: sim.monthlyDebtPayments, opacity: 'opacity-70' },
     { label: 'Healthcare', val: hc, opacity: 'opacity-50' },
-    { label: 'Tax Reserve', val: sim.selfEmploymentTax, opacity: 'opacity-30' },
+    { label: `Tax Reserve (${sim.taxReservePercent ?? 25}%)`, val: sim.selfEmploymentTax, opacity: 'opacity-30' },
     { label: 'Business Costs', val: sim.businessCostBaseline, opacity: 'opacity-20' },
   ].filter(s => s.val > 0);
   const grossTotal = segments.reduce((a, s) => a + s.val, 0);
@@ -265,7 +266,7 @@ function SavingsCurve({ sim, pas: pasCap }: { sim: SimulationResult; pas: number
         </div>
         <div className="flex items-center gap-1.5">
           <div className="w-5 h-px" style={{ borderTop: '1.5px dashed #94a3b8' }} />
-          <span>Severe (−30%)</span>
+          <span>Severe (-30%)</span>
         </div>
         {pm !== null && (
           <div className="flex items-center gap-1.5">
@@ -287,10 +288,18 @@ export default function Results() {
   const downloadPdf = useDownloadSimulationPdf();
   const { toast } = useToast();
 
+  const [downloadError, setDownloadError] = React.useState(false);
   const handleDownload = () => {
     if (!id) return;
+    setDownloadError(false);
     downloadPdf.mutate(id, {
-      onError: (err) => toast({ title: "Report generation failed", description: err.message, variant: "destructive" }),
+      onError: (err) => {
+        setDownloadError(true);
+        toast({ title: "Report generation failed", description: err.message, variant: "destructive" });
+      },
+      onSuccess: () => {
+        setDownloadError(false);
+      }
     });
   };
 
@@ -354,7 +363,7 @@ export default function Results() {
     { label: 'Living Expenses', val: sim.livingExpenses },
     { label: 'Debt Payments (required minimums)', val: sim.monthlyDebtPayments },
     { label: 'Healthcare', val: hc },
-    { label: 'Tax Reserve (28%)', val: sim.selfEmploymentTax },
+    { label: `Tax Reserve (${sim.taxReservePercent ?? 25}%)`, val: sim.selfEmploymentTax },
     { label: 'Business Costs', val: sim.businessCostBaseline },
   ].filter(c => c.val > 0);
   const grossOutflow = outflowComponents.reduce((a, c) => a + c.val, 0);
@@ -404,7 +413,7 @@ export default function Results() {
   const advisorBestMove = hcPct >= 15
     ? `Healthcare cost (${hcPct}% of gross outflow) is the highest-leverage controllable cost. Partner coverage or income-based ACA subsidies could shift the position materially.`
     : sim.rampDuration > 6
-    ? `Shortening your ramp timeline or entering with a signed client commitment would reduce the capital gap significantly. each month of earlier revenue eliminates one month of full-burden drawdown.`
+    ? `Shortening your ramp timeline or entering with a signed client commitment would reduce the capital gap significantly. Each month of earlier revenue eliminates one month of full-burden drawdown.`
     : `Increasing stable revenue by ${fmt(1000)}/month would extend your Tier 1 Runway by approximately ${revDelta ? `${revDelta} months` : 'a meaningful amount'} under severe stress.`;
 
   // Shock runways
@@ -433,11 +442,21 @@ export default function Results() {
                   Prepared {reportDate} · {marginLabel}
                 </p>
               </div>
-              <Button onClick={handleDownload} disabled={downloadPdf.isPending}
-                className="gap-2 shrink-0 mt-1" data-testid="button-download-pdf">
-                <Download className="w-4 h-4" />
-                {downloadPdf.isPending ? 'Generating PDF...' : 'Download Full Report'}
-              </Button>
+              <div className="flex flex-col items-end gap-2">
+                <Button onClick={handleDownload} disabled={downloadPdf.isPending}
+                  className="gap-2 shrink-0 mt-1" data-testid="button-download-pdf">
+                  <Download className="w-4 h-4" />
+                  {downloadPdf.isPending ? 'Generating PDF...' : 'Download Full Report'}
+                </Button>
+                {downloadError && (
+                  <div className="flex flex-col items-end gap-1">
+                    <p className="text-xs text-destructive font-medium">Report generation failed. Please retry.</p>
+                    <Button variant="outline" size="sm" onClick={handleDownload} className="h-7 text-xs" data-testid="button-retry-download">
+                      Retry
+                    </Button>
+                  </div>
+                )}
+              </div>
             </div>
             <div className="mt-5 h-px bg-border" />
           </div>
@@ -601,7 +620,7 @@ export default function Results() {
               </div>
               <div className="mb-4">
                 <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">Income Plan Costs</p>
-                <OutflowRow label="Tax Reserve (28% of projected revenue)" value={sim.selfEmploymentTax} />
+                <OutflowRow label={`Tax Reserve (${sim.taxReservePercent ?? 25}% of projected revenue)`} value={sim.selfEmploymentTax} />
                 <OutflowRow label="Business operating costs" value={sim.businessCostBaseline} />
               </div>
               <div className="mt-4 flex flex-col items-center justify-center py-5 rounded-md bg-[#1e293b]" data-testid="text-tmib-total">
@@ -769,11 +788,16 @@ export default function Results() {
                 ) : (
                   <p className="text-sm text-muted-foreground italic">No Tier 2 Contingent Capital entered.</p>
                 )}
+                <div className="mt-4 p-3.5 bg-muted/20 border border-border rounded-md italic">
+                  <p className="text-xs text-muted-foreground leading-relaxed">
+                    <span className="font-semibold text-foreground">Tier 3 Structural Capital (not modeled):</span> Highly illiquid assets such as private business equity, real estate partnerships, or deferred compensation. These assets are excluded from runway calculations because they cannot reliably fund short-term transitions.
+                  </p>
+                </div>
                 {reliesOnRestricted && (
                   <div className="mt-3 flex items-start gap-2.5 p-3.5 bg-amber-50 border border-amber-200 rounded-md">
                     <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
                     <p className="text-xs text-amber-700 leading-relaxed">
-                      Tier 1 Liquid Capital ({fmt(pas)}) covers less than 12 months of net outflow under stress. You are not liquid enough to sustain this transition without entering Tier 2 asset territory. treat that as emergency capital, not a plan.
+                      Tier 1 Liquid Capital ({fmt(pas)}) covers less than 12 months of net outflow under stress. You are not liquid enough to sustain this transition without entering Tier 2 asset territory. Treat that as emergency capital, not a plan.
                     </p>
                   </div>
                 )}
@@ -806,7 +830,7 @@ export default function Results() {
                             Outflow drops to <strong className="text-foreground">{fmt(sim.tmib - 1000)}/month</strong>. Tier 1 Runway extends from {fmtRunway(sev30)} to {fmtRunway(burnMinus1k)} under severe stress.
                           </p>
                           <p className="text-xs text-muted-foreground/70 mt-1 leading-relaxed">
-                            Examples: consolidating subscriptions, refinancing a loan, or eliminating one recurring fixed obligation.
+                            Examples: Consolidating subscriptions, refinancing a loan, or eliminating one recurring fixed obligation.
                           </p>
                         </div>
                         <span className="text-sm font-bold text-green-700 shrink-0">+{burnDelta} mo</span>
@@ -1016,8 +1040,8 @@ export default function Results() {
                     psr30 >= 999
                       ? 'Revenue timing risk is low. Even under severe stress, savings stabilize before depletion.'
                       : psr30 >= 12
-                      ? `Under severe stress (−30% revenue), Tier 1 capital holds for ${fmtRunway(psr30)}. Revenue timing is a manageable risk.`
-                      : `Under severe stress (−30% revenue), Tier 1 capital is exhausted in ${fmtRunway(psr30)}. Revenue timing is the primary risk.`,
+                      ? `Under severe stress (-30% revenue), Tier 1 capital holds for ${fmtRunway(psr30)}. Revenue timing is a manageable risk.`
+                      : `Under severe stress (-30% revenue), Tier 1 capital is exhausted in ${fmtRunway(psr30)}. Revenue timing is the primary risk.`,
                     (sim.totalDebt ?? 0) > 0
                       ? `Monthly debt obligations of ${fmt(sim.monthlyDebtPayments)} are the primary fixed structural constraint.`
                       : 'No outstanding debt. Monthly outflow is driven by living expenses and operating costs only.',
@@ -1035,7 +1059,7 @@ export default function Results() {
                 <div className="pt-4 border-t border-border">
                   <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground mb-2">Where Pressure Concentrates</p>
                   <p className="text-sm text-muted-foreground leading-relaxed">
-                    Under severe contraction (−30%), Tier 1 capital is exhausted in <strong className="text-foreground">{fmtRunway(psr30)}</strong>.
+                    Under severe contraction (-30%), Tier 1 capital is exhausted in <strong className="text-foreground">{fmtRunway(psr30)}</strong>.
                     {t3Total > 0 && sim.runway30Down > psr30 ? ` Total depth extends to ${fmtRunway(sim.runway30Down)} if Tier 2 is accessed, but that is emergency capital, not a plan.` : ''}
                   </p>
                 </div>
@@ -1069,6 +1093,26 @@ export default function Results() {
                 </ul>
               </div>
 
+            </div>
+          </SectionCard>
+
+          {/* ── 11. Glossary ────────────────────────────────────────── */}
+          <SectionCard className="mb-8">
+            <SectionHeader n={11}>Glossary of Key Terms</SectionHeader>
+            <div className="px-7 py-6 space-y-4">
+              {[
+                { term: "Tier 1 Liquid Capital", def: "Penalty-free, immediately accessible capital (Cash + Brokerage accounts after an 80% liquidity haircut)." },
+                { term: "Tier 1 Runway", def: "The number of months Tier 1 Liquid Capital can sustain the net gap between household outflow and business revenue." },
+                { term: "Tier 2 Contingent Capital", def: "Emergency capital sources (Retirement accounts, Home Equity) that carry high access costs, taxes, or penalties." },
+                { term: "Tier 3 Structural Capital", def: "Highly illiquid assets not included in the primary runway model. Examples include private business equity, real estate partnerships, or deferred compensation requiring significant time or cost to access. These assets are intentionally excluded from runway calculations because they cannot reliably fund short-term transitions." },
+                { term: "Net Monthly Outflow", def: "Total household expenses and business operating costs, minus any stable non-business income (like a partner's salary)." },
+                { term: "Structural Breakpoint", def: "The specific month when Tier 1 Liquid Capital is exhausted and the transition requires either revenue break-even or Tier 2 access." }
+              ].map((item) => (
+                <div key={item.term} className="space-y-1">
+                  <p className="text-sm font-bold text-foreground">{item.term}</p>
+                  <p className="text-xs text-muted-foreground leading-relaxed">{item.def}</p>
+                </div>
+              ))}
             </div>
           </SectionCard>
 

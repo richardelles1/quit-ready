@@ -34,6 +34,7 @@ export const simulations = pgTable("simulations", {
   volatilityPercent: integer("volatility_percent").notNull().default(15),
   rampDuration: integer("ramp_duration").notNull().default(0),
   breakevenMonths: integer("breakeven_months").notNull().default(0),
+  taxReservePercent: integer("tax_reserve_percent").notNull().default(25),
 
   // Computed Results
   tmib: integer("tmib").notNull().default(0),
@@ -86,6 +87,7 @@ export const insertSimulationSchema = createInsertSchema(simulations).omit({
   currentPayrollHealthcare: z.coerce.number().min(0).default(0),
   totalDebt: z.coerce.number().min(0).default(0),
   monthlyDebtPayments: z.coerce.number().min(0).default(0),
+  taxReservePercent: z.coerce.number().min(10).max(40).default(25),
 });
 
 export type Simulation = typeof simulations.$inferSelect;

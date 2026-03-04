@@ -103,7 +103,7 @@ function estimatePlan(adults: number, children: number): number {
   return Math.min(base, 3000);
 }
 
-const SE_TAX_RATE = 0.28;
+const SE_TAX_RATE = 0.25; // fallback default (user can override)
 const fmt = (n: number) => `$${Math.round(n).toLocaleString('en-US')}`;
 
 // ─── Money input ───────────────────────────────────────────────────────────
@@ -213,6 +213,7 @@ function SimulatorInner() {
       volatilityPercent: 15,
       rampDuration: undefined as unknown as number,
       breakevenMonths: 0,
+      taxReservePercent: 25,
     },
     mode: "onChange",
   });
@@ -238,7 +239,8 @@ function SimulatorInner() {
         : BUSINESS_CHOICES.find(b => b.value === businessChoice)?.monthlyCost ?? 500)
     : 500;
 
-  const seTax = Math.round((values.expectedRevenue ?? 0) * SE_TAX_RATE);
+  const taxRate = (values.taxReservePercent ?? 25) / 100;
+  const seTax = Math.round((values.expectedRevenue ?? 0) * taxRate);
   const partnerOffset = values.isDualIncome ? (values.partnerIncome ?? 0) : 0;
   const fixedObligations = (values.monthlyDebtPayments ?? 0) + (values.livingExpenses ?? 0);
   const transitionNet = healthcareDelta - partnerOffset;
@@ -665,6 +667,24 @@ function SimulatorInner() {
                       label="Expected monthly revenue once stable"
                       placeholder="8,000" autoFocus
                       note="The report runs stress tests at −15% and −30% of this figure automatically." />
+                    <div className="mt-6">
+                      <label className="block text-sm font-medium text-muted-foreground mb-2">
+                        Self-employment tax reserve rate
+                      </label>
+                      <p className="text-xs text-muted-foreground mb-3 leading-relaxed">
+                        This percentage of your expected revenue is set aside monthly for federal and self-employment taxes. Consult a tax professional for your actual rate. The model default is 25%.
+                      </p>
+                      <div className="flex flex-wrap gap-2">
+                        {[15, 20, 25, 28, 30, 35].map(pct => (
+                          <button key={pct} type="button"
+                            onClick={() => setValue('taxReservePercent', pct, { shouldValidate: true })}
+                            className={`px-4 py-2 rounded-md border text-sm font-medium transition-all ${(values.taxReservePercent ?? 25) === pct ? 'border-foreground bg-foreground/5 text-foreground' : 'border-border text-muted-foreground'}`}
+                            data-testid={`preset-tax-${pct}`}>
+                            {pct}%
+                          </button>
+                        ))}
+                      </div>
+                    </div>
                   </div>
                 )}
 
@@ -736,7 +756,7 @@ function SimulatorInner() {
                         <p className="text-xs text-muted-foreground font-medium">Business + taxes</p>
                       </div>
                       <BurnRow label="Business operating cost" value={bizCost} />
-                      <BurnRow label="Self-employment tax reserve (28%)" value={seTax} />
+                      <BurnRow label={`Self-employment tax reserve (${values.taxReservePercent ?? 25}%)`} value={seTax} />
                       <BurnRow label="Net Monthly Outflow" value={totalBurn} total />
                     </div>
                     <div className="grid grid-cols-3 gap-3 mb-5">

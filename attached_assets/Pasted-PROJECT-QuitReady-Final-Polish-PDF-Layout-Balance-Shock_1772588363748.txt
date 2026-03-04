@@ -1,0 +1,280 @@
+PROJECT: QuitReady Final Polish — PDF Layout Balance, Shock Layout, Reliability, and Tax Logic
+
+OBJECTIVE
+
+Implement the final set of fixes and improvements to prepare QuitReady for market release.  
+Focus on:
+
+• Eliminating visual gaps in the PDF (especially Life Event spillover)
+• Improving spacing and layout balance
+• Ensuring the web report remains professional and mobile-friendly
+• Fixing encoding artifacts
+• Improving reliability of the PDF download
+• Allowing customizable self-employment tax reserve
+• Clarifying Tier-3 capital language
+• Ensuring the PDF remains the premium deliverable
+
+Do NOT redesign the entire report. Apply targeted fixes only.
+
+--------------------------------------------------
+
+GLOBAL DESIGN CONSISTENCY
+
+Ensure the web report and PDF both use the same design tokens.
+
+Typography
+
+Title: 30px  
+Section Header: 20px  
+Subheader: 16px  
+Body: 13px  
+Metric Numbers: 24px  
+Table Header: 12px  
+
+Spacing scale
+
+XS: 6px  
+SM: 10px  
+MD: 16px  
+LG: 28px  
+XL: 44px  
+
+Rules
+
+• No section may touch another without at least MD spacing
+• Major sections must have LG spacing
+• Chart blocks require LG spacing above and below
+
+--------------------------------------------------
+
+FIX ENCODING ARTIFACTS
+
+Search entire codebase for malformed characters:
+
+("30%)
+("15%)
+
+Replace with:
+
+(30%)
+(15%)
+
+Apply to:
+
+Stress scenario page  
+Scenario comparison table  
+Timeline page  
+Revenue chart labels
+
+--------------------------------------------------
+
+HOUSEHOLD SHOCK SCENARIOS — ADAPTIVE GRID
+
+The PDF currently leaves large empty space when fewer shocks appear.
+
+Implement an adaptive layout:
+
+If 1 scenario → centered card  
+If 2 scenarios → two-column layout  
+If 3–4 scenarios → grid layout  
+If 5 scenarios → balanced 3+2 grid
+
+Shock scenarios should always include baseline events:
+
+• Emergency Expense
+• Unexpected Tax Bill
+• Business Launch Delay
+• Healthcare Cost Increase
+• New Child
+
+If partner income exists, ADD:
+
+• Partner Income Loss
+
+If partner income does NOT exist, remove ONLY the partner-loss scenario.
+
+Spacing between shock cards must be MD.
+
+--------------------------------------------------
+
+PAGE 1 BALANCE IMPROVEMENT
+
+Page 1 currently feels slightly under-filled.
+
+Add a small horizontal visual element below the metric grid:
+
+Income vs Outflow bar chart
+
+Design
+
+Income bar (green/blue)  
+Outflow bar (red/neutral)
+
+Keep this chart minimal and unobtrusive.
+
+Purpose
+
+• Improve visual comprehension
+• Fill unused whitespace
+• Reinforce financial structure visually
+
+Spacing above chart: MD  
+Spacing below chart: LG
+
+--------------------------------------------------
+
+CHART POSITIONING ADJUSTMENT
+
+On the Revenue vs Liquidity page:
+
+Increase top spacing above the chart by MD.
+
+Ensure the chart is visually centered within the page.
+
+--------------------------------------------------
+
+RUNWAY EXPANSION SECTION — CARD LAYOUT
+
+Current lever list is text-heavy.
+
+Convert the three sensitivity results into cards.
+
+Example
+
+Card 1  
+Reduce Monthly Outflow by $2,000  
++4 months runway
+
+Card 2  
+Revenue ramp 3 months earlier  
++4 months runway
+
+Card 3  
+Reduce Monthly Outflow by $1,000  
++1 month runway
+
+Cards must:
+
+• be horizontally aligned in PDF
+• stack vertically on mobile
+• include MD spacing between cards
+
+--------------------------------------------------
+
+TIER 3 CLARIFICATION
+
+In the glossary and savings tier explanation, clarify Tier-3 capital.
+
+Update wording:
+
+Tier 3 Structural Capital  
+Highly illiquid assets not included in the primary model.  
+Examples include private business equity, real estate partnerships, or deferred compensation requiring significant time or cost to access.
+
+Add note:
+
+Tier-3 assets are intentionally excluded from runway calculations because they cannot reliably fund short-term transitions.
+
+--------------------------------------------------
+
+SELF-EMPLOYMENT TAX RESERVE LOGIC
+
+The system currently defaults to 28% tax reserve regardless of user input.
+
+Fix logic:
+
+Use the user-provided tax reserve percentage.
+
+If the user does not enter a value, default to 25%.
+
+Allow values between 10% and 40%.
+
+Ensure calculations for:
+
+Tax Reserve  
+Net Outflow  
+Break-Even Revenue
+
+all use the user’s actual tax percentage.
+
+--------------------------------------------------
+
+PDF DOWNLOAD RELIABILITY
+
+Improve reliability of the “Download Full Report” button.
+
+Requirements
+
+• Button must trigger immediate PDF generation
+• Show loading state only while the file is generating
+• Ensure the file download always completes
+• Prevent the spinner from looping indefinitely
+
+Add fallback:
+
+If generation fails, display:
+
+"Report generation failed. Please retry."
+
+Provide retry button.
+
+--------------------------------------------------
+
+WEB REPORT STRUCTURE
+
+Maintain the current section order used in the PDF.
+
+Sections
+
+Financial Position  
+Income Strength  
+Monthly Outflow  
+Debt Structure  
+Tier Runway  
+Stress Scenarios  
+Revenue Timing  
+Household Shocks  
+Savings Timeline  
+Revenue vs Liquidity  
+Runway Expansion Options  
+Scenario Comparison  
+Decision Interpretation  
+Glossary
+
+--------------------------------------------------
+
+MOBILE OPTIMIZATION
+
+Ensure web report remains readable on mobile.
+
+Rules
+
+Metric grids stack vertically.
+
+Tables convert to stacked cards:
+
+Example
+
+Category  
+Amount  
+Percent
+
+Charts must scale to container width.
+
+Ensure no horizontal scrolling is required.
+
+--------------------------------------------------
+
+FINAL VALIDATION
+
+Before completing this update confirm:
+
+• Shock scenarios fill layout without large blank spaces
+• Encoding artifacts removed
+• Page 1 no longer feels visually empty
+• Charts are balanced on their pages
+• Runway levers render as cards
+• User-selected tax rate is respected
+• PDF download works reliably
+• Web report remains readable on mobile
+• PDF remains the premium export version

@@ -63,7 +63,7 @@ export const BUSINESS_COST_BASELINES: Record<string, number> = {
   saas_product:     2500,
 };
 
-const SE_TAX_RATE = 0.28;
+const SE_TAX_RATE = 0.25; // fallback default
 
 // ─── Main calculation engine ───────────────────────────────────────────────
 export function calculateSimulation(data: InsertSimulation) {
@@ -100,8 +100,11 @@ export function calculateSimulation(data: InsertSimulation) {
     ? data.businessCostOverride
     : (BUSINESS_COST_BASELINES[data.businessModelType] ?? 1000);
 
-  // 3. SE TAX RESERVE
-  const selfEmploymentTax = Math.round(data.expectedRevenue * SE_TAX_RATE);
+  // 3. SE TAX RESERVE — use user-supplied rate or default to 25%
+  const seRate = (data.taxReservePercent != null && data.taxReservePercent > 0)
+    ? data.taxReservePercent / 100
+    : SE_TAX_RATE;
+  const selfEmploymentTax = Math.round(data.expectedRevenue * seRate);
 
   // 4. TRUE MONTHLY INDEPENDENCE BURN (TMIB)
   let tmib =

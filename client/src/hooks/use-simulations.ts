@@ -32,6 +32,7 @@ export const simulationFormSchema = z.object({
   volatilityPercent: z.coerce.number().min(10).max(40).default(15),
   rampDuration: z.coerce.number().min(0).default(0),
   breakevenMonths: z.coerce.number().min(0).default(0),
+  taxReservePercent: z.coerce.number().min(10).max(40).default(25),
 });
 
 export type SimulationFormValues = z.infer<typeof simulationFormSchema>;
@@ -76,6 +77,7 @@ export interface SimulationResult {
   healthcareRisk: string;
   breakpointMonth: number;
   breakpointScenario: string;
+  taxReservePercent: number;
   createdAt: string;
 }
 
