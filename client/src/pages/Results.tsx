@@ -507,36 +507,31 @@ export default function Results() {
               )}
             </div>
 
-            {/* Second row: capital and runway metrics */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 border-t border-border">
-              {[
-                { label: 'Tier 1 Liquid Capital', val: fmt(pas), testid: 'metric-capital' },
-                { label: 'Full Capital Depth', val: fmt(sim.accessibleCapital), testid: 'metric-total-capital' },
-                { label: 'Tier 1 Runway, Base', val: fmtRunway(psrBase), testid: 'metric-base-runway' },
-                { label: 'Risk Classification', val: getScoreLabel(score), testid: 'metric-risk-class', color: sc.text },
-              ].map((m: any, i) => (
-                <div key={m.label} className={`px-7 py-5 ${i < 3 ? 'border-r border-border' : ''}`} data-testid={m.testid}>
-                  <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground/70 mb-1.5">{m.label}</p>
-                  <p className={`text-xl font-bold font-serif ${m.color ?? 'text-foreground'}`}>{m.val}</p>
-                </div>
-              ))}
+            {/* Second row: 2 key metrics */}
+            <div className="grid grid-cols-2 border-t border-border">
+              <div className="px-7 py-5 border-r border-border" data-testid="metric-capital">
+                <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground/70 mb-1.5">Tier 1 Liquid Capital</p>
+                <p className="text-xl font-bold font-serif text-foreground">{fmt(pas)}</p>
+                <p className="text-xs text-muted-foreground/60 mt-0.5">Cash + Brokerage (penalty-free)</p>
+              </div>
+              <div className="px-7 py-5" data-testid="metric-risk-class">
+                <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground/70 mb-1.5">Runway Status</p>
+                <p className={`text-xl font-bold font-serif ${sc.text}`}>{getScoreLabel(score)}</p>
+                <p className="text-xs text-muted-foreground/60 mt-0.5">Overall structural position</p>
+              </div>
             </div>
           </SectionCard>
 
-          {/* ── 2. Risk Position Score ────────────────────────────────── */}
+          {/* ── 2. Structural Assessment ──────────────────────────────── */}
           <SectionCard className="mb-6">
-            <SectionHeader n={2}>Risk Position Score</SectionHeader>
+            <SectionHeader n={2}>Structural Assessment</SectionHeader>
             <div className="p-6">
-              <div className="flex items-start gap-6 mb-6">
-                <div className={`rounded-md border ${sc.border} ${sc.bg} px-6 py-5 text-center shrink-0`}>
-                  <p className={`text-5xl font-bold font-serif ${sc.text}`} data-testid="text-score">{score}</p>
-                  <p className="text-xs text-muted-foreground mt-1">out of 100</p>
-                </div>
-                <div>
-                  <p className={`text-base font-semibold ${sc.text} mb-1.5`}>{getScoreLabel(score)}</p>
+              <div className="mb-6">
+                <div className={`p-5 rounded-lg border ${sc.border} ${sc.bg} mb-4`}>
+                  <p className={`text-base font-bold ${sc.text} mb-1.5`} data-testid="text-score">{getScoreLabel(score)}</p>
                   {sim.breakpointMonth >= 999 ? (
                     <p className="text-sm text-muted-foreground leading-relaxed">
-                      No breakpoint was found within the model range. Tier 1 Liquid Capital remains solvent across all modeled scenarios.
+                      No depletion point was found within the model range. Tier 1 Liquid Capital remains stable across all modeled scenarios.
                     </p>
                   ) : (
                     <div className="space-y-1.5">
@@ -546,7 +541,7 @@ export default function Results() {
                       </p>
                       {t3Total > 0 && sim.runway30Down > psr30 && (
                         <p className="text-sm text-muted-foreground leading-relaxed">
-                          At that point, the transition could only continue by accessing retirement accounts or home equity. Those assets extend the total theoretical runway to <strong className="text-foreground">{fmtRunway(sim.runway30Down)}</strong>, but they represent emergency capital rather than primary transition funding.
+                          At that point, the transition could only continue by accessing retirement accounts or home equity. Those assets extend the total runway to <strong className="text-foreground">{fmtRunway(sim.runway30Down)}</strong>, but they represent emergency capital rather than planned transition funding.
                         </p>
                       )}
                     </div>
@@ -568,12 +563,12 @@ export default function Results() {
               </div>
               <p className="text-xs text-muted-foreground leading-relaxed border-t border-border pt-4">
                 {score >= 86
-                  ? `A score of ${score} reflects a structurally strong position. Tier 1 Liquid Capital covers the gap for a meaningful duration, the severe stress scenario does not produce a critical breakpoint, and the debt load is within a manageable range relative to capital. The primary risk to this position is a prolonged revenue delay.`
+                  ? 'The position shows a strong buffer. Tier 1 Liquid Capital covers the monthly gap for a meaningful duration, the severe stress scenario does not produce a critical breakpoint, and the debt load is within a manageable range relative to capital. The primary risk is a prolonged revenue delay.'
                   : score >= 70
-                  ? `A score of ${score} reflects a stable but not insulated position. The base case and moderate contraction scenarios are manageable. The severe contraction scenario reveals meaningful exposure. The structure works if execution is close to plan.`
+                  ? 'The position is structurally stable but not fully insulated. The base case and moderate contraction scenarios are manageable. Severe contraction reveals meaningful exposure. The structure holds if execution is close to plan.'
                   : score >= 50
-                  ? `A score of ${score} reflects moderate exposure. The position is not immediately fragile, but revenue underperformance or a delayed ramp would accelerate capital drawdown. There is limited structural cushion for execution variability.`
-                  : `A score of ${score} reflects a structurally fragile position. Capital depth, revenue trajectory, and/or debt exposure are in a range that leaves little margin for error. Strengthening Tier 1 Liquid Capital or compressing outflow before the transition would materially change this reading.`}
+                  ? 'The position carries moderate structural exposure. Revenue underperformance or a delayed ramp would accelerate capital drawdown. There is limited cushion for execution variability.'
+                  : 'The position is structurally fragile. Capital depth, revenue trajectory, or debt exposure are in a range that leaves little margin for error. Strengthening Tier 1 Liquid Capital or reducing outflow before the transition would materially improve this position.'}
               </p>
             </div>
           </SectionCard>
@@ -600,9 +595,9 @@ export default function Results() {
                 <OutflowRow label="Tax Reserve (28% of projected revenue)" value={sim.selfEmploymentTax} />
                 <OutflowRow label="Business operating costs" value={sim.businessCostBaseline} />
               </div>
-              <div className="flex items-center justify-between py-4 border-t-2 border-border">
-                <span className="text-sm font-bold text-foreground">Net Monthly Outflow</span>
-                <span className="text-xl font-bold font-serif text-foreground" data-testid="text-tmib-total">{fmt(sim.tmib)}</span>
+              <div className="mt-4 flex flex-col items-center justify-center py-5 rounded-md bg-[#1e293b]" data-testid="text-tmib-total">
+                <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400 mb-2">Net Monthly Outflow</p>
+                <p className="text-3xl font-bold font-serif text-white">{fmt(sim.tmib)}</p>
               </div>
               <OutflowCompositionBar sim={sim} hc={hc} />
               {grossOutflow > 0 && (
@@ -910,7 +905,7 @@ export default function Results() {
                 <thead>
                   <tr className="border-b border-border">
                     <th className="text-left py-2 font-semibold uppercase tracking-wider text-muted-foreground pr-3">Metric</th>
-                    {['Base', '−15%', '−30%', '+3mo Ramp'].map(c => (
+                    {['Base Case', 'Moderate (15%)', 'Severe (30%)', '+3mo Ramp'].map(c => (
                       <th key={c} className="text-center py-2 font-semibold uppercase tracking-wider text-muted-foreground px-2">{c}</th>
                     ))}
                   </tr>
@@ -941,65 +936,85 @@ export default function Results() {
           {/* ── 9. Decision Interpretation ───────────────────────────── */}
           <SectionCard className="mb-6">
             <SectionHeader n={9}>Decision Interpretation</SectionHeader>
-            <div className="px-7 py-6 space-y-5">
+            <div className="px-7 py-6 space-y-6">
 
-              {/* Block 1: Structural Stability */}
+              {/* Classification badge */}
+              <div className={`p-4 rounded-lg border ${sc.border} ${sc.bg}`}>
+                <p className={`text-xs font-bold uppercase tracking-wider ${sc.text}`}>{getScoreLabel(score)}</p>
+              </div>
+
+              {/* Current position bullets */}
               <div>
-                <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground mb-2">Structural Stability</p>
-                <div className={`p-5 rounded-lg border ${sc.border} ${sc.bg}`}>
-                  <p className={`text-xs font-bold uppercase tracking-wider mb-2 ${sc.text}`}>{getScoreLabel(score)}</p>
-                  <p className="text-sm text-muted-foreground leading-relaxed">{advisorSummary}</p>
-                </div>
-              </div>
-
-              {/* Block 2: Primary Risk Drivers */}
-              <div className="pt-4 border-t border-border">
-                <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground mb-2">Primary Risk Drivers</p>
-                <p className="text-sm text-muted-foreground leading-relaxed">{advisorBestMove}</p>
-              </div>
-
-              {/* Block 3: Where Pressure Appears */}
-              <div className="pt-4 border-t border-border">
-                <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground mb-2">Where Pressure Appears</p>
-                {psr30 >= 999 ? (
-                  <p className="text-sm text-muted-foreground leading-relaxed">
-                    No pressure point was identified within the model range. Under all tested scenarios, Tier 1 Liquid Capital remains solvent.
-                  </p>
-                ) : (
-                  <p className="text-sm text-muted-foreground leading-relaxed">
-                    Under severe revenue contraction (−30%), Tier 1 Liquid Capital would be exhausted in <strong className="text-foreground">{fmtRunway(psr30)}</strong>.{t3Total > 0 && sim.runway30Down > psr30 ? ` Total capital depth extends to ${fmtRunway(sim.runway30Down)} if Tier 2 assets are accessed, but those carry taxes and penalties and should be treated as a last resort.` : ''}
-                  </p>
-                )}
-                {restrictedClarification && (
-                  <div className="flex items-start gap-3 mt-3 p-4 bg-amber-50 border border-amber-200 rounded-lg">
-                    <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
-                    <p className="text-sm text-amber-800 leading-relaxed">{restrictedClarification}</p>
-                  </div>
-                )}
-              </div>
-
-              {/* Block 4: What Would Improve the Position */}
-              <div className="pt-4 border-t border-border">
-                <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground mb-2">What Would Improve the Position</p>
-                <ul className="space-y-1.5">
-                  {[
-                    'Reduce fixed monthly obligations before the transition date.',
-                    'Enter with at least one signed client or confirmed revenue source.',
-                    `Increase Tier 1 Liquid Capital before leaving${pas < sim.tmib * 12 ? ', currently covering less than 12 months of net gap' : ''}.`,
-                    'Shorten the revenue ramp by building a client pipeline in advance.',
-                    'Ensure partner income is stable and will not be interrupted.',
-                  ].map(item => (
-                    <li key={item} className="flex gap-2 text-sm text-muted-foreground leading-relaxed">
-                      <span className="text-foreground/30 shrink-0 mt-0.5">&#8226;</span>
+                <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground mb-3">Your position today</p>
+                <ul className="space-y-2">
+                  {([
+                    grossSurplus >= 0
+                      ? 'Household income currently exceeds baseline monthly expenses.'
+                      : 'Household income does not currently cover baseline monthly expenses.',
+                    sim.isDualIncome && partnerOff > 0
+                      ? `Partner income of ${fmt(partnerOff)}/month provides meaningful financial cushioning after the transition.`
+                      : 'No partner income is entered. All transition costs fall on new business revenue and savings.',
+                    pas >= sim.tmib * 18
+                      ? `Tier 1 Liquid Capital of ${fmt(pas)} provides a strong runway foundation.`
+                      : pas >= sim.tmib * 9
+                      ? `Tier 1 Liquid Capital of ${fmt(pas)} provides a workable but limited runway.`
+                      : `Tier 1 Liquid Capital of ${fmt(pas)} is below 9 months of net outflow. Capital cushion is thin.`,
+                    psr30 >= 999
+                      ? 'Revenue timing risk is low. Even under severe stress, savings stabilize before depletion.'
+                      : psr30 >= 12
+                      ? `Under severe stress (−30% revenue), Tier 1 capital holds for ${fmtRunway(psr30)}. Revenue timing is a manageable risk.`
+                      : `Under severe stress (−30% revenue), Tier 1 capital is exhausted in ${fmtRunway(psr30)}. Revenue timing is the primary risk.`,
+                    (sim.totalDebt ?? 0) > 0
+                      ? `Monthly debt obligations of ${fmt(sim.monthlyDebtPayments)} are the primary fixed structural constraint.`
+                      : 'No outstanding debt. Monthly outflow is driven by living expenses and operating costs only.',
+                  ] as string[]).map(item => (
+                    <li key={item} className="flex gap-2.5 text-sm text-muted-foreground leading-relaxed">
+                      <span className="text-foreground/40 shrink-0 mt-0.5">&#8226;</span>
                       <span>{item}</span>
                     </li>
                   ))}
                 </ul>
               </div>
 
-              <p className="text-[10px] text-muted-foreground/60 italic border-t border-border pt-4">
-                This report is a financial simulation based on your inputs. It is not financial, tax, or legal advice. All sensitivity calculations show directional impact only. Actual outcomes depend on factors not captured in this model. Consult a qualified professional before making any significant financial decision.
-              </p>
+              {/* Pressure note */}
+              {psr30 < 999 && (
+                <div className="pt-4 border-t border-border">
+                  <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground mb-2">Where Pressure Concentrates</p>
+                  <p className="text-sm text-muted-foreground leading-relaxed">
+                    Under severe contraction (−30%), Tier 1 capital is exhausted in <strong className="text-foreground">{fmtRunway(psr30)}</strong>.
+                    {t3Total > 0 && sim.runway30Down > psr30 ? ` Total depth extends to ${fmtRunway(sim.runway30Down)} if Tier 2 is accessed, but that is emergency capital, not a plan.` : ''}
+                  </p>
+                </div>
+              )}
+
+              {/* Clarification for restricted */}
+              {restrictedClarification && (
+                <div className="flex items-start gap-3 p-4 bg-amber-50 border border-amber-200 rounded-lg">
+                  <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+                  <p className="text-sm text-amber-800 leading-relaxed">{restrictedClarification}</p>
+                </div>
+              )}
+
+              {/* Improvement bullets */}
+              <div className="pt-4 border-t border-border">
+                <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground mb-3">What would improve the position</p>
+                <ul className="space-y-2">
+                  {([
+                    'Reduce fixed monthly obligations before the transition date.',
+                    'Enter with at least one signed client or confirmed revenue commitment.',
+                    pas < sim.tmib * 12
+                      ? 'Increase Tier 1 Liquid Capital before leaving. Current level covers less than 12 months of net outflow.'
+                      : 'Continue building Tier 1 Liquid Capital to increase the available runway cushion.',
+                    'Shorten the revenue ramp by building a client pipeline before leaving.',
+                  ] as string[]).map(item => (
+                    <li key={item} className="flex gap-2.5 text-sm text-muted-foreground leading-relaxed">
+                      <span className="text-foreground/40 shrink-0 mt-0.5">&#8226;</span>
+                      <span>{item}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+
             </div>
           </SectionCard>
 

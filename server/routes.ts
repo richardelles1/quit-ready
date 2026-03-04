@@ -12,7 +12,7 @@ import type { Simulation } from "@shared/schema";
 const C = { navy:'#1e293b', coal:'#334155', muted:'#64748b', mid:'#f1f5f9',
   light:'#f8fafc', border:'#e2e8f0', white:'#ffffff',
   green:'#15803d', amber:'#b45309', red:'#dc2626', blue:'#1d4ed8' };
-const L = 52, W = 508, R = 560, TOTAL = 14;
+const L = 52, W = 508, R = 560, TOTAL = 15;
 
 // ─── Formatting utilities ──────────────────────────────────────────────────
 const fmtM = (n: number) => `$${Math.round(n).toLocaleString('en-US')}`;
@@ -461,38 +461,38 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       // COVER PAGE (unnumbered)
       // ════════════════════════════════════════════════════════════════════
       const LOGO_PATH = join(process.cwd(), 'attached_assets', '626986E9-B8B4-462B-8F52-CB974B10376C_1772581585428.png');
-      // White fill
-      doc.rect(0, 0, 612, 792).fill(C.white);
-      // Logo
-      try { doc.image(LOGO_PATH, L, 58, { width: 168 }); } catch (_) { /* skip */ }
-      // Thin rule
-      doc.rect(L, 115, W, 0.75).fill(C.border);
-      // Title
-      doc.fillColor(C.navy).fontSize(24).font('Times-Bold')
-        .text('QuitReady Financial Transition Report', L, 133, { width: W });
-      doc.fillColor(C.muted).fontSize(11).font('Helvetica')
-        .text('A financial readiness analysis for transitioning from employment to independent income.', L, 166, { width: 460, lineGap: 2 });
-      // Rule
-      doc.rect(L, 208, W, 0.75).fill(C.border);
-      // Generated date
-      doc.fillColor(C.muted).fontSize(8).font('Helvetica-Bold').text('GENERATED', L, 224);
-      doc.fillColor(C.navy).fontSize(13).font('Times-Bold').text(date, L, 237);
-      // Preview metrics block
-      const coverY = 290;
-      doc.rect(L, coverY, W, 102).fill(C.mid);
-      doc.rect(L, coverY, 2.5, 102).fill(C.navy);
-      const previewCols = [
-        { label: 'Monthly Surplus / Deficit', val: (_surplusForMargin >= 0 ? '+' : '') + fmtM(_surplusForMargin), x: L },
-        { label: 'Tier 1 Runway', val: fmtRunway(psrBase), x: L + 175 },
-        { label: 'Risk Classification', val: scoreLabel, x: L + 350 },
-      ];
-      previewCols.forEach(({ label, val, x }) => {
-        doc.fillColor(C.muted).fontSize(7.5).font('Helvetica-Bold').text(label.toUpperCase(), x + 12, coverY + 18, { width: 158 });
-        doc.fillColor(C.navy).fontSize(14).font('Times-Bold').text(val, x + 12, coverY + 34, { width: 158 });
-      });
-      // Footer note
+      // Full navy background
+      doc.rect(0, 0, 612, 792).fill(C.navy);
+      // White header band (top)
+      doc.rect(0, 0, 612, 88).fill(C.white);
+      // Logo in white header band (left-aligned)
+      try { doc.image(LOGO_PATH, 52, 22, { width: 152 }); } catch (_) {
+        doc.fillColor(C.navy).fontSize(16).font('Times-Bold').text('QuitReady.', 52, 36);
+      }
+      // White footer band (bottom)
+      doc.rect(0, 732, 612, 60).fill(C.white);
+      // Footer text
       doc.fillColor(C.muted).fontSize(7.5).font('Helvetica')
-        .text('This report contains 14 pages of detailed financial analysis. Calculations are deterministic and based solely on the inputs provided. This is not financial advice.', L, 680, { width: W, lineGap: 1.5 });
+        .text('Confidential. This report is a structural simulation. It is not financial advice.', 52, 750, { width: 508, align: 'center' });
+      // Center content area
+      // Thin white rule
+      doc.rect(52, 160, 508, 0.75).fill('#334155');
+      // Title (white on navy)
+      doc.fillColor(C.white).fontSize(26).font('Times-Bold')
+        .text('Financial Transition Report', 52, 178, { width: 508, align: 'center' });
+      // Subtitle
+      doc.fillColor('#94a3b8').fontSize(11).font('Helvetica')
+        .text('A financial readiness analysis for transitioning from employment to independent income.', 52, 216, { width: 508, align: 'center', lineGap: 2 });
+      // Thin rule
+      doc.rect(52, 262, 508, 0.75).fill('#334155');
+      // Generated date
+      doc.fillColor('#94a3b8').fontSize(9).font('Helvetica-Bold').text('GENERATED', 52, 280, { width: 508, align: 'center' });
+      doc.fillColor(C.white).fontSize(13).font('Times-Bold').text(date, 52, 295, { width: 508, align: 'center' });
+      // Classification badge centered
+      const badgeBg = score >= 70 ? '#15803d' : score >= 50 ? '#b45309' : '#dc2626';
+      doc.rect(206, 340, 200, 36).fill(badgeBg);
+      doc.fillColor(C.white).fontSize(11).font('Helvetica-Bold')
+        .text(scoreLabel, 206, 352, { width: 200, align: 'center' });
 
       // ════════════════════════════════════════════════════════════════════
       // PAGE 1. EXECUTIVE SNAPSHOT
@@ -552,13 +552,13 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
 
       // Score interpretation
       const scoreInterpretation = score >= 86
-        ? `A score of ${score} reflects a strong buffer position. Your capital depth and income structure are well-aligned to absorb a standard ramp period, including meaningful revenue underperformance.`
+        ? 'This is a strong buffer position. Capital depth and income structure are well-aligned to absorb a standard ramp period, including meaningful revenue underperformance.'
         : score >= 70
-        ? `A score of ${score} reflects a structurally stable position. The transition is viable under expected conditions and remains defensible under moderate stress. The primary risk is execution speed.`
+        ? 'This is a structurally stable position. The transition is viable under expected conditions and remains defensible under moderate stress. The primary risk is execution speed.'
         : score >= 50
-        ? `A score of ${score} reflects moderate structural exposure. Your position is workable under expected conditions but carries meaningful sensitivity to revenue timing and early shortfalls.`
-        : `A score of ${score} reflects structural fragility. The gap between a viable outcome and a distressed one is narrow. Strengthening Tier 1 Liquid Capital or reducing outflow before the transition would improve the position.`;
-      y = insight(doc, 'What This Score Means', scoreInterpretation, y);
+        ? 'This position reflects moderate structural exposure. The transition is workable under expected conditions but carries meaningful sensitivity to revenue timing and early shortfalls.'
+        : 'This position reflects structural fragility. The gap between a viable outcome and a distressed one is narrow. Strengthening Tier 1 Liquid Capital or reducing outflow before the transition would improve the position.';
+      y = insight(doc, 'What This Classification Means', scoreInterpretation, y);
 
       // Tier 1 vs Full Capital Depth explanation
       const tier1Explanation = `Tier 1 Runway is the true comfort window. It reflects how long your penalty-free capital (cash and brokerage) can sustain the net gap between outflow and revenue. Full Capital Depth extends the runway further only if Tier 2 Contingent Capital (retirement accounts, home equity) is drawn. Tier 2 access carries tax obligations and permanent compounding loss. Tier 1 Runway is the number that matters most.`;
@@ -840,26 +840,32 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
         {
           name: 'Revenue arrives on time and hits target', tag: 'Base case',
           psr: psrBase, full: frBase, pm: pmBase, needsT3: t3Cap > 0 && psrBase < frBase,
-          interp: psrBase >= 36
-            ? `At ${fmtRunway(psrBase)} of Tier 1 Runway, this scenario shows a comfortable starting position. Capital draw is gradual through the ramp, and the trajectory stabilizes as revenue builds.`
+          interp: psrBase >= 999
+            ? 'Under expected revenue conditions, savings stabilize before depletion. Capital is not the limiting factor in this scenario.'
+            : psrBase >= 36
+            ? `With ${fmtRunway(psrBase)} of Tier 1 Runway, this scenario shows a comfortable starting position. Capital draw is gradual through the ramp, and the trajectory stabilizes as revenue builds.`
             : psrBase >= 18
-            ? `At ${fmtRunway(psrBase)} of Tier 1 Runway, the base case is workable but leaves limited room for execution delays. Revenue arriving on time is a structural assumption in this scenario.`
-            : `At ${fmtRunway(psrBase)} under expected conditions, the base case is tight. Revenue performance at or above target is required to keep this timeline viable.`,
+            ? `With ${fmtRunway(psrBase)} of Tier 1 Runway, the base case is workable but leaves limited room for execution delays. Revenue arriving on time is a structural assumption in this scenario.`
+            : `With ${fmtRunway(psrBase)} under expected conditions, the base case is tight. Revenue performance at or above target is required to keep this timeline viable.`,
         },
         {
           name: 'Revenue underperforms target by 15%', tag: 'Moderate contraction',
           psr: psr15, full: fr15, pm: pm15, needsT3: t3Cap > 0 && psr15 < fr15,
-          interp: Math.abs(psrBase - psr15) < 3
-            ? `A 15% revenue shortfall reduces Tier 1 Runway by only ${Math.abs(psrBase - psr15)} months versus base case. The position is relatively resilient to moderate underperformance.`
+          interp: psr15 >= 999
+            ? 'Even with 15% revenue underperformance, savings stabilize before depletion. The position is resilient to moderate contraction.'
+            : (psrBase >= 999 || Math.abs(psrBase - psr15) < 3)
+            ? `A 15% revenue shortfall reduces Tier 1 Runway to ${fmtRunway(psr15)}. The position is relatively resilient to moderate underperformance.`
             : `A 15% revenue shortfall reduces Tier 1 Runway from ${fmtRunway(psrBase)} to ${fmtRunway(psr15)}. This is the scenario most likely to occur. It deserves more weight than the base case.`,
         },
         {
           name: 'Revenue materially underperforms by 30%', tag: 'Severe contraction',
           psr: psr30, full: fr30, pm: pm30, needsT3: t3Cap > 0 && psr30 < fr30,
-          interp: psr30 >= 18
+          interp: psr30 >= 999
+            ? 'Even under a 30% revenue shortfall, savings stabilize before depletion. Capital is not the limiting factor in this scenario.'
+            : psr30 >= 18
             ? `Even under a 30% revenue shortfall, Tier 1 Runway extends to ${fmtRunway(psr30)}. This scenario represents meaningful stress that does not fundamentally break the structure.`
             : psr30 >= 9
-            ? `A 30% revenue shortfall compresses Tier 1 Runway to ${fmtRunway(psr30)}. This is the scenario that meaningfully changes risk posture. Recovery would depend on either controlling outflow or accelerating revenue.`
+            ? `A 30% revenue shortfall compresses Tier 1 Runway to ${fmtRunway(psr30)}. This is the scenario that meaningfully changes risk posture. Recovery would depend on controlling outflow or accelerating revenue.`
             : `A 30% shortfall exhausts Tier 1 Liquid Capital within ${fmtRunway(psr30)}. This is the structurally significant scenario. Entering with a signed contract or a smaller outflow base would be the most effective mitigation.`,
         },
       ];
@@ -933,11 +939,11 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       // ════════════════════════════════════════════════════════════════════
       doc.addPage(); hdr(doc, date); y = 42;
       y = secHead(doc, 8, 'Household Shock Scenarios',
-        'Secondary events that compound the transition. These are not predictions. they\'re edge cases worth quantifying before making a major move.', y);
+        'Secondary events that compound the transition. These are not predictions. They are edge cases worth quantifying before making a major financial move.', y);
 
       const shockRows = [
         {
-          name: 'Partner income loss. 6 months',
+          name: 'Partner income loss (6 months)',
           desc: sim.isDualIncome && sim.partnerIncome > 0
             ? `Partner income of ${fmtM(sim.partnerIncome)}/month stops for 6 months, then resumes. Burn increases by that amount during the loss period.`
             : 'Not applicable. No partner income entered.',
@@ -947,7 +953,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
         },
         {
           name: 'New child',
-          desc: `Assumptions: ${fmtM(CHILD_ONETIME)} one-time setup cost + ${fmtM(CHILD_MONTHLY)}/month ongoing (childcare, supplies, insurance adjustments). These are estimates. actual costs vary significantly.`,
+          desc: `Assumptions: ${fmtM(CHILD_ONETIME)} one-time setup cost + ${fmtM(CHILD_MONTHLY)}/month ongoing (childcare, supplies, insurance adjustments). These are estimates. Actual costs vary significantly.`,
           psr: psrNewChild, full: fullRunway(sim, 1.00, undefined, () => CHILD_MONTHLY),
           needsT3: t3Cap > 0 && psrNewChild < fullRunway(sim, 1.00, undefined, () => CHILD_MONTHLY),
           applicable: true,
@@ -978,7 +984,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       y += 6;
 
       y = insight(doc, 'The Pattern Behind Household Shocks',
-        `These scenarios matter because they\'re correlated. difficult personal events tend to cluster. A partner job loss during a transition period is not unusual. A new child changes financial structure for years. The question isn\'t whether these will happen. it\'s whether the runway is wide enough to absorb one if it does.`, y);
+        'These scenarios matter because they are correlated. Difficult personal events tend to cluster. A partner job loss during a transition period is not unusual. A new child changes financial structure for years. The question is not whether these will happen. It is whether the runway is wide enough to absorb one if it does.', y);
 
       ftr(doc, 8);
 
@@ -1356,15 +1362,37 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
         doc.fillColor(C.coal).fontSize(8.5).font('Helvetica').text(entry.def, L + 12, y + 21, { width: W - 24, lineGap: 1.5 });
         y += h + 4;
       });
-      y += 8;
-
-      doc.rect(L, y, W, 36).fill(C.mid);
-      doc.rect(L, y, 3, 36).fill(C.muted);
-      doc.fillColor(C.muted).fontSize(8).font('Helvetica-Bold').text('IMPORTANT NOTICE', L + 12, y + 8);
-      doc.fillColor(C.muted).fontSize(7.5).font('Helvetica').text('This report is a structural simulation based on your inputs. It is not financial advice, tax advice, or a prediction of future outcomes. All figures depend entirely on the information provided. Consult a qualified financial professional before making major financial or career decisions.', L + 12, y + 18, { width: W - 24, lineGap: 1.5 });
-      y += 44;
-
       ftr(doc, 14);
+
+      // ════════════════════════════════════════════════════════════════════
+      // PAGE 15. IMPORTANT NOTICE (DISCLAIMER)
+      // ════════════════════════════════════════════════════════════════════
+      doc.addPage(); hdr(doc, date); y = 42;
+      doc.rect(L, y, W, 1).fill(C.border); y += 8;
+      doc.fillColor('#94a3b8').fontSize(7.5).font('Helvetica').text(`PAGE 15 OF ${TOTAL}`, L, y); y += 11;
+      doc.fillColor(C.navy).fontSize(16).font('Times-Bold').text('Important Notice', L, y, { width: W }); y += 30;
+
+      const disclaimerParas = [
+        'This report is a structural financial simulation generated by QuitReady. It is based solely on the inputs provided by the user. It does not constitute financial advice, tax advice, investment advice, or legal advice of any kind.',
+        'All outputs — including runway figures, surplus and deficit calculations, capital depth estimates, and stress scenario results — are deterministic mathematical projections. They are not predictions of future outcomes. Actual results will differ based on market conditions, personal circumstances, changes in tax law, and many other factors not captured in this model.',
+        'No licensed professional has reviewed the inputs or outputs in this report. The calculations assume that all user-provided information is accurate and complete. Errors or omissions in the inputs will produce materially incorrect results.',
+        'QuitReady does not make any representation as to the accuracy, completeness, or suitability of this analysis for any particular purpose. The user assumes full responsibility for any decisions made in reliance on this report.',
+        'Healthcare cost estimates are based on general ACA marketplace assumptions and may not reflect actual premiums available in your state or for your household. Tax estimates are illustrative only and do not account for individual circumstances, credits, deductions, or state-level obligations.',
+        'Before making any significant financial, career, or investment decision, you are strongly encouraged to consult with a qualified financial planner, tax professional, or attorney who can assess your complete financial situation.',
+        'This report is confidential and intended solely for the personal use of the individual who generated it. It should not be shared with, or relied upon by, any third party without independent professional review.',
+      ];
+
+      disclaimerParas.forEach((para, i) => {
+        const isFirst = i === 0;
+        if (isFirst) {
+          doc.rect(L, y - 4, W, 2).fill(C.navy);
+          y += 6;
+        }
+        doc.fillColor(C.coal).fontSize(9).font('Helvetica').text(para, L, y, { width: W, lineGap: 2 });
+        y += doc.heightOfString(para, { width: W, lineGap: 2 }) + 14;
+      });
+
+      ftr(doc, 15);
       doc.end();
 
     } catch (err) {

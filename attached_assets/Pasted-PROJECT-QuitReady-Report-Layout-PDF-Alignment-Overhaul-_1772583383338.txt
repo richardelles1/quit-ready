@@ -1,0 +1,371 @@
+PROJECT: QuitReady Report Layout + PDF Alignment Overhaul
+
+Goal:
+Fix the QuitReady report so the on-screen report and generated PDF are visually identical, professionally designed, and free of layout bugs. Implement a clean, unified layout system that eliminates drift between report and PDF rendering. This update should address cover page design, typography consistency, page 1 layout, encoding issues, spacing, and table styling.
+
+CRITICAL ARCHITECTURE CHANGE
+
+There must be ONE source of truth for the report layout.
+
+Current problem:
+HTML report layout and PDF layout appear to be separate templates. This causes visual drift and prevents updates from propagating.
+
+Fix:
+
+Create a single ReportLayout component used for both:
+
+Report view
+PDF export
+
+Example structure:
+
+/components/report/ReportLayout
+/components/report/pages/*
+/lib/report/renderPDF
+
+Flow should be:
+
+ReportLayout
+↓
+render in browser
+↓
+renderToPDF(ReportLayout)
+
+Remove any separate PDF template system.
+
+Both outputs must render the exact same layout components.
+
+---
+
+COVER PAGE REDESIGN
+
+The cover page must be a full standalone page.
+
+Remove all metric widgets and surplus bars from the cover.
+
+Design:
+
+Full page deep blue background.
+
+White header band at top.
+White footer band at bottom.
+
+Center layout:
+
+QuitReady
+Financial Transition Report
+
+Prepared for: {User Name}
+Generated: {Date}
+
+Subtitle:
+
+A financial readiness analysis for transitioning from employment to independent income.
+
+Logo usage:
+
+Large "Q" mark as faint background watermark
+Full logo near top header band
+
+No charts.
+No metrics.
+No bars.
+
+This page should look like a professional consulting report cover.
+
+---
+
+GLOBAL TYPOGRAPHY SYSTEM
+
+Create a shared typography system used across all pages.
+
+Example scale:
+
+Title: 28px
+Section Header: 18px
+Subheader: 14px
+Body Text: 11px
+Metric Numbers: 22px
+Table Headers: 12px
+
+All pages must reference these styles.
+
+Remove any local font size overrides.
+
+Font sizes must be consistent across the entire report.
+
+---
+
+PAGE 1 REDESIGN (Financial Position)
+
+Current layout wastes space and misaligns metric boxes.
+
+Replace the 6 small boxes with a clean 4-card layout.
+
+New layout:
+
+Row 1:
+Total Monthly Income
+Total Monthly Outflow
+Monthly Surplus
+
+Row 2:
+Tier 1 Liquid Capital
+Runway Status
+
+Remove “Risk Score” box completely.
+
+Risk classification should appear in the interpretation text instead.
+
+Ensure metric cards:
+
+Have equal width
+Are vertically aligned
+Do not wrap headers onto messy second lines
+
+Example header corrections:
+
+Replace:
+TOTAL MONTHLY OUTFLOW (ALL
+EXPENSES)
+
+With:
+Total Monthly Outflow
+
+Short clean headers only.
+
+Reduce bottom whitespace on page 1.
+
+Expand interpretation section slightly to fill space.
+
+---
+
+RUNWAY TERMINOLOGY FIX
+
+Replace all instances of:
+
+24+ years
+
+with:
+
+Sustainable Runway
+
+Definition:
+Capital is not the limiting factor under modeled conditions.
+
+Ensure this wording appears consistently across:
+
+Page 1
+Stress scenarios
+Revenue timing
+Scenario comparison
+Interpretation page
+
+---
+
+NET MONTHLY OUTFLOW ROW (PAGE 3)
+
+Current styling is incorrect.
+
+Fix the NET MONTHLY OUTFLOW row:
+
+Background: dark navy
+Text: white
+Label centered
+Dollar value large and bold
+
+Example layout:
+
+NET MONTHLY OUTFLOW
+$6,740
+
+Both elements centered.
+
+The dollar value should visually match the metric font size.
+
+---
+
+DEBT PAGE TONE ADJUSTMENT
+
+Ensure language is neutral and contextual.
+
+Replace harsh warnings with explanatory tone.
+
+Section header:
+
+Debt Structure & Financial Commitments
+
+Rename alert box to:
+
+Debt Load Considerations
+
+Explanation should emphasize:
+
+Mortgage and long-term financing context
+Impact on flexibility rather than alarm.
+
+---
+
+ASSET TABLE COLOR SYSTEM
+
+Colors must represent liquidity levels.
+
+Use consistent logic:
+
+Cash & HYSA → blue
+Brokerage → light blue
+Roth contributions → teal
+Retirement accounts → amber
+Home equity → grey
+
+Remove random highlight colors.
+
+Ensure table row shading improves readability.
+
+---
+
+FIX ENCODING ERRORS
+
+Replace corrupted characters such as:
+
+("30%)
+("15%)
+
+with:
+
+(30%)
+(15%)
+
+Scan entire document and clean all encoding artifacts.
+
+---
+
+STRESS SCENARIO PAGE TEXT FIXES
+
+Remove rendering bugs such as:
+
+“At Sustainable Runway of Tier 1 Runway”
+
+Replace with:
+
+Under expected revenue conditions, savings stabilize before depletion. Capital is not the limiting factor in this scenario.
+
+Ensure all scenario descriptions are clear and readable.
+
+---
+
+HOUSEHOLD SHOCK PAGE CLEANUP
+
+Fix grammar errors and spacing.
+
+Example correction:
+
+“These are not predictions. they're edge cases”
+
+→
+
+“These are not predictions. They are edge cases worth quantifying before making a major transition.”
+
+Increase vertical spacing between scenarios.
+
+Ensure each scenario appears as its own card block.
+
+---
+
+SCENARIO COMPARISON TABLE
+
+Remove quotation formatting from column headers.
+
+Replace:
+
+Mild ("15%)
+Severe ("30%)
+
+with:
+
+Moderate Contraction (15%)
+Severe Contraction (30%)
+
+Ensure columns have equal width and consistent alignment.
+
+---
+
+DECISION INTERPRETATION PAGE
+
+Convert paragraph sections into bullet insight lists.
+
+Example:
+
+Your position today:
+
+• Household income currently exceeds baseline expenses
+• Partner income provides meaningful financial cushioning
+• Liquid capital provides runway stability
+• Debt payments are the primary structural constraint
+
+This improves readability.
+
+---
+
+CHART PAGE SPACING
+
+Add additional vertical spacing above the revenue vs liquidity chart.
+
+Ensure chart labels and legend align with typography system.
+
+---
+
+RISK COMPRESSION SECTION
+
+Convert the Risk Compression Tactics block into bullet lists.
+
+Example format:
+
+• Set a 6-month revenue checkpoint
+• Define minimum revenue floor before drawing savings
+• Establish a re-entry employment trigger
+• Maintain fallback consulting income
+
+Remove long paragraph formatting.
+
+---
+
+GLOSSARY PAGE
+
+Keep glossary content but fix bottom rendering issues.
+
+Ensure the glossary occupies one full page cleanly.
+
+Move disclaimer text to a final standalone page.
+
+---
+
+DISCLAIMER PAGE
+
+Create a separate final page titled:
+
+Important Notice
+
+Place the legal disclaimer here only once.
+
+Remove duplicate disclaimers from other pages.
+
+---
+
+FINAL VALIDATION REQUIREMENTS
+
+After implementing changes:
+
+Report view and PDF must match exactly.
+
+Verify:
+
+Cover page full design
+Typography consistency
+Correct table alignment
+No encoding artifacts
+Balanced spacing
+All sections render cleanly
+No header wrapping issues
+
+Output must appear as a professional financial report suitable for a paid product.
