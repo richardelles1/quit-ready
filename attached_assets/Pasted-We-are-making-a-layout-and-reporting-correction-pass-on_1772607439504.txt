@@ -1,0 +1,277 @@
+We are making a layout and reporting correction pass on the QuitReady report and PDF output.  
+Do not change the simulation model. Only correct layout, formatting, and reporting structure.
+
+The goal is a clean, structured financial report with consistent alignment, spacing, and visual hierarchy.
+
+---
+
+SECTION 1 — FINANCIAL POSITION TODAY LAYOUT
+
+Under the section Financial Position Today, the three summary metric blocks are currently left-aligned and visually hugging the title.
+
+Fix this layout.
+
+Rules:
+
+• The three metric blocks must be center aligned within the card container  
+• Equal spacing between the three blocks  
+• They should visually sit in the middle of the card, not pushed to the left
+
+Metrics affected:
+
+Monthly Net Cash Flow  
+Full Capital Depth  
+Tier 1 Runway
+
+All numeric values in these blocks must be center aligned, not right aligned.
+
+---
+
+SECTION 2 — MONTHLY OUTFLOW COLOR
+
+The Monthly Outflow number is currently displayed in a harsh red.
+
+Replace with a muted financial red.
+
+Recommended color:
+
+#C94B4B
+
+The goal is warning tone, not alarm tone.
+
+---
+
+SECTION 3 — “WHERE YOUR MONEY GOES” TABLE
+
+The Monthly Amount column must not be right aligned.
+
+Fix alignment:
+
+Category column → left aligned  
+Monthly amount column → center aligned
+
+The current right-justified formatting makes the table visually unstable.
+
+---
+
+SECTION 4 — TIER 1 RUNWAY ANALYSIS TABLE
+
+On the Tier 1 Runway analysis page, the columns:
+
+Your Amount  
+Counted As
+
+are currently right aligned.
+
+Fix alignment:
+
+Both columns must be center aligned.
+
+Numbers should not hug the right border.
+
+---
+
+SECTION 5 — TIER 2 CONTINGENT CAPITAL BOX
+
+The yellow box titled:
+
+Tier 2 Contingent Capital  
+Retirement + Home Equity
+
+is visually floating in the middle of the analysis.
+
+Move this box to the bottom of the page under the Tier timeline section.
+
+It should function as a supporting explanatory note, not a centerpiece.
+
+Placement rules:
+
+Tier timeline  
+↓  
+Spacer  
+↓  
+Tier 2 Contingent Capital box
+
+---
+
+SECTION 6 — HOUSEHOLD SHOCK SCENARIOS
+
+The Household Shock Scenarios layout is currently broken into uneven blocks.
+
+Replace the layout entirely.
+
+Shock scenarios should use the same card structure as the section below titled:
+
+The Pattern Behind Household Shocks
+
+Each scenario must be a uniform card in a vertical stack.
+
+Structure:
+
+Shock Title  
+Short description  
+New Tier 1 Runway  
+Change from base
+
+Spacing between cards must be consistent.
+
+Remove the uneven multi-column block layout.
+
+---
+
+SECTION 7 — SAVINGS TIER TIMELINE
+
+The Savings Tier Timeline page currently has large unused white space and confusing spacing.
+
+Fix rules:
+
+• Timeline graphic centered  
+• Tier 1 depletion label placed directly under the Tier 1 marker  
+• Tier 2 marker placed proportionally on the timeline  
+• Remove unused vertical spacing above and below the graphic
+
+The timeline must visually communicate capital depletion flow, not float in empty space.
+
+---
+
+SECTION 8 — HOW TO WIDEN THE RUNWAY PAGE
+
+This page should visually match the structured suggestion layout used elsewhere in the report.
+
+Specifically:
+
+The four sections must render as clean stacked cards:
+
+Cash Flow Levers  
+Revenue De-Risking Levers  
+Structural Cushion Levers  
+Risk Compression Tactics
+
+Each card must include:
+
+Header  
+Bullet list  
+Consistent padding  
+Equal card widths
+
+Match the layout style shown in the reference screenshot.
+
+---
+
+SECTION 9 — REVENUE RAMP SENSITIVITY BUG
+
+The revenue ramp sensitivity currently produces identical results:
+
+Revenue begins 3 months earlier → same runway  
+Revenue begins 6 months earlier → same runway  
+Revenue begins 9 months earlier → same runway
+
+This indicates the ramp parameter is not being applied in the calculation.
+
+Fix:
+
+Each ramp scenario must recalculate runway using the adjusted ramp timing.
+
+Expected result:
+
+Each scenario should produce a different runway value and different impact delta.
+
+---
+
+SECTION 10 — SCENARIO COMPARISON TABLE
+
+The Scenario Comparison table is currently visually inconsistent.
+
+Fix formatting rules:
+
+All runway results must be formatted:
+
+X years, Y months
+
+Examples:
+
+4 years, 9 months  
+2 years, 8 months  
+1 year, 11 months
+
+All columns must be center aligned.
+
+Column spacing must be consistent.
+
+---
+
+SECTION 11 — BASE SCENARIO LANGUAGE
+
+The base scenario currently states:
+
+Healthy but still leads to Tier 2.
+
+This wording is confusing.
+
+Replace with:
+
+Sustainable under current assumptions but eventually relies on Tier 2 capital if no revenue recovery occurs.
+
+This better reflects long-term depletion logic.
+
+---
+
+SECTION 12 — PRESSURE DEFINITION
+
+Where the report states:
+
+Pressure begins at month X
+
+Add a short definition below:
+
+Pressure indicates the point where Tier 1 liquid capital falls below the modeled burn requirement and contingency capital may begin to be accessed.
+
+---
+
+SECTION 13 — DECISION INTERPRETATION FORMAT
+
+The Decision Interpretation section must be bullet points only.
+
+No paragraphs.
+
+Structure:
+
+Key takeaway bullet  
+Risk bullet  
+Opportunity bullet  
+Suggested caution bullet
+
+Each line should be concise.
+
+---
+
+SECTION 14 — GENERAL SPACING RULES
+
+Apply these spacing rules across the entire report:
+
+• Consistent card padding  
+• Even vertical spacing between sections  
+• Remove excessive white space blocks  
+• Center major graphics  
+• Align numbers consistently
+
+The goal is a structured financial report layout, not free-flowing content.
+
+---
+
+SECTION 15 — FINAL VALIDATION
+
+Before completing:
+
+Confirm that:
+
+• Financial Position cards are centered  
+• Outflow color is muted red  
+• Tables use center alignment for numbers  
+• Shock scenarios render as uniform stacked cards  
+• Timeline spacing is corrected  
+• Revenue ramp sensitivity produces different outcomes  
+• Scenario comparison table formatting is consistent  
+• Decision interpretation uses bullet points only
+
+Do not modify simulation logic. Only correct layout, alignment, and reporting structure.

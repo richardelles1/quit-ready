@@ -387,11 +387,16 @@ export default function Results() {
       { desc: 'Reduce burn by $2,000/month', psr: bL(2000) },
       { desc: 'Reduce burn by $3,000/month', psr: bL(3000) },
     ]},
-    ...(sim.rampDuration > 0 ? [{ category: 'Revenue Ramp (Earlier Start)', levers: [
-      { desc: 'Revenue begins 3 months earlier', psr: rL(3) },
-      { desc: 'Revenue begins 6 months earlier', psr: rL(6) },
-      { desc: 'Revenue begins 9 months earlier', psr: rL(9) },
-    ]}] : []),
+    ...(sim.rampDuration > 0 ? [{ category: 'Revenue Ramp (Earlier Start)', levers: (
+      [
+        { adj: 3, desc: 'Revenue begins 3 months earlier' },
+        { adj: 6, desc: 'Revenue begins 6 months earlier' },
+        { adj: 9, desc: 'Revenue begins 9 months earlier' },
+      ]
+        .map(item => ({ desc: item.desc, psr: rL(item.adj), newRamp: Math.max(0, sim.rampDuration - item.adj) }))
+        .filter((item, i, arr) => i === 0 || item.newRamp !== arr[i - 1].newRamp)
+        .map(item => ({ desc: item.desc, psr: item.psr }))
+    )}] : []),
     { category: 'Supplemental Income', levers: [
       { desc: 'Add $1,500/month supplemental income', psr: bL(1500) },
       { desc: 'Add $3,000/month supplemental income', psr: bL(3000) },
@@ -509,16 +514,17 @@ export default function Results() {
                   val: fmt(grossOutflow),
                   testid: 'metric-tmib',
                   sub: 'All expense components, before partner offset',
+                  color: 'text-[#C94B4B]',
                 },
                 {
                   label: 'Monthly Surplus / Deficit',
                   val: (grossSurplus >= 0 ? '+' : '') + fmt(grossSurplus),
                   testid: 'metric-surplus',
-                  color: grossSurplus >= 0 ? 'text-green-700' : 'text-red-700',
+                  color: grossSurplus >= 0 ? 'text-green-700' : 'text-[#C94B4B]',
                   sub: grossSurplus >= 0 ? 'Household income exceeds total outflow' : 'Total outflow exceeds household income',
                 },
               ].map((m, i) => (
-                <div key={m.label} className={`px-7 py-6 border-b sm:border-b-0 ${i < 2 ? 'sm:border-r' : 'border-b-0'} border-border`} data-testid={m.testid}>
+                <div key={m.label} className={`px-7 py-6 border-b sm:border-b-0 ${i < 2 ? 'sm:border-r' : 'border-b-0'} border-border flex flex-col items-center text-center`} data-testid={m.testid}>
                   <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground/70 mb-2">{m.label}</p>
                   <p className={`text-2xl font-bold font-serif ${m.color ?? 'text-foreground'}`}>{m.val}</p>
                   {m.sub && <p className="text-xs text-muted-foreground/60 mt-1 leading-tight">{m.sub}</p>}
@@ -662,11 +668,11 @@ export default function Results() {
               {grossOutflow > 0 && (
                 <div className="mt-5 pt-5 border-t border-border space-y-1.5">
                   <p className="text-xs text-muted-foreground leading-relaxed">
-                    <strong className="text-foreground">{pcts[0] + (pcts[1] ?? 0)}% is fixed obligations</strong>. living expenses and debt payments that will not decrease if revenue underperforms. These are the hardest costs to reduce under pressure.
+                    <strong className="text-foreground">{pcts[0] + (pcts[1] ?? 0)}% is fixed obligations</strong> — living expenses and debt payments that will not decrease if revenue underperforms. These are the hardest costs to reduce under pressure.
                   </p>
                   {sim.selfEmploymentTax > 0 && (
                     <p className="text-xs text-muted-foreground leading-relaxed">
-                      The <strong className="text-foreground">tax reserve</strong> ({pcts[outflowComponents.findIndex(c => c.val === sim.selfEmploymentTax)]}% of gross outflow) eases naturally in lower-revenue months. giving the outflow structure some flexibility tied to income.
+                      The <strong className="text-foreground">tax reserve</strong> ({pcts[outflowComponents.findIndex(c => c.val === sim.selfEmploymentTax)]}% of gross outflow) eases naturally in lower-revenue months, giving the outflow structure some flexibility tied to income.
                     </p>
                   )}
                   {(sim.totalDebt ?? 0) > 0 && (
@@ -697,9 +703,9 @@ export default function Results() {
                   <thead>
                     <tr className="border-b border-border">
                       <th className="text-left py-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Scenario</th>
-                      <th className="text-right py-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Tier 1 Runway</th>
-                      <th className="text-right py-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Full Capital Depth</th>
-                      <th className="text-right py-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Tier 2 Required?</th>
+                      <th className="text-center py-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Tier 1 Runway</th>
+                      <th className="text-center py-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Full Capital Depth</th>
+                      <th className="text-center py-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Tier 2 Required?</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -713,9 +719,9 @@ export default function Results() {
                       return (
                         <tr key={s.label} className="border-b border-border last:border-0">
                           <td className="py-3 text-sm text-muted-foreground">{s.label}</td>
-                          <td className="py-3 text-sm font-semibold text-foreground text-right">{fmtRunway(s.psr)}</td>
-                          <td className="py-3 text-sm font-semibold text-foreground text-right">{fmtRunway(s.full)}</td>
-                          <td className={`py-3 text-sm font-semibold text-right ${needsR ? 'text-red-700' : 'text-green-700'}`}>
+                          <td className="py-3 text-sm font-semibold text-foreground text-center">{fmtRunway(s.psr)}</td>
+                          <td className="py-3 text-sm font-semibold text-foreground text-center">{fmtRunway(s.full)}</td>
+                          <td className={`py-3 text-sm font-semibold text-center ${needsR ? 'text-[#C94B4B]' : 'text-green-700'}`}>
                             {needsR ? 'Yes' : 'No'}
                           </td>
                         </tr>
@@ -889,37 +895,41 @@ export default function Results() {
               Household Shock Scenarios
             </SectionHeader>
             <div className="px-6 py-5">
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              <div className="space-y-3">
                 {[
-                  { name: 'Emergency Expense', desc: '$15,000 one-time capital hit', psr: psrEmergency },
-                  { name: 'Unexpected Tax Bill', desc: '$10,000 one-time capital hit', psr: psrTaxBill },
-                  { name: 'Business Launch Delay', desc: '+3 months to revenue ramp', psr: psrRampDelay3 },
-                  { name: 'Healthcare Cost Increase', desc: '+$500/month recurring cost', psr: psrHealthcare },
-                  ...(psrPartnerLoss !== null ? [{ name: 'Partner Income Loss', desc: 'Loss of all partner income for 6 months', psr: psrPartnerLoss }] : []),
-                  { name: 'New Child in Household', desc: '+$1,500/month recurring cost', psr: psrNewChild },
-                ].map(shock => (
-                  <div key={shock.name} className="p-4 rounded-lg border border-border bg-muted/5 flex flex-col h-full">
-                    <p className="text-sm font-bold text-foreground mb-1">{shock.name}</p>
-                    <p className="text-xs text-muted-foreground mb-3 flex-1">{shock.desc}</p>
-                    <div className="pt-3 border-t border-border mt-auto">
-                      <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-1">New Tier 1 Runway</p>
-                      <p className="text-sm font-bold text-foreground mb-0.5">
-                        {shock.psr >= 999 ? 'Sustainable Runway' : fmtRunway(Math.round(shock.psr))}
-                      </p>
-                      {psrBase < 999 && shock.psr < 999 && (() => {
-                        const d = Math.round(shock.psr - psrBase);
-                        return (
-                          <p className={`text-xs ${d < 0 ? 'text-red-600' : 'text-green-600'}`}>
+                  { name: 'Emergency Expense', desc: 'A one-time $15,000 emergency expense reduces Tier 1 capital immediately.', psr: psrEmergency },
+                  { name: 'Unexpected Tax Bill', desc: 'A one-time $10,000 tax obligation hits Tier 1 capital immediately.', psr: psrTaxBill },
+                  { name: 'Business Launch Delay', desc: 'Revenue ramp takes 3 additional months to reach target.', psr: psrRampDelay3 },
+                  { name: 'Healthcare Cost Increase', desc: 'An unexpected $500/month increase in healthcare premiums or medical costs.', psr: psrHealthcare },
+                  ...(psrPartnerLoss !== null ? [{ name: 'Partner Income Loss', desc: `Partner income of ${fmt(partnerOff)}/month stops for 6 months then resumes.`, psr: psrPartnerLoss }] : []),
+                  { name: 'New Child in Household', desc: 'Ongoing household cost increase of $1,000/month for child-related expenses.', psr: psrNewChild },
+                ].map(shock => {
+                  const d = psrBase < 999 && shock.psr < 999 ? Math.round(shock.psr - psrBase) : null;
+                  const needsT2 = t3Total > 0 && shock.psr < sim.baseRunway;
+                  return (
+                    <div key={shock.name} className="flex items-center justify-between p-4 rounded-lg border border-border bg-muted/5">
+                      <div className="flex-1 min-w-0 pr-4">
+                        <p className="text-sm font-bold text-foreground mb-0.5">{shock.name}</p>
+                        <p className="text-xs text-muted-foreground leading-relaxed">{shock.desc}</p>
+                      </div>
+                      <div className="shrink-0 text-right min-w-[140px]">
+                        <p className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground mb-0.5">New Tier 1 Runway</p>
+                        <p className="text-sm font-bold text-foreground">
+                          {shock.psr >= 999 ? 'Sustainable Runway' : fmtRunway(Math.round(shock.psr))}
+                        </p>
+                        {d !== null && (
+                          <p className={`text-xs mt-0.5 ${d < 0 ? 'text-[#C94B4B]' : 'text-green-600'}`}>
                             Change from base: {d >= 0 ? '+' : ''}{d} months
                           </p>
-                        );
-                      })()}
-                      {psrBase >= 999 && shock.psr < 999 && (
-                        <p className="text-xs text-muted-foreground">Base was Sustainable</p>
-                      )}
+                        )}
+                        {psrBase >= 999 && shock.psr < 999 && (
+                          <p className="text-xs text-muted-foreground mt-0.5">Base was Sustainable</p>
+                        )}
+                        {needsT2 && <p className="text-[9px] text-amber-600 font-semibold mt-0.5">Tier 2 Required</p>}
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
           </SectionCard>
@@ -935,7 +945,7 @@ export default function Results() {
                 <thead>
                   <tr className="border-b border-border">
                     <th className="text-left py-2 font-semibold uppercase tracking-wider text-muted-foreground pr-3">Metric</th>
-                    {['Base', 'Moderate (-15%)', 'Severe (-30%)', '+3mo Ramp', ...(sim.isDualIncome ? ['Partner Loss'] : []), 'New Child'].map(c => (
+                    {['Base Case', 'Moderate (-15%)', 'Severe (-30%)', '+3mo Ramp', ...(sim.isDualIncome ? ['Partner Loss'] : []), 'New Child'].map(c => (
                       <th key={c} className="text-center py-2 font-semibold uppercase tracking-wider text-muted-foreground px-2">{c}</th>
                     ))}
                   </tr>
@@ -1029,6 +1039,9 @@ export default function Results() {
                   <p className="text-sm text-muted-foreground leading-relaxed">
                     Under severe contraction (-30%), Tier 1 capital is exhausted in <strong className="text-foreground">{fmtRunway(psr30)}</strong>.
                     {t3Total > 0 && sim.runway30Down > psr30 ? ` Total depth extends to ${fmtRunway(sim.runway30Down)} if Tier 2 is accessed, but that is emergency capital, not a plan.` : ''}
+                  </p>
+                  <p className="text-xs text-muted-foreground/70 mt-2 italic leading-relaxed">
+                    Pressure indicates the point where Tier 1 liquid capital falls below the modeled burn requirement and contingency capital may begin to be accessed.
                   </p>
                 </div>
               )}

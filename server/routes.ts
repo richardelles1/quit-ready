@@ -736,8 +736,8 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
         doc.rect(L, y, W, h).fill(i % 2 === 0 ? C.light : C.mid);
         doc.fillColor(C.coal).fontSize(9).font('Helvetica-Bold').text(c.label, L + 8, y + 5, { width: 152 });
         doc.fillColor(C.muted).fontSize(7.5).font('Helvetica').text(definitions[i] ?? '', L + 165, y + 5, { width: 185, lineGap: 1 });
-        doc.fillColor(C.navy).fontSize(10).font('Helvetica-Bold').text(fmtM(c.val), L + 350, y + 12, { width: 96, align: 'right' });
-        doc.fillColor(C.navy).fontSize(10).font('Helvetica-Bold').text(`${pct}%`, L + 454, y + 12, { width: 46, align: 'right' });
+        doc.fillColor(C.navy).fontSize(10).font('Helvetica-Bold').text(fmtM(c.val), L + 350, y + 12, { width: 96, align: 'center' });
+        doc.fillColor(C.navy).fontSize(10).font('Helvetica-Bold').text(`${pct}%`, L + 454, y + 12, { width: 46, align: 'center' });
         y += h;
       });
 
@@ -872,8 +872,8 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
         const catColor = row.cat === 'Tier 2' ? C.amber : C.navy;
         doc.fillColor(C.coal).fontSize(9).font('Helvetica').text(row.label, L + 8, y + 7, { width: 198 });
         doc.fillColor(C.muted).fontSize(7.5).font('Helvetica').text(row.haircut, L + 210, y + 7, { width: 96 });
-        doc.fillColor(C.coal).fontSize(9).font('Helvetica').text(fmtM(row.raw), L + 308, y + 7, { width: 106, align: 'right' });
-        doc.fillColor(catColor).fontSize(9).font('Helvetica-Bold').text(fmtM(row.counted), L + 418, y + 7, { width: 84, align: 'right' });
+        doc.fillColor(C.coal).fontSize(9).font('Helvetica').text(fmtM(row.raw), L + 308, y + 7, { width: 106, align: 'center' });
+        doc.fillColor(catColor).fontSize(9).font('Helvetica-Bold').text(fmtM(row.counted), L + 418, y + 7, { width: 84, align: 'center' });
         y += 24;
       });
 
@@ -897,7 +897,10 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       }
       if (pm30 < 999) {
         doc.fillColor(C.muted).fontSize(9).font('Helvetica')
-          .text(`Under severe contraction (-30%), Tier 1 Liquid Capital would be exhausted in ${fmtRunway(psr30)}. Financial pressure begins around ${fmtRunwayShort(pm30)}.`, L, y, { width: W });
+          .text(`Under severe contraction (-30%), Tier 1 Liquid Capital would be exhausted in ${fmtRunway(psr30)}. Financial pressure begins around month ${Math.round(pm30)} (${fmtRunwayShort(pm30)}).`, L, y, { width: W });
+        y += 18;
+        doc.fillColor(C.muted).fontSize(7.5).font('Helvetica-Oblique')
+          .text('Pressure indicates the point where Tier 1 liquid capital falls below the modeled burn requirement and contingency capital may begin to be accessed.', L, y, { width: W });
         y += 18;
       }
 
@@ -1235,11 +1238,16 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
         },
         ...(sim.rampDuration > 0 ? [{
           name: 'Revenue Ramp (Earlier Start)',
-          rows: [
-            { desc: 'Revenue begins 3 months earlier', psr: calcRampLever(3) },
-            { desc: 'Revenue begins 6 months earlier', psr: calcRampLever(6) },
-            { desc: 'Revenue begins 9 months earlier', psr: calcRampLever(9) },
-          ],
+          rows: (
+            [
+              { adj: 3, desc: 'Revenue begins 3 months earlier' },
+              { adj: 6, desc: 'Revenue begins 6 months earlier' },
+              { adj: 9, desc: 'Revenue begins 9 months earlier' },
+            ]
+              .map(item => ({ desc: item.desc, psr: calcRampLever(item.adj), newRamp: Math.max(0, sim.rampDuration - item.adj) }))
+              .filter((item, i, arr) => i === 0 || item.newRamp !== arr[i - 1].newRamp)
+              .map(item => ({ desc: item.desc, psr: item.psr }))
+          ),
         }] : []),
         {
           name: 'Supplemental Income',
@@ -1298,10 +1306,10 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       y += 26;
 
       const gridRows = [
-        { label: 'Tier 1 Runway', vals: cols.map(c => fmtRunwayShort(c.psr)) },
-        { label: 'Full Capital Depth', vals: cols.map(c => fmtRunwayShort(c.full)) },
+        { label: 'Tier 1 Runway', vals: cols.map(c => fmtRunway(c.psr)) },
+        { label: 'Full Capital Depth', vals: cols.map(c => fmtRunway(c.full)) },
         { label: 'Tier 2 Required?', vals: cols.map(c => c.r3 ? 'Yes' : 'No'), colors: cols.map(c => c.r3 ? C.red : C.green) },
-        { label: 'Pressure begins', vals: cols.map(c => c.pm >= 999 ? 'None' : fmtRunwayShort(c.pm)) },
+        { label: 'Pressure begins', vals: cols.map(c => c.pm >= 999 ? 'None' : fmtRunway(c.pm)) },
       ];
 
       gridRows.forEach((row, ri) => {
@@ -1317,7 +1325,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       y += 16;
 
       y = insight(doc, 'Reading This Grid',
-        `Each column represents a distinct revenue or household scenario. Tier 1 Runway is when your Tier 1 Liquid Capital (cash + brokerage) runs out. Full Capital Depth extends beyond that if Tier 2 Contingent Capital is drawn. "Tier 2 Required?" = Yes means there is a gap between Tier 1 Liquid Capital and full capital depth that would require accessing retirement or home equity.`, y);
+        `Each column represents a distinct revenue or household scenario. "Base Case" reflects expected conditions: sustainable under current assumptions, but if no revenue recovery occurs it will eventually rely on Tier 2 capital. Tier 1 Runway is when your Tier 1 Liquid Capital (cash + brokerage) runs out. Full Capital Depth extends beyond that if Tier 2 Contingent Capital is drawn. Pressure begins is the point where Tier 1 liquid capital falls below the modeled burn requirement and contingency capital may begin to be accessed.`, y);
 
       ftr(doc, 12);
 
@@ -1331,50 +1339,96 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       const riskBlocks = [
         {
           num: 1, title: 'Structural Stability',
-          body: score >= 70
-            ? `Your financial structure is defensible under expected conditions. Tier 1 Liquid Capital of ${fmtM(pasCap)} supports ${fmtRunway(psrBase)} of Tier 1 Runway at target revenue. The transition is viable as currently modeled. The primary variable is execution speed.`
+          bullets: score >= 70
+            ? [
+                `Tier 1 Liquid Capital: ${fmtM(pasCap)} — supports ${fmtRunway(psrBase)} of Tier 1 Runway at target revenue.`,
+                'Financial structure is defensible under expected conditions.',
+                'The transition is viable as currently modeled.',
+                'Primary variable is execution speed, not capital depth.',
+              ]
             : score >= 50
-            ? `Your financial structure is workable but the margin is limited. Tier 1 Liquid Capital of ${fmtM(pasCap)} provides ${fmtRunway(psrBase)} under expected conditions. Revenue underperformance or a delayed ramp would compress that window meaningfully.`
-            : `Your financial structure carries meaningful pressure. Tier 1 Liquid Capital of ${fmtM(pasCap)} may not be sufficient to absorb revenue delays or shortfalls without entering Tier 2 asset territory early in the transition. Strengthening the capital base before leaving would improve the position.`,
+            ? [
+                `Tier 1 Liquid Capital: ${fmtM(pasCap)} — provides ${fmtRunway(psrBase)} under expected conditions.`,
+                'Structure is workable but the margin is limited.',
+                'Revenue underperformance or a delayed ramp would compress this window meaningfully.',
+              ]
+            : [
+                `Tier 1 Liquid Capital: ${fmtM(pasCap)} — may not be sufficient to absorb revenue delays or shortfalls.`,
+                'Without early revenue, Tier 2 asset territory would be entered early in the transition.',
+                'Strengthening the capital base before leaving would materially improve this position.',
+              ],
         },
         {
           num: 2, title: 'Primary Risk Drivers',
-          body: (() => {
+          bullets: (() => {
             const fixedPct2 = grossOutflow > 0 ? Math.round(((sim.monthlyDebtPayments ?? 0) / grossOutflow) * 100) : 0;
             const hcPct = grossOutflow > 0 ? Math.round((hc / grossOutflow) * 100) : 0;
-            if (fixedPct2 > 25) return `Fixed debt payments (${fmtM(sim.monthlyDebtPayments)}/month, ${fixedPct2}% of gross outflow) are the primary structural risk. These cannot be reduced under stress and remain constant even when revenue underperforms.`;
-            if (hcPct > 18) return `Healthcare transition cost (${fmtM(hc)}/month, ${hcPct}% of gross outflow) is the primary structural risk. This is unusually high as a share of total outflow. Partner coverage or income-based ACA subsidies could materially change the position.`;
-            if (sim.rampDuration > 8) return `Revenue ramp duration (${sim.rampDuration} months) is the primary structural risk. A long ramp extends the period where savings must cover the full gap. Entering with even one paying client shortens this window meaningfully.`;
-            return `Revenue reliability is the primary structural risk. Under a 30% income contraction, Tier 1 Runway drops to ${fmtRunway(psr30)}. Entering with pre-existing revenue or a confirmed client reduces dependence on the ramp timeline.`;
+            if (fixedPct2 > 25) return [
+              `Fixed debt payments represent ${fixedPct2}% of gross outflow at ${fmtM(sim.monthlyDebtPayments)}/month.`,
+              'These obligations cannot be reduced under stress.',
+              'Debt service remains constant even when revenue underperforms.',
+            ];
+            if (hcPct > 18) return [
+              `Healthcare transition cost (${fmtM(hc)}/month) represents ${hcPct}% of gross outflow.`,
+              'This is unusually high as a share of total outflow.',
+              'Partner coverage or income-based ACA subsidies could materially change the position.',
+            ];
+            if (sim.rampDuration > 8) return [
+              `Revenue ramp duration is ${sim.rampDuration} months — the primary structural risk factor.`,
+              'A long ramp extends the period where savings must cover the full gap.',
+              'Entering with even one paying client shortens this window meaningfully.',
+            ];
+            return [
+              `Revenue reliability is the primary structural risk.`,
+              `Under 30% income contraction, Tier 1 Runway drops to ${fmtRunway(psr30)}.`,
+              'Entering with pre-existing revenue or a confirmed client reduces dependence on the ramp timeline.',
+            ];
           })(),
         },
         {
           num: 3, title: 'Where Pressure Appears',
-          body: pm30 >= 999
-            ? `No pressure point was identified within the model range. Tier 1 Liquid Capital remains solvent across all modeled scenarios. If revenue reaches target and ramp timing holds, this position does not encounter a critical depletion threshold.`
+          bullets: pm30 >= 999
+            ? [
+                'No pressure point was identified within the model range.',
+                'Tier 1 Liquid Capital remains solvent across all modeled scenarios.',
+                'If revenue reaches target and ramp timing holds, no critical depletion threshold is encountered.',
+              ]
             : t3Cap > 0 && psr30 < frBase
-            ? `Under severe income contraction (-30%), Tier 1 Liquid Capital would be exhausted in ${fmtRunway(psr30)}. At that point, the transition could only continue by accessing retirement accounts or home equity. Those assets extend the total theoretical runway to ${fmtRunway(fr30)}, but they represent emergency capital rather than primary transition funding.`
-            : `Under severe income contraction (-30%), Tier 1 Liquid Capital would be exhausted in ${fmtRunway(psr30)}. Pressure begins around ${fmtRunwayShort(pm30)}, when the depletion window narrows within 6 months of exhaustion.`,
+            ? [
+                `Under severe income contraction (-30%), Tier 1 capital would be exhausted in ${fmtRunway(psr30)}.`,
+                `Retirement accounts or home equity could extend total runway to ${fmtRunway(fr30)}.`,
+                'Tier 2 assets represent emergency capital, not primary transition funding.',
+                'Pressure indicates when Tier 1 liquid capital falls below the modeled burn requirement.',
+              ]
+            : [
+                `Under severe income contraction (-30%), Tier 1 capital would be exhausted in ${fmtRunway(psr30)}.`,
+                `Pressure begins around month ${Math.round(pm30)} — when the depletion window narrows within 6 months.`,
+                'Pressure indicates when Tier 1 liquid capital falls below the modeled burn requirement.',
+              ],
         },
         {
           num: 4, title: 'What Would Improve the Position',
-          body: [
+          bullets: [
             'Reduce fixed monthly obligations before the transition date.',
-            'Enter with at least one signed client or confirmed revenue source.',
+            'Enter with at least one signed client or confirmed revenue commitment.',
             `Increase Tier 1 Liquid Capital (currently ${fmtM(pasCap)}) before leaving.`,
             'Shorten the revenue ramp by building a client pipeline before quitting.',
             'Ensure partner income remains stable through the ramp period.',
-          ].join(' '),
+          ],
         },
       ];
 
       riskBlocks.forEach((block) => {
-        const lines = Math.max(3, Math.ceil(block.body.length / 86));
-        const h = lines * 10 + 38;
+        const bulletH = 13;
+        const h = block.bullets.length * bulletH + 44;
         doc.rect(L, y, W, h).fill(block.num % 2 === 0 ? C.light : C.mid);
         doc.rect(L, y, 3, h).fill(C.navy);
         doc.fillColor(C.muted).fontSize(7.5).font('Helvetica-Bold').text(`${block.num}. ${block.title.toUpperCase()}`, L + 12, y + 10);
-        doc.fillColor(C.coal).fontSize(9.5).font('Helvetica').text(block.body, L + 12, y + 24, { width: W - 24, lineGap: 2 });
+        let by = y + 26;
+        block.bullets.forEach(bullet => {
+          doc.fillColor(C.coal).fontSize(8.5).font('Helvetica').text(`\u2022  ${sanitize(bullet)}`, L + 14, by, { width: W - 28, lineGap: 1 });
+          by += bulletH;
+        });
         y += h + 8;
       });
 
