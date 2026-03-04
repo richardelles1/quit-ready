@@ -38,3 +38,8 @@ author = "agent"
 task = "shell.exec"
 args = "npm run dev"
 waitForPort = 5000
+
+[userenv]
+
+[userenv.shared]
+STRIPE_PRICE_ID_CORRECT = "price_1T7OhEGW49E7KwKe8dG8aBqS"
