@@ -166,8 +166,8 @@ function statRow(doc: PDFKit.PDFDocument, items: {label:string; val:string; colo
   items.forEach((item, i) => {
     const x = L + i * w;
     doc.rect(x, y, w - 4, rowH).fill(C.mid);
-    doc.fillColor(C.muted).fontSize(7).font('Helvetica').text(item.label.toUpperCase(), x, y + 8, { width: w - 4, align: 'center' });
-    doc.fillColor(item.color ?? C.navy).fontSize(13).font('Times-Bold').text(item.val, x, y + 22, { width: w - 4, align: 'center' });
+    doc.fillColor(C.muted).fontSize(7).font('Helvetica').text(item.label.toUpperCase(), x, y + 11, { width: w - 4, align: 'center' });
+    doc.fillColor(item.color ?? C.navy).fontSize(13).font('Times-Bold').text(item.val, x, y + 26, { width: w - 4, align: 'center' });
   });
   return y + rowH + 6;
 }
@@ -560,8 +560,8 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
 
       y = statRow(doc, [
         { label: 'Total Monthly Income', val: fmtM(totalIncome) },
-        { label: 'Total Monthly Outflow (all expenses)', val: fmtM(grossOutflowPDF), color: '#C94B4B' },
-        { label: 'Monthly Surplus / Deficit', val: (grossSurplus >= 0 ? '+' : '') + fmtM(grossSurplus), color: grossSurplus >= 0 ? C.green : '#C94B4B' },
+        { label: 'Total Monthly Outflow (all expenses)', val: fmtM(grossOutflowPDF), color: '#8B3A3A' },
+        { label: 'Monthly Surplus / Deficit', val: (grossSurplus >= 0 ? '+' : '') + fmtM(grossSurplus), color: grossSurplus >= 0 ? C.green : '#8B3A3A' },
       ], y);
 
       // --- Income vs Outflow mini bar chart (T001) ---
@@ -867,10 +867,25 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
         { label: 'Home equity', cat: 'Tier 2', haircut: '30% (illiquid, costly)', raw: sim.realEstate, counted: Math.round(sim.realEstate * 0.30) },
       ].filter(r => r.raw > 0);
 
-      tierRows.forEach((row, i) => {
-        const bg = row.cat === 'Tier 2' ? (i % 2 === 0 ? '#fffbeb' : '#fef9c3') : i % 2 === 0 ? C.light : C.mid;
+      // Color palette keyed by asset label for distinct tier zones
+      const tierBg: Record<string, string> = {
+        'Cash & HYSA':               '#dbeafe',  // blue-100  (Tier 1 primary)
+        'Brokerage accounts':        '#bfdbfe',  // blue-200  (Tier 1 secondary)
+        'Roth IRA contributions':    '#fef9c3',  // yellow-100 (Tier 2 accessible)
+        'Traditional IRA / 401(k)': '#fef08a',  // yellow-200 (Tier 2 penalized)
+        'Home equity':               '#ffedd5',  // orange-100 (Tier 2 illiquid)
+      };
+      const tierValColor: Record<string, string> = {
+        'Cash & HYSA':               C.navy,
+        'Brokerage accounts':        C.navy,
+        'Roth IRA contributions':    C.amber,
+        'Traditional IRA / 401(k)': C.amber,
+        'Home equity':               '#c2410c',  // orange-700
+      };
+      tierRows.forEach((row) => {
+        const bg = tierBg[row.label] ?? C.light;
+        const catColor = tierValColor[row.label] ?? C.navy;
         doc.rect(L, y, W, 24).fill(bg);
-        const catColor = row.cat === 'Tier 2' ? C.amber : C.navy;
         doc.fillColor(C.coal).fontSize(9).font('Helvetica').text(row.label, L + 8, y + 7, { width: 198 });
         doc.fillColor(C.muted).fontSize(7.5).font('Helvetica').text(row.haircut, L + 210, y + 7, { width: 96 });
         doc.fillColor(C.coal).fontSize(9).font('Helvetica').text(fmtM(row.raw), L + 308, y + 7, { width: 106, align: 'center' });
@@ -889,20 +904,22 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       y += 36;
 
       // Runway + pressure point
-      doc.fillColor(C.muted).fontSize(8).font('Helvetica-Bold').text('TIER 1 RUNWAY, BASE CASE', L, y); y += 10;
-      doc.fillColor(C.navy).fontSize(22).font('Times-Bold').text(fmtRunway(psrBase), L, y); y += 28;
+      y += 6;
+      doc.rect(L, y, W, 1).fill(C.border); y += 12;
+      doc.fillColor(C.muted).fontSize(8).font('Helvetica-Bold').text('TIER 1 RUNWAY, BASE CASE', L, y); y += 12;
+      doc.fillColor(C.navy).fontSize(22).font('Times-Bold').text(fmtRunway(psrBase), L, y); y += 32;
       if (psrBase >= 999) {
         doc.fillColor(C.muted).fontSize(8.5).font('Helvetica-Oblique')
           .text('Because revenue reaches the modeled target, savings stabilize early in the transition. Capital is not the limiting factor in this scenario.', L, y, { width: W, lineGap: 1.5 });
-        y += 36;
+        y += 38;
       }
       if (pm30 < 999) {
         doc.fillColor(C.muted).fontSize(9).font('Helvetica')
-          .text(`Under severe contraction (-30%), Tier 1 Liquid Capital would be exhausted in ${fmtRunway(psr30)}. Financial pressure begins around month ${Math.round(pm30)} (${fmtRunwayShort(pm30)}).`, L, y, { width: W });
-        y += 18;
+          .text(`Under severe contraction (-30%), Tier 1 Liquid Capital would be exhausted in ${fmtRunway(psr30)}. Financial pressure begins around month ${Math.round(pm30)} (${fmtRunwayShort(pm30)}).`, L, y, { width: W, lineGap: 1.5 });
+        y += 28;
         doc.fillColor(C.muted).fontSize(7.5).font('Helvetica-Oblique')
-          .text('Pressure indicates the point where Tier 1 liquid capital falls below the modeled burn requirement and contingency capital may begin to be accessed.', L, y, { width: W });
-        y += 18;
+          .text('Pressure indicates the point where Tier 1 liquid capital falls below the modeled burn requirement and contingency capital may begin to be accessed.', L, y, { width: W, lineGap: 1 });
+        y += 22;
       }
 
       ftr(doc, 5);
@@ -1037,37 +1054,40 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
         ] : []),
       ];
 
-      // Single-column full-width shock cards
-      const shockCardH = 92;
+      // Single-column full-width shock cards — horizontal internal layout to keep height compact
+      const shockCardH = 52;
+      const leftW = Math.round(W * 0.58);   // name + desc zone
+      const rightX = L + Math.round(W * 0.62); // runway data zone start
+      const rightW = Math.round(W * 0.33);  // runway data zone width
+      const badgeW = 30;
       shockList.forEach((sh, i) => {
         doc.rect(L, y, W, shockCardH).fill(i % 2 === 0 ? C.light : C.mid);
         doc.rect(L, y, 3, shockCardH).fill(C.navy);
-        // Badge
-        const badgeW = 30;
+        // Badge — top-right corner
         const badgeBg = sh.needsT3 ? '#fef2f2' : '#f0fdf4';
         doc.rect(L + W - badgeW - 8, y + 8, badgeW, 13).fill(badgeBg);
         doc.fillColor(sh.needsT3 ? C.red : C.green).fontSize(6.5).font('Helvetica-Bold')
           .text(sh.needsT3 ? 'T2 Req' : 'T1 OK', L + W - badgeW - 8, y + 11, { width: badgeW, align: 'center' });
-        // Name
+        // Left zone: name + desc
         doc.fillColor(C.navy).fontSize(9).font('Helvetica-Bold')
-          .text(sh.name, L + 10, y + 8, { width: W - badgeW - 28 });
-        // Desc
+          .text(sh.name, L + 10, y + 9, { width: leftW - badgeW - 18 });
         doc.fillColor(C.muted).fontSize(7.5).font('Helvetica')
-          .text(sh.desc, L + 10, y + 22, { width: W - 24, lineGap: 1 });
-        // "New Tier 1 Runway" label
-        doc.fillColor(C.muted).fontSize(6.5).font('Helvetica-Bold').text('NEW TIER 1 RUNWAY', L + 10, y + 52);
-        // Runway value
-        const runwayVal = sh.psr >= 999 ? 'Sustainable Runway' : fmtRunwayShort(Math.round(sh.psr));
-        doc.fillColor(C.navy).fontSize(11).font('Times-Bold').text(runwayVal, L + 10, y + 62, { width: W - 24 });
-        // Delta
+          .text(sh.desc, L + 10, y + 22, { width: leftW, lineGap: 1 });
+        // Right zone: runway label + value + delta
+        doc.fillColor(C.muted).fontSize(6.5).font('Helvetica-Bold')
+          .text('NEW TIER 1 RUNWAY', rightX, y + 9, { width: rightW });
+        const runwayVal = sh.psr >= 999 ? 'Sustainable' : fmtRunwayShort(Math.round(sh.psr));
+        doc.fillColor(C.navy).fontSize(10).font('Times-Bold')
+          .text(runwayVal, rightX, y + 19, { width: rightW });
         if (psrBase < 999 && sh.psr < 999) {
           const d = Math.round(sh.psr - psrBase);
-          const deltaStr = `Change from base: ${d >= 0 ? '+' : ''}${d} months`;
-          doc.fillColor(d < 0 ? C.red : C.green).fontSize(7).font('Helvetica').text(deltaStr, L + 10, y + 77, { width: W - 24 });
+          doc.fillColor(d < 0 ? C.red : C.green).fontSize(7).font('Helvetica')
+            .text(`${d >= 0 ? '+' : ''}${d} months`, rightX, y + 35, { width: rightW });
         } else if (psrBase >= 999 && sh.psr < 999) {
-          doc.fillColor(C.muted).fontSize(7).font('Helvetica').text('Base was Sustainable', L + 10, y + 77, { width: W - 24 });
+          doc.fillColor(C.muted).fontSize(7).font('Helvetica')
+            .text('Base was Sustainable', rightX, y + 35, { width: rightW });
         }
-        y += shockCardH + 6;
+        y += shockCardH + 5;
       });
       y += 4;
 
@@ -1096,16 +1116,40 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
           desc: `All savings exhausted. ${stage2End >= 999 ? 'Not reached within the model range under any scenario.' : `Projected around ${fmtRunway(stage2End)} under severe contraction.`}` },
       ];
 
-      stages.forEach((st, i) => {
-        const h = 64;
+      // Stage bullet content indexed by stage label prefix
+      const stageBullets: Record<string, string[]> = {
+        'Stage 1': [
+          '\u2022  Cash, HYSA, and brokerage accounts.',
+          '\u2022  No penalties or tax consequences.',
+          `\u2022  Stage ends around ${fmtRunway(stage1End)} under severe stress.`,
+        ],
+        'Stage 2': [
+          '\u2022  Retirement accounts and home equity.',
+          '\u2022  Early access triggers income taxes and penalties.',
+          `\u2022  Begins if Stage 1 is exhausted around ${fmtRunway(stage1End)}.`,
+        ],
+        'Stage 3': [
+          stage2End >= 999
+            ? '\u2022  Not reached within any modeled scenario.'
+            : `\u2022  Projected around ${fmtRunway(stage2End)} under severe contraction.`,
+          '\u2022  Represents full capital exhaustion across all tiers.',
+        ],
+      };
+      stages.forEach((st) => {
+        const h = 78;
+        const keyPrefix = (st.label as string).slice(0, 7);
+        const bullets = stageBullets[keyPrefix] ?? [];
         doc.rect(L, y, W, h).fill(st.bg as string);
         doc.rect(L, y, 3, h).fill(st.border as string);
         doc.fillColor(st.color as string).fontSize(10).font('Helvetica-Bold').text(st.label, L + 12, y + 10, { width: W - 24 });
         if (st.cap !== 'n/a') {
-          doc.fillColor(C.muted).fontSize(8).font('Helvetica').text('Capital in this stage', L + 12, y + 26);
-          doc.fillColor(st.color as string).fontSize(13).font('Times-Bold').text(st.cap, L + 12, y + 36);
+          doc.fillColor(C.muted).fontSize(8).font('Helvetica').text('Capital in this stage', L + 12, y + 28);
+          doc.fillColor(st.color as string).fontSize(13).font('Times-Bold').text(st.cap, L + 12, y + 40);
         }
-        doc.fillColor(C.coal).fontSize(9).font('Helvetica').text(st.desc, L + 200, y + 10, { width: W - 212, lineGap: 1.5 });
+        bullets.forEach((b, bi) => {
+          doc.fillColor(C.coal).fontSize(8.5).font('Helvetica')
+            .text(b, L + 200, y + 12 + bi * 19, { width: W - 212, lineGap: 1 });
+        });
         y += h + 8;
       });
 
@@ -1122,10 +1166,9 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       doc.fillColor(C.white).fontSize(8).font('Helvetica-Bold').text('Stage 1 (Primary)', L + 4, y + 8);
       if (hasStage2 && stage2W > 40) doc.text('Stage 2 (Restricted)', L + stage1W + 4, y + 8);
       y += 30;
-      doc.fillColor(C.muted).fontSize(7.5).font('Helvetica')
-        .text(`Stage 1 ends: ${fmtRunway(stage1End)}`, L, y)
-        .text(hasStage2 ? `Stage 2 ends: ${fmtRunway(stage2End)}` : `No Stage 2 reached under this scenario. Note: Tier 3 Structural Capital (private business equity, real estate partnerships) is intentionally excluded from runway modeling.`, L + 200, y);
-      y += 20;
+
+      y = insight(doc, 'Reading the Timeline',
+        'The blue bar represents Stage 1: penalty-free Tier 1 capital (cash and brokerage). This is your primary runway — accessible without tax or penalty. The amber bar represents Stage 2: Tier 2 contingent capital (retirement accounts and home equity). These assets carry early-access penalties and tax consequences. They extend the runway but at a permanent cost. The red zone marks total capital exhaustion — the structural hard stop. Aim to stabilize revenue before the Stage 1 bar ends.', y);
 
       ftr(doc, 9);
 
@@ -1178,8 +1221,25 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
         { label: 'Difference', val: psr30 >= 999 || psrBase >= 999 ? 'N/A' : `${psrBase - psr30} months` },
       ], y, 66);
 
-      y = insight(doc, 'Reading This Chart',
-        `The upper line shows Tier 1 Liquid Capital under expected revenue conditions. The lower line shows the same position under a 30% revenue shortfall. Under expected conditions, revenue ramps toward its target and savings stabilize. Under severe underperformance, savings continue declining until Tier 1 capital is exhausted${psr30 < 999 ? ` around month ${Math.round(psr30)}` : ''}. The difference between these paths is revenue timing and reliability, not the size of savings.`, y);
+      // "Reading This Chart" — 4 bullets with bold lead phrases
+      {
+        const blockBullets = [
+          { lead: 'Upper line (Base Case):', body: ' Revenue ramps toward target. Savings stabilize. Capital is not exhausted.' },
+          { lead: 'Lower line (Severe \u221230%):', body: ' Revenue persistently underperforms. Savings continue declining until Tier 1 is exhausted.' },
+          { lead: 'The gap between lines:', body: ' Reflects the cost of revenue timing risk — not the size of savings.' },
+          { lead: 'Key watch point:', body: psr30 < 999 ? ` If the lower line hits $0 before month 24, the transition requires structural strengthening. (Current: month ${Math.round(psr30)}.)` : ' Lower line stays positive through the modeled range — revenue timing risk is well-contained.' },
+        ];
+        const blockH = 110;
+        doc.rect(L, y, W, blockH).fill(C.light);
+        doc.rect(L, y, 3, blockH).fill(C.navy);
+        doc.fillColor(C.muted).fontSize(7).font('Helvetica-Bold').text('READING THIS CHART', L + 10, y + 8);
+        blockBullets.forEach((bl, bi) => {
+          const by = y + 22 + bi * 21;
+          doc.fillColor(C.navy).fontSize(8.5).font('Helvetica-Bold').text(`\u2022  ${bl.lead}`, L + 10, by, { continued: true });
+          doc.fillColor(C.coal).font('Helvetica').text(bl.body, { width: W - 24 });
+        });
+        y += blockH + 8;
+      }
 
       ftr(doc, 10);
 
@@ -1245,14 +1305,14 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
         // Category header
         doc.rect(L, y, W, 22).fill(C.navy);
         doc.fillColor(C.white).fontSize(8).font('Helvetica-Bold').text(cat.name, L + 8, y + 7);
-        doc.fillColor('#94a3b8').fontSize(7.5).font('Helvetica-Bold').text('New Runway', L + 330, y + 7, { width: 88, align: 'right' });
+        doc.fillColor('#94a3b8').fontSize(7.5).font('Helvetica-Bold').text('New Runway', L + 330, y + 7, { width: 88, align: 'center' });
         doc.fillColor('#94a3b8').fontSize(7.5).font('Helvetica-Bold').text('Impact', L + 425, y + 7, { width: 75, align: 'right' });
         y += 22;
         cat.rows.forEach((lv, i) => {
           const li = leverImpact(lv.psr);
           doc.rect(L, y, W, 26).fill(i % 2 === 0 ? C.light : C.mid);
           doc.fillColor(C.coal).fontSize(9).font('Helvetica').text(lv.desc, L + 8, y + 8, { width: 318 });
-          doc.fillColor(C.navy).fontSize(9).font('Helvetica-Bold').text(li.runway, L + 330, y + 8, { width: 88, align: 'right' });
+          doc.fillColor(C.navy).fontSize(9).font('Helvetica-Bold').text(li.runway, L + 330, y + 8, { width: 88, align: 'center' });
           doc.fillColor(li.color).fontSize(9).font('Helvetica-Bold').text(li.impact, L + 425, y + 8, { width: 75, align: 'right' });
           y += 26;
         });
@@ -1305,21 +1365,30 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
         },
       ];
 
-      if (y > 640) { doc.addPage(); hdr(doc, date); y = 42; }
+      // Ensure enough room for 2×2 grid; add page if needed
+      const advCardH = 82;
+      const advCardW = Math.floor((W - 8) / 2);
+      if (y + 2 * (advCardH + 6) > 720) { doc.addPage(); hdr(doc, date); y = 42; }
 
-      advisoryCards.forEach((card, ci) => {
-        const cardBulletH = card.bullets.length * 12;
-        const advCardH = cardBulletH + 38;
-        if (y + advCardH > 750) { doc.addPage(); hdr(doc, date); y = 42; }
-        doc.rect(L, y, W, advCardH).fill(ci % 2 === 0 ? C.light : C.mid);
-        doc.rect(L, y, 3, advCardH).fill(card.color);
-        doc.fillColor(card.color).fontSize(8).font('Helvetica-Bold').text(card.title, L + 10, y + 10, { width: W - 20 });
-        card.bullets.forEach((bullet, bi) => {
-          doc.fillColor(C.coal).fontSize(7.5).font('Helvetica')
-            .text(`  \u2022  ${bullet}`, L + 10, y + 26 + bi * 12, { width: W - 20 });
+      // Render advisory cards in 2×2 grid (row-major: cards 0+1 on row 1, cards 2+3 on row 2)
+      [[0, 1], [2, 3]].forEach(([a, b], rowIdx) => {
+        const rowY = y + rowIdx * (advCardH + 6);
+        [a, b].forEach(ci => {
+          const card = advisoryCards[ci];
+          if (!card) return;
+          const col = ci % 2;
+          const cx = L + col * (advCardW + 8);
+          doc.rect(cx, rowY, advCardW, advCardH).fill(C.light);
+          doc.rect(cx, rowY, 3, advCardH).fill(card.color);
+          doc.fillColor(card.color).fontSize(7.5).font('Helvetica-Bold')
+            .text(card.title, cx + 10, rowY + 10, { width: advCardW - 16 });
+          card.bullets.forEach((bullet, bi) => {
+            doc.fillColor(C.coal).fontSize(7).font('Helvetica')
+              .text(`\u2022  ${bullet}`, cx + 10, rowY + 26 + bi * 13, { width: advCardW - 16 });
+          });
         });
-        y += advCardH + 6;
       });
+      y += 2 * (advCardH + 6) + 4;
 
       ftr(doc, 11);
 
