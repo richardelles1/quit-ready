@@ -1,0 +1,196 @@
+You are updating the previously generated Stripe paywall implementation plan for QuitReady. Do not rebuild the plan from scratch. Instead, apply the following required corrections and refinements to the existing plan before executing it. These changes ensure portability, webhook correctness, and stronger conversion behavior. Maintain the same architecture and flow but incorporate the adjustments below.
+
+Project reminder:
+QuitReady inserts a $9.99 Stripe paywall between stress test completion and report/PDF unlock.
+
+Final flow:
+
+User inputs → Run Stress Test → simulation completes → paywall preview → Stripe Checkout → webhook marks paid → full report + PDF unlock.
+
+The PDF remains gated behind the paid=true flag.
+
+⸻
+
+REQUIRED PLAN CORRECTIONS
+
+1. Remove dependency on the Replit Stripe Connector
+
+The implementation must use the official Stripe Node SDK directly, not the Replit Stripe integration connector.
+
+Update the plan so that:
+
+Stripe is initialized server-side using:
+
+Environment variables:
+	•	STRIPE_SECRET_KEY
+	•	STRIPE_PUBLIC_KEY
+	•	STRIPE_PRICE_ID
+	•	STRIPE_WEBHOOK_SECRET
+
+Create a Stripe client in:
+
+server/services/stripeClient.ts
+
+Example initialization pattern:
+
+Stripe is instantiated using new Stripe(process.env.STRIPE_SECRET_KEY, { apiVersion: '2024-04-10' }).
+
+This keeps the integration portable when the project is later moved from Replit to GitHub + Vercel.
+
+Remove all references to:
+	•	proposeIntegration()
+	•	addIntegration()
+	•	Replit Stripe connector IDs
+
+Stripe setup instead becomes:
+	1.	Install Stripe SDK
+	2.	Initialize client
+	3.	Configure product + price in Stripe dashboard
+	4.	Configure webhook endpoint
+
+Acceptance condition:
+Stripe operates purely via SDK and environment variables.
+
+⸻
+
+2. Fix webhook raw body handling
+
+Stripe webhook signature verification requires the raw request body, not JSON-parsed body.
+
+Update the backend plan to ensure:
+
+The webhook route uses:
+
+express.raw({ type: ‘application/json’ })
+
+and is mounted before any global express.json() middleware.
+
+Implementation requirement:
+
+Webhook route must be defined so that JSON parsing middleware does not run first.
+
+Incorrect order example (must avoid):
+
+app.use(express.json())
+app.post(’/api/stripe/webhook’, …)
+
+Correct handling example:
+
+Webhook route either mounted before JSON middleware OR explicitly defined with raw middleware.
+
+Acceptance condition:
+Stripe signature verification passes consistently.
+
+⸻
+
+3. Improve webhook idempotency and payment deduplication
+
+The plan currently deduplicates using stripe_session_id. Keep that, but expand it.
+
+Update the simulations schema to include:
+	•	stripeSessionId
+	•	stripePaymentIntentId (nullable)
+
+During webhook processing:
+	1.	Extract session.id
+	2.	Extract session.payment_intent if present
+	3.	Check if either ID already exists in database
+	4.	If already processed → return 200 immediately (no-op)
+
+Store both identifiers when marking simulation paid.
+
+Updated schema fields:
+	•	stripeSessionId
+	•	stripePaymentIntentId
+	•	paid
+	•	paidAt
+	•	purchaserEmail
+	•	purchaserName
+
+Acceptance condition:
+Duplicate webhook events do not cause duplicate updates.
+
+⸻
+
+4. Update paywall teaser metrics
+
+The paywall preview must show two meaningful teaser outputs that create curiosity without giving away the full report.
+
+Update the teaser section as follows:
+
+Teaser Metric 1:
+Tier 1 Runway
+
+Value:
+sim.baseRunway formatted using existing formatter.
+
+Teaser Metric 2:
+Earliest Pressure Point (Severe Stress Scenario)
+
+Definition:
+First month where the user would need to access non-liquid reserves if revenue remains flat.
+
+User-facing description:
+
+“First month your plan would need to draw from non-liquid reserves if revenue stayed flat.”
+
+This replaces the previous “Structural Score” teaser.
+
+Purpose:
+	•	more intuitive
+	•	more curiosity-driven
+	•	avoids appearing like financial advice
+
+Acceptance condition:
+Two teaser cards display real values before paywall.
+
+⸻
+
+ADDITIONAL SMALL IMPROVEMENTS
+
+Update the schema to include:
+
+purchaserName: text(“purchaser_name”)
+
+Polling behavior:
+
+Polling duration: 20 seconds
+Interval: 2 seconds
+
+If polling expires before webhook confirmation:
+
+Show message:
+
+“Payment processing. This usually completes within a few seconds. Please refresh if the report has not unlocked yet.”
+
+⸻
+
+SECURITY RULE (MANDATORY)
+
+The report and PDF must never unlock based on URL parameters.
+
+Unlock logic must rely only on:
+
+simulation.paid === true
+
+Server-side validation must protect:
+
+GET /api/simulations/:id/pdf
+
+Return:
+
+HTTP 402 Payment Required
+
+if paid=false.
+
+⸻
+
+FINAL PLAN OUTPUT REQUIREMENT
+
+Regenerate the existing implementation plan with the above corrections applied.
+
+Do not introduce additional features.
+
+Maintain the same task structure (schema update, routes, frontend paywall, polling, webhook handling).
+
+Ensure the updated plan remains executable by the agent without further clarification.

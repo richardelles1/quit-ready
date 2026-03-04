@@ -1,0 +1,146 @@
+You are an expert Replit Agent and full-stack engineer. Your task is to PRODUCE A DETAILED PLAN (not code yet) to implement the next workflow step for QuitReady: inserting Stripe payment + webhook-based unlock into the existing “Run Stress Test → Paywall Preview → Unlock → PDF/Report” funnel. The plan must be step-by-step, with specific file/module touchpoints, data fields, routes, and UX states. Optimize for conversion and correctness. Do NOT propose new features beyond what is described. Do NOT ask clarifying questions—make reasonable assumptions and proceed.
+
+PROJECT CONTEXT / INTENT
+	•	QuitReady is a web-first micro-tool. The stress test already runs and generates a results artifact (report data + PDF generation exists).
+	•	We want to insert a paywall after the stress test completes, before the user can view full results and download the PDF.
+	•	The PDF is the primary “deliverable”; the on-page interactive report remains as a supporting view after unlock.
+	•	Payment must be verified via Stripe webhook (source of truth). Do NOT unlock based on client-side redirect alone.
+	•	Goal: maximize purchase follow-through while maintaining trust and avoiding “financial advice” framing.
+
+TARGET USER FLOW (MUST MATCH)
+	1.	User fills inputs.
+	2.	User clicks “Run Stress Test”.
+	3.	Simulation runs and completes.
+	4.	App shows a Paywall Preview screen (blurred/locked report) with:
+	•	A short “Your report is ready” message
+	•	TWO personalized teaser outputs (e.g., Structural Burn Rate and Tier 1 Runway)
+	•	A blurred preview of the report sections below
+	•	A single primary CTA button: “Unlock My Report” with price ($9.99)
+	•	Microcopy: “Instant access. No subscription.”
+	5.	Clicking “Unlock My Report” opens Stripe Checkout (hosted Stripe page).
+	6.	User pays.
+	7.	Stripe redirects back to the app (success URL).
+	8.	App checks paid status server-side; only unlock after webhook marks the report as paid.
+	9.	After unlock: show full interactive report + enable “Download PDF” (and keep “View Interactive Report” if you have a split UI).
+	10.	Optional rerun upsell exists elsewhere; DO NOT change it in this iteration.
+
+PRICING (LOCKED FOR THIS IMPLEMENTATION)
+	•	Primary purchase: $9.99 one-time unlock of the report/PDF for that run/simulation.
+	•	Rerun pricing exists but is NOT part of this build step. Do not touch it.
+
+DATA MODEL / STATE REQUIREMENTS (MUST PLAN)
+	•	There is a “report instance” created when stress test completes. If none exists today, add a minimal persistent record.
+	•	Each report instance must have:
+	•	report_id (unique)
+	•	created_at
+	•	paid (boolean, default false)
+	•	paid_at (timestamp, nullable)
+	•	stripe_session_id (nullable, for dedupe)
+	•	purchaser_email (nullable)
+	•	purchaser_name (nullable)
+	•	inputs_snapshot (optional but recommended if already storing)
+	•	outputs_snapshot (optional if already storing)
+	•	Stripe Checkout session should include metadata: report_id.
+	•	Webhook must be idempotent (dedupe on stripe_session_id).
+	•	Unlock logic must check paid status on page load/server fetch.
+
+TECHNICAL IMPLEMENTATION PLAN REQUIREMENTS
+Produce a plan that includes:
+
+A) STRIPE SETUP (TEST MODE)
+	•	Identify required env vars:
+	•	STRIPE_PUBLIC_KEY
+	•	STRIPE_SECRET_KEY
+	•	STRIPE_WEBHOOK_SECRET
+	•	STRIPE_PRICE_ID (preferred) OR inline price creation approach
+	•	Decide whether to use a Stripe Product/Price created in dashboard (recommended).
+	•	Explain how to configure the webhook endpoint and which event(s) to subscribe to:
+	•	checkout.session.completed (primary)
+	•	Note local/preview/webhook URL differences and how to update later when deployed off Replit.
+
+B) ROUTES / ENDPOINTS
+Plan new backend endpoints (names may match existing framework):
+	1.	POST /api/stripe/create-checkout-session
+	•	Input: report_id, purchaser_name, purchaser_email (optional)
+	•	Validate report exists and unpaid
+	•	Create Stripe Checkout session with:
+	•	mode=payment
+	•	line_items using price id ($9.99)
+	•	success_url pointing back to results page with report_id + session reference
+	•	cancel_url back to paywall preview
+	•	metadata: report_id
+	•	Return checkout_url for redirect
+	2.	POST /api/stripe/webhook
+	•	Verify signature with STRIPE_WEBHOOK_SECRET
+	•	On checkout.session.completed:
+	•	Extract report_id from metadata
+	•	Extract stripe_session_id
+	•	Mark report paid=true, paid_at=now, store stripe_session_id
+	•	Save purchaser_email if present from session
+	•	Must be idempotent (if stripe_session_id already processed, no-op)
+	•	Respond 200 quickly
+
+C) FRONTEND UX STATES
+	•	After stress test completes: route user to /results/:report_id or /results?report_id=
+	•	Results page behavior:
+	•	Fetch report record/status
+	•	If paid=false: show PAYWALL PREVIEW view
+	•	If paid=true: show FULL REPORT view + PDF download enabled
+	•	Paywall Preview view must include:
+	•	Two real teaser outputs computed from that run
+	•	A “blurred” report preview (sections visible but blurred; show headings, hide values)
+	•	CTA triggers POST to create-checkout-session then redirects to Stripe checkout URL
+	•	After returning from Stripe success redirect:
+	•	Show “Checking payment…” state
+	•	Poll paid status (short, capped) OR re-fetch on interval for ~10–20 seconds
+	•	Once paid=true, show full report automatically
+	•	Do NOT rely on query param “success=true” to unlock; only paid flag unlocks
+
+D) PDF DOWNLOAD RELIABILITY
+	•	Ensure “Download PDF” only appears/enables when paid=true.
+	•	If PDF generation is expensive, confirm whether it is pre-generated at stress test time or generated on demand.
+	•	If on demand: recommend generating server-side and caching the PDF per report_id after payment, then serving via:
+	•	GET /api/report/:report_id/pdf (protected by paid flag)
+	•	Ensure the download button works reliably and returns a file, not a spinner.
+
+E) SECURITY / ABUSE PREVENTION
+	•	Prevent re-purchase:
+	•	If paid=true, do not create a new checkout session; return “already paid”
+	•	Prevent unlocking by URL:
+	•	All sensitive endpoints must validate paid flag
+	•	Webhook verification:
+	•	Must verify Stripe signature
+	•	Keep logs minimal, no PII leakage
+
+F) COPY / CONVERSION DETAILS (ONLY AS PART OF THE PLAN)
+Provide exact copy blocks for:
+	•	Paywall headline and subheader
+	•	CTA label
+	•	Bullet list “Includes”
+	•	“No subscription” line
+	•	A small line that avoids sounding like financial advice
+No hype, calm adult tone.
+
+G) FILE/COMPONENT TOUCHPOINTS
+	•	Call out exactly where to implement changes:
+	•	Which page/component controls results rendering
+	•	Where stress test currently sends users after run
+	•	Where to add DB/model (if using SQLite/Prisma/Supabase/etc.)
+	•	Where env vars live in Replit
+	•	Where webhook route lives
+
+H) ACCEPTANCE TESTS (VERY IMPORTANT)
+Provide a checklist of tests:
+	1.	Unpaid user sees paywall preview
+	2.	Checkout redirects correctly
+	3.	Webhook marks paid and unlocks report
+	4.	Refresh results page shows paid content
+	5.	PDF download works and matches unlocked report
+	6.	Webhook idempotency verified
+	7.	Cancel from Stripe returns user to preview without unlocking
+
+OUTPUT FORMAT
+	•	Produce a numbered plan with sections A–H.
+	•	No code. (This is the PLAN prompt; execution will come after.)
+	•	Assume a typical Next.js/React full-stack setup unless the project indicates otherwise.
+	•	Use concise but explicit steps so the Replit Agent can execute without asking questions.
