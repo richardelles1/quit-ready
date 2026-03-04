@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { z } from "zod";
+import { apiRequest } from "@/lib/queryClient";
 
 export const simulationFormSchema = z.object({
   currentSalary: z.coerce.number().min(0).default(0),
@@ -79,6 +80,13 @@ export interface SimulationResult {
   breakpointScenario: string;
   taxReservePercent: number;
   createdAt: string;
+  // Payment fields
+  paid: boolean;
+  paidAt: string | null;
+  stripeSessionId: string | null;
+  stripePaymentIntentId: string | null;
+  purchaserEmail: string | null;
+  purchaserName: string | null;
 }
 
 export function useCreateSimulation() {
@@ -120,6 +128,9 @@ export function useDownloadSimulationPdf() {
   return useMutation({
     mutationFn: async (id: number) => {
       const res = await fetch(`/api/simulations/${id}/pdf`);
+      if (res.status === 402) {
+        throw new Error('payment_required');
+      }
       if (!res.ok) {
         const err = await res.json().catch(() => ({ message: 'PDF generation failed' }));
         throw new Error(err.message || 'PDF generation failed');
@@ -133,6 +144,23 @@ export function useDownloadSimulationPdf() {
       a.click();
       window.URL.revokeObjectURL(url);
       document.body.removeChild(a);
+    },
+  });
+}
+
+export function useCreateCheckoutSession() {
+  return useMutation({
+    mutationFn: async (args: { simulationId: number; purchaserEmail?: string; purchaserName?: string }): Promise<{ url: string }> => {
+      const res = await apiRequest('POST', '/api/stripe/create-checkout-session', args);
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        if (err.error === 'already_paid') throw new Error('already_paid');
+        throw new Error('Failed to create checkout session');
+      }
+      return res.json();
+    },
+    onSuccess: ({ url }) => {
+      window.location.href = url;
     },
   });
 }

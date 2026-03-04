@@ -6,14 +6,16 @@ A deterministic, conservative financial stress engine for U.S. professionals mod
 
 - **Frontend**: React + TypeScript, Wouter routing, TanStack Query, React Hook Form + Zod, Framer Motion, shadcn/ui, Tailwind CSS
 - **Backend**: Express.js + TypeScript, Drizzle ORM, PostgreSQL
-- **PDF**: PDFKit (server-side, 6-page branded report)
+- **PDF**: PDFKit (server-side, 15-page branded report)
+- **Payments**: Stripe Checkout (hosted), webhook-verified unlock, $9.99 one-time
 
 ## Architecture
 
 - `shared/schema.ts` — Drizzle table + Zod validation schemas
 - `shared/routes.ts` — API contract definitions
 - `server/services/simulator.ts` — Deterministic math engine (TMIB, ACA subsidy, accessible capital, runway, score)
-- `server/routes.ts` — API routes + 6-page PDF generation
+- `server/routes.ts` — API routes + 15-page PDF generation + Stripe checkout + webhook
+- `server/services/stripeClient.ts` — Stripe SDK lazy-init client
 - `server/storage.ts` — Database storage layer
 - `client/src/pages/Home.tsx` — Landing page
 - `client/src/pages/Simulator.tsx` — 16-screen 3-phase wizard

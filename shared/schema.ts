@@ -55,6 +55,14 @@ export const simulations = pgTable("simulations", {
   breakpointScenario: text("breakpoint_scenario").notNull().default(''),
 
   createdAt: timestamp("created_at").defaultNow().notNull(),
+
+  // Payment fields
+  paid: boolean("paid").notNull().default(false),
+  paidAt: timestamp("paid_at"),
+  stripeSessionId: text("stripe_session_id"),
+  stripePaymentIntentId: text("stripe_payment_intent_id"),
+  purchaserEmail: text("purchaser_email"),
+  purchaserName: text("purchaser_name"),
 });
 
 export const insertSimulationSchema = createInsertSchema(simulations).omit({
@@ -76,6 +84,12 @@ export const insertSimulationSchema = createInsertSchema(simulations).omit({
   breakpointMonth: true,
   breakpointScenario: true,
   healthcareMonthlyCost: true,
+  paid: true,
+  paidAt: true,
+  stripeSessionId: true,
+  stripePaymentIntentId: true,
+  purchaserEmail: true,
+  purchaserName: true,
 }).extend({
   healthcareType: z.enum(['employer', 'cobra', 'aca', 'partner', 'none']),
   businessModelType: z.enum(['solo_bootstrap', 'contractor_heavy', 'agency_service', 'inventory_heavy', 'saas_product']),

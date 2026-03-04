@@ -1,10 +1,10 @@
 import React from "react";
 import { useParams, Link } from "wouter";
-import { Download, AlertTriangle, AlertCircle } from "lucide-react";
+import { Download, AlertTriangle, AlertCircle, Lock, CheckCircle2 } from "lucide-react";
 import logoPath from "@assets/626986E9-B8B4-462B-8F52-CB974B10376C_1772581585428.png";
 import Layout from "../components/Layout";
 import { Button } from "@/components/ui/button";
-import { useSimulation, useDownloadSimulationPdf, SimulationResult } from "../hooks/use-simulations";
+import { useSimulation, useDownloadSimulationPdf, useCreateCheckoutSession, SimulationResult } from "../hooks/use-simulations";
 import { useToast } from "@/hooks/use-toast";
 
 // ─── Formatting utilities ──────────────────────────────────────────────────
@@ -284,9 +284,43 @@ function SavingsCurve({ sim, pas: pasCap }: { sim: SimulationResult; pas: number
 export default function Results() {
   const params = useParams();
   const id = params.id ? parseInt(params.id, 10) : null;
-  const { data: sim, isLoading, isError } = useSimulation(id);
+  const { data: sim, isLoading, isError, refetch } = useSimulation(id);
   const downloadPdf = useDownloadSimulationPdf();
+  const createCheckoutSession = useCreateCheckoutSession();
   const { toast } = useToast();
+
+  // ─── Payment polling state ───────────────────────────────────────────────
+  const [isPolling, setIsPolling] = React.useState(false);
+  const [pollTimedOut, setPollTimedOut] = React.useState(false);
+  const pollIntervalRef = React.useRef<ReturnType<typeof setInterval> | null>(null);
+  const pollAttemptsRef = React.useRef(0);
+
+  React.useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const sessionId = params.get('session_id');
+    if (sessionId && sim && !sim.paid) {
+      setIsPolling(true);
+      pollAttemptsRef.current = 0;
+      pollIntervalRef.current = setInterval(async () => {
+        pollAttemptsRef.current += 1;
+        const result = await refetch();
+        if (result.data?.paid) {
+          clearInterval(pollIntervalRef.current!);
+          pollIntervalRef.current = null;
+          setIsPolling(false);
+          window.history.replaceState({}, '', `/results/${id}`);
+        } else if (pollAttemptsRef.current >= 10) {
+          clearInterval(pollIntervalRef.current!);
+          pollIntervalRef.current = null;
+          setIsPolling(false);
+          setPollTimedOut(true);
+        }
+      }, 2000);
+    }
+    return () => {
+      if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
+    };
+  }, [sim?.id, sim?.paid]);
 
   const [downloadError, setDownloadError] = React.useState(false);
   const handleDownload = () => {
@@ -294,13 +328,33 @@ export default function Results() {
     setDownloadError(false);
     downloadPdf.mutate(id, {
       onError: (err) => {
-        setDownloadError(true);
-        toast({ title: "Report generation failed", description: err.message, variant: "destructive" });
+        if (err.message === 'payment_required') {
+          toast({ title: "Payment required", description: "Please unlock your report to download the PDF.", variant: "destructive" });
+        } else {
+          setDownloadError(true);
+          toast({ title: "Report generation failed", description: err.message, variant: "destructive" });
+        }
       },
       onSuccess: () => {
         setDownloadError(false);
       }
     });
+  };
+
+  const handleUnlock = () => {
+    if (!id) return;
+    createCheckoutSession.mutate(
+      { simulationId: id },
+      {
+        onError: (err) => {
+          if (err.message === 'already_paid') {
+            refetch();
+          } else {
+            toast({ title: "Checkout failed", description: "Unable to start checkout. Please try again.", variant: "destructive" });
+          }
+        },
+      }
+    );
   };
 
   if (isLoading) {
@@ -321,6 +375,137 @@ export default function Results() {
           <h2 className="text-xl font-bold font-serif text-foreground">Report not found</h2>
           <p className="text-sm text-muted-foreground max-w-xs">This simulation may have expired. Start a new one.</p>
           <Link href="/simulator"><Button>Start new simulation</Button></Link>
+        </div>
+      </Layout>
+    );
+  }
+
+  // ─── Polling / Checking payment state ────────────────────────────────────
+  if (isPolling) {
+    return (
+      <Layout>
+        <div className="flex-1 flex flex-col items-center justify-center py-24 gap-5 text-center px-4">
+          <div className="w-8 h-8 border-2 border-muted border-t-foreground rounded-full animate-spin" />
+          <div>
+            <p className="text-base font-semibold text-foreground">Verifying your payment…</p>
+            <p className="text-sm text-muted-foreground mt-1">This usually takes a few seconds.</p>
+          </div>
+        </div>
+      </Layout>
+    );
+  }
+
+  // ─── Poll timed out state ────────────────────────────────────────────────
+  if (pollTimedOut && !sim.paid) {
+    return (
+      <Layout>
+        <div className="flex-1 flex flex-col items-center justify-center py-24 gap-5 text-center px-4 max-w-md mx-auto">
+          <AlertCircle className="w-8 h-8 text-amber-500" />
+          <div>
+            <p className="text-base font-semibold text-foreground">Payment processing</p>
+            <p className="text-sm text-muted-foreground mt-2 leading-relaxed">
+              This usually completes within a few seconds. Please refresh if the report has not unlocked yet.
+            </p>
+          </div>
+          <Button onClick={() => window.location.reload()} variant="outline">Refresh page</Button>
+        </div>
+      </Layout>
+    );
+  }
+
+  // ─── Paywall Preview ─────────────────────────────────────────────────────
+  if (!sim.paid) {
+    const teaserRunway = fmtRunway(sim.baseRunway);
+    const teaserPressure = sim.breakpointMonth >= 999 ? 'Not reached' : `Month ${sim.breakpointMonth}`;
+
+    return (
+      <Layout>
+        <div className="flex-1 bg-muted/20 py-16">
+          <div className="max-w-2xl mx-auto px-4">
+
+            {/* Logo + headline */}
+            <div className="text-center mb-10">
+              <img src={logoPath} alt="QuitReady" className="h-8 w-auto mx-auto mb-6" />
+              <h1 className="text-3xl font-bold font-serif text-foreground mb-3">Your Analysis Is Ready</h1>
+              <p className="text-sm text-muted-foreground max-w-md mx-auto leading-relaxed">
+                Two outputs from your structural position. Unlock to view the full 15-section report and download your branded PDF.
+              </p>
+            </div>
+
+            {/* Two teaser stat cards */}
+            <div className="grid grid-cols-2 gap-4 mb-8" data-testid="paywall-teasers">
+              <div className="border border-border rounded-lg bg-white p-5 text-center shadow-sm" data-testid="teaser-runway">
+                <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground mb-2">Tier 1 Runway</p>
+                <p className="text-2xl font-bold font-serif text-foreground">{teaserRunway}</p>
+                <p className="text-xs text-muted-foreground mt-1.5">Base case, Tier 1 assets only</p>
+              </div>
+              <div className="border border-border rounded-lg bg-white p-5 text-center shadow-sm" data-testid="teaser-pressure">
+                <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground mb-2">Earliest Pressure Point</p>
+                <p className="text-2xl font-bold font-serif text-foreground">{teaserPressure}</p>
+                <p className="text-xs text-muted-foreground mt-1.5">First month needing non-liquid reserves if revenue stays flat</p>
+              </div>
+            </div>
+
+            {/* Blurred preview */}
+            <div className="relative mb-8 rounded-lg overflow-hidden border border-border">
+              <div style={{ filter: 'blur(5px)', pointerEvents: 'none', userSelect: 'none' }}
+                className="bg-white p-6 space-y-4">
+                {['Where Your Money Goes', 'Revenue vs. Liquidity Curve', 'Shock Scenario Analysis', 'Scenario Comparison'].map(heading => (
+                  <div key={heading} className="space-y-2">
+                    <div className="h-4 bg-muted/60 rounded w-2/5" />
+                    <p className="text-sm font-bold text-foreground">{heading}</p>
+                    <div className="h-2 bg-muted/40 rounded w-full" />
+                    <div className="h-2 bg-muted/40 rounded w-4/5" />
+                    <div className="h-2 bg-muted/40 rounded w-3/5" />
+                  </div>
+                ))}
+              </div>
+              {/* Lock overlay */}
+              <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-white/60">
+                <div className="bg-foreground/90 text-white rounded-full p-3">
+                  <Lock className="w-5 h-5" />
+                </div>
+                <p className="text-xs font-semibold text-foreground/70 uppercase tracking-wide">Full report locked</p>
+              </div>
+            </div>
+
+            {/* Paywall card */}
+            <div className="border border-border rounded-xl bg-white shadow-sm p-8 max-w-sm mx-auto text-center" data-testid="paywall-card">
+              <p className="text-4xl font-bold text-foreground mb-1">$9.99</p>
+              <p className="text-xs text-muted-foreground mb-6">One-time unlock</p>
+
+              <Button
+                onClick={handleUnlock}
+                disabled={createCheckoutSession.isPending}
+                className="w-full text-base py-6 mb-6"
+                size="lg"
+                data-testid="button-unlock-report"
+              >
+                {createCheckoutSession.isPending ? 'Redirecting to checkout…' : 'Unlock Full Report'}
+              </Button>
+
+              <ul className="text-left space-y-2.5 mb-6">
+                {[
+                  '15-section interactive report',
+                  '15-page downloadable PDF',
+                  'Stress scenario modeling (3 revenue paths)',
+                  'Household shock scenario analysis',
+                  'Sensitivity levers and structural action factors',
+                ].map(item => (
+                  <li key={item} className="flex items-start gap-2.5 text-sm text-muted-foreground">
+                    <CheckCircle2 className="w-4 h-4 text-green-600 shrink-0 mt-0.5" />
+                    <span>{item}</span>
+                  </li>
+                ))}
+              </ul>
+
+              <p className="text-xs text-muted-foreground mb-2">Instant access. No subscription. One-time analysis.</p>
+              <p className="text-[11px] text-muted-foreground/60 leading-relaxed">
+                This is a structural financial simulation based on your inputs. It is not financial, tax, or legal advice.
+              </p>
+            </div>
+
+          </div>
         </div>
       </Layout>
     );

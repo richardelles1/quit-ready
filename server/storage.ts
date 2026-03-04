@@ -22,6 +22,14 @@ type SimulationComputedFields = {
 export interface IStorage {
   createSimulation(data: InsertSimulation & SimulationComputedFields): Promise<Simulation>;
   getSimulation(id: number): Promise<Simulation | undefined>;
+  markSimulationPaid(
+    id: number,
+    stripeSessionId: string,
+    stripePaymentIntentId: string | null,
+    email?: string,
+    name?: string
+  ): Promise<void>;
+  getSimulationByStripeSession(stripeSessionId: string): Promise<Simulation | undefined>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -32,6 +40,31 @@ export class DatabaseStorage implements IStorage {
 
   async getSimulation(id: number): Promise<Simulation | undefined> {
     const [result] = await db.select().from(simulations).where(eq(simulations.id, id));
+    return result;
+  }
+
+  async markSimulationPaid(
+    id: number,
+    stripeSessionId: string,
+    stripePaymentIntentId: string | null,
+    email?: string,
+    name?: string
+  ): Promise<void> {
+    await db.update(simulations)
+      .set({
+        paid: true,
+        paidAt: new Date(),
+        stripeSessionId,
+        stripePaymentIntentId: stripePaymentIntentId ?? null,
+        purchaserEmail: email ?? null,
+        purchaserName: name ?? null,
+      })
+      .where(eq(simulations.id, id));
+  }
+
+  async getSimulationByStripeSession(stripeSessionId: string): Promise<Simulation | undefined> {
+    const [result] = await db.select().from(simulations)
+      .where(eq(simulations.stripeSessionId, stripeSessionId));
     return result;
   }
 }

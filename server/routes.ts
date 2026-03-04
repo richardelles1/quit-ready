@@ -7,6 +7,7 @@ import { calculateSimulation } from "./services/simulator";
 import { z } from "zod";
 import PDFDocument from "pdfkit";
 import type { Simulation } from "@shared/schema";
+import { stripe } from "./services/stripeClient";
 
 // ─── Palette ───────────────────────────────────────────────────────────────
 const C = { navy:'#1e293b', coal:'#334155', muted:'#64748b', mid:'#f1f5f9',
@@ -257,6 +258,92 @@ function lineChart(doc: PDFKit.PDFDocument, base: number[], severe: number[], ma
 // ─── Route registration ────────────────────────────────────────────────────
 export async function registerRoutes(httpServer: Server, app: Express): Promise<Server> {
 
+  // ─── Stripe Webhook (must be before express.json parses body) ───────────
+  // server/index.ts captures rawBody via verify() on express.json — use req.rawBody
+  app.post('/api/stripe/webhook', async (req, res) => {
+    const sig = req.headers['stripe-signature'] as string;
+    const rawBody = (req as any).rawBody as Buffer | undefined;
+
+    if (!rawBody) {
+      return res.status(400).send('Missing raw body');
+    }
+
+    let event: import('stripe').default.Event;
+    try {
+      event = stripe.webhooks.constructEvent(
+        rawBody,
+        sig,
+        process.env.STRIPE_WEBHOOK_SECRET!
+      );
+    } catch (err: any) {
+      console.error('Webhook signature verification failed:', err.message);
+      return res.status(400).send(`Webhook Error: ${err.message}`);
+    }
+
+    if (event.type === 'checkout.session.completed') {
+      const session = event.data.object as import('stripe').default.Checkout.Session;
+      const simulationId = parseInt(session.metadata?.simulationId ?? '', 10);
+      const stripeSessionId = session.id;
+      const stripePaymentIntentId = (session.payment_intent as string) ?? null;
+
+      if (isNaN(simulationId)) {
+        console.error('Webhook: missing or invalid simulationId in metadata');
+        return res.status(200).json({ received: true });
+      }
+
+      // Idempotency — deduplicate by stripeSessionId
+      const existing = await storage.getSimulationByStripeSession(stripeSessionId);
+      if (existing) {
+        return res.status(200).json({ received: true });
+      }
+
+      await storage.markSimulationPaid(
+        simulationId,
+        stripeSessionId,
+        stripePaymentIntentId,
+        session.customer_details?.email ?? undefined,
+        session.customer_details?.name ?? undefined
+      );
+    }
+
+    res.status(200).json({ received: true });
+  });
+
+  // ─── Stripe Checkout Session ─────────────────────────────────────────────
+  app.post('/api/stripe/create-checkout-session', async (req, res) => {
+    try {
+      const { simulationId, purchaserEmail, purchaserName } = req.body;
+      const simId = parseInt(simulationId, 10);
+
+      if (!simId || isNaN(simId)) {
+        return res.status(400).json({ error: 'invalid_simulation_id' });
+      }
+
+      const sim = await storage.getSimulation(simId);
+      if (!sim) return res.status(404).json({ error: 'simulation_not_found' });
+
+      if (sim.paid) {
+        return res.status(400).json({ error: 'already_paid' });
+      }
+
+      const origin = `https://${req.headers.host}`;
+
+      const session = await stripe.checkout.sessions.create({
+        mode: 'payment',
+        line_items: [{ price: process.env.STRIPE_PRICE_ID!, quantity: 1 }],
+        success_url: `${origin}/results/${simId}?session_id={CHECKOUT_SESSION_ID}`,
+        cancel_url: `${origin}/results/${simId}`,
+        customer_email: purchaserEmail || undefined,
+        metadata: { simulationId: String(simId) },
+      });
+
+      res.json({ url: session.url });
+    } catch (err: any) {
+      console.error('Stripe checkout session error:', err.message);
+      res.status(500).json({ error: 'stripe_error', message: err.message });
+    }
+  });
+
   app.post(api.simulations.create.path, async (req, res) => {
     try {
       const body = {
@@ -323,6 +410,11 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
   app.get(api.simulations.downloadPdf.path, async (req, res) => {
     const sim = await storage.getSimulation(Number(req.params.id));
     if (!sim) return res.status(404).json({ message: 'Simulation not found' });
+
+    // Gate behind payment
+    if (!sim.paid) {
+      return res.status(402).json({ error: 'payment_required', message: 'Payment required to access this report.' });
+    }
 
     // Validate before generating
     const validationErrors = validateReport(sim);
