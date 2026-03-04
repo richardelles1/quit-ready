@@ -24,7 +24,7 @@ function fmtRunway(months: number): string {
   const mo = months % 12;
   if (yrs === 0) return `${mo} month${mo !== 1 ? 's' : ''}`;
   if (mo === 0) return `${yrs} year${yrs !== 1 ? 's' : ''}`;
-  return `${yrs} year${yrs !== 1 ? 's' : ''} ${mo} month${mo !== 1 ? 's' : ''}`;
+  return `${yrs} year${yrs !== 1 ? 's' : ''}, ${mo} month${mo !== 1 ? 's' : ''}`;
 }
 
 function fmtRunwayShort(months: number): string {
@@ -442,13 +442,14 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
         return 999;
       })();
 
-      // Levers
+      // Levers — all computed under severe contraction (0.70 revenue mult) so the delta is meaningful
+      const SEV = 0.70;
       const calcBurnLever = (adj: number) => {
-        if (sim.tmib <= 0) return 999;
+        if (sim.tmib - adj <= 0) return 999;
         let cap = pasCap; const vol = 1 - sim.volatilityPercent / 100;
         for (let m = 1; m <= 360; m++) {
           const rf = sim.rampDuration > 0 && m <= sim.rampDuration ? 0.50 * (m / sim.rampDuration) : 1.0;
-          cap -= ((sim.tmib - adj) - sim.expectedRevenue * rf * vol);
+          cap -= ((sim.tmib - adj) - sim.expectedRevenue * SEV * rf * vol);
           if (cap <= 0) return m;
         }
         return 999;
@@ -458,7 +459,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
         let cap = pasCap; const vol = 1 - sim.volatilityPercent / 100;
         for (let m = 1; m <= 360; m++) {
           const rf = sim.rampDuration > 0 && m <= sim.rampDuration ? 0.50 * (m / sim.rampDuration) : 1.0;
-          cap -= (sim.tmib - (sim.expectedRevenue + adj) * rf * vol);
+          cap -= (sim.tmib - (sim.expectedRevenue + adj) * SEV * rf * vol);
           if (cap <= 0) return m;
         }
         return 999;
@@ -469,7 +470,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
         let cap = pasCap; const vol = 1 - sim.volatilityPercent / 100;
         for (let m = 1; m <= 360; m++) {
           const rf = newRamp > 0 && m <= newRamp ? 0.50 * (m / newRamp) : 1.0;
-          cap -= (sim.tmib - sim.expectedRevenue * rf * vol);
+          cap -= (sim.tmib - sim.expectedRevenue * SEV * rf * vol);
           if (cap <= 0) return m;
         }
         return 999;
@@ -1021,21 +1022,11 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       //    OR: New Child (single, half-width)   (if single income)
       // Full-width row: Combined (only if dual income)
 
-      const rowSpacing = 14;
-      const cardH = 90;
+      const rowSpacing = 12;
+      const cardH = 98;
       const cardW = (W / 2) - 4;
       const gap = 8;
 
-      const fmtImpactCard = (base: number, shocked: number): string => {
-        const bStr = base >= 999 ? 'Sust.' : `${Math.round(base)} mo`;
-        const sStr = shocked >= 999 ? 'Sust.' : `${Math.round(shocked)} mo`;
-        if (base >= 999 && shocked >= 999) return sStr;
-        if (base < 999 && shocked < 999) {
-          const d = Math.round(shocked - base);
-          return `${bStr} > ${sStr} (${d >= 0 ? '+' : ''}${d} mo)`;
-        }
-        return `${bStr} > ${sStr}`;
-      };
       const drawCard = (sh: { name: string; desc: string; psr: number; needsT3: boolean },
         cx: number, cy: number, cw: number, even: boolean) => {
         doc.rect(cx, cy, cw, cardH).fill(even ? C.light : C.mid);
@@ -1045,16 +1036,25 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
         doc.rect(cx + cw - badgeW - 6, cy + 6, badgeW, 13).fill(badgeBg);
         doc.fillColor(sh.needsT3 ? C.red : C.green).fontSize(6.5).font('Helvetica-Bold')
           .text(sh.needsT3 ? 'T2 Req' : 'T1 OK', cx + cw - badgeW - 6, cy + 9, { width: badgeW, align: 'center' });
-        // Name (constrained so it doesn't collide with badge)
+        // Name
         doc.fillColor(C.coal).fontSize(8).font('Helvetica-Bold')
           .text(sh.name, cx + 6, cy + 7, { width: cw - badgeW - 18 });
         // Desc
         doc.fillColor(C.muted).fontSize(7).font('Helvetica')
           .text(sh.desc, cx + 6, cy + 22, { width: cw - 12, lineGap: 1 });
-        // Tier 1 Runway label + value
-        doc.fillColor(C.muted).fontSize(7).font('Helvetica').text('Tier 1 Runway', cx + 6, cy + 57);
-        doc.fillColor(C.navy).fontSize(8).font('Helvetica-Bold')
-          .text(fmtImpactCard(psrBase, sh.psr), cx + 6, cy + 67, { width: cw - 12 });
+        // "New Tier 1 Runway" label
+        doc.fillColor(C.muted).fontSize(6.5).font('Helvetica-Bold').text('NEW TIER 1 RUNWAY', cx + 6, cy + 56);
+        // Runway value (prominent)
+        const runwayVal = sh.psr >= 999 ? 'Sustainable Runway' : fmtRunwayShort(Math.round(sh.psr));
+        doc.fillColor(C.navy).fontSize(9).font('Helvetica-Bold').text(runwayVal, cx + 6, cy + 65, { width: cw - 12 });
+        // Delta (secondary)
+        if (psrBase < 999 && sh.psr < 999) {
+          const d = Math.round(sh.psr - psrBase);
+          const deltaStr = `Change from base: ${d >= 0 ? '+' : ''}${d} months`;
+          doc.fillColor(d < 0 ? C.red : C.green).fontSize(6.5).font('Helvetica').text(deltaStr, cx + 6, cy + 79, { width: cw - 12 });
+        } else if (psrBase >= 999 && sh.psr < 999) {
+          doc.fillColor(C.muted).fontSize(6.5).font('Helvetica').text('Base was Sustainable', cx + 6, cy + 79, { width: cw - 12 });
+        }
       };
 
       // Build applicable shock list
@@ -1160,14 +1160,22 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       lineChart(doc, baseData, severeData, maxCap, chartX, chartY, chartW, chartH_2, CHART_MONTHS);
       y += chartH_2 + 30;
 
-      // Annotation: Tier 1 depletion point
-      if (pm30 < 999 && pm30 <= CHART_MONTHS) {
-        const pmX = chartX + (pm30 / CHART_MONTHS) * chartW;
-        const labelX = pm30 > 24 ? pmX - 85 : pmX + 4;
-        doc.moveTo(pmX, chartY).lineTo(pmX, chartY + chartH_2).strokeColor(C.red).lineWidth(1).dash(3, { space: 3 }).stroke();
+      // Annotation: Tier 1 depletion point at psr30 (actual depletion, not pressure point)
+      if (psr30 < 999 && psr30 <= CHART_MONTHS) {
+        const depX = chartX + (psr30 / CHART_MONTHS) * chartW;
+        const depLabelX = psr30 > 24 ? depX - 90 : depX + 4;
+        doc.moveTo(depX, chartY).lineTo(depX, chartY + chartH_2).strokeColor(C.red).lineWidth(1).dash(3, { space: 3 }).stroke();
         doc.undash();
-        doc.fillColor(C.red).fontSize(7).font('Helvetica-Bold').text('Tier 1 depletion', labelX, chartY - 14, { width: 80 });
-        doc.fillColor(C.red).fontSize(7).font('Helvetica').text(`~month ${pm30}`, labelX, chartY - 5, { width: 80 });
+        doc.fillColor(C.red).fontSize(7).font('Helvetica-Bold').text('Tier 1 depletion', depLabelX, chartY - 14, { width: 88 });
+        doc.fillColor(C.red).fontSize(7).font('Helvetica').text(`month ${Math.round(psr30)} (${fmtRunwayShort(psr30)})`, depLabelX, chartY - 5, { width: 88 });
+      }
+      // Annotation: Pressure point at pm30 (6 months before depletion)
+      if (pm30 < 999 && pm30 <= CHART_MONTHS && pm30 !== psr30) {
+        const pmX = chartX + (pm30 / CHART_MONTHS) * chartW;
+        const pmLabelX = pm30 > 18 ? pmX - 70 : pmX + 4;
+        doc.moveTo(pmX, chartY + chartH_2 - 30).lineTo(pmX, chartY + chartH_2).strokeColor(C.amber).lineWidth(1).dash(2, { space: 2 }).stroke();
+        doc.undash();
+        doc.fillColor(C.amber).fontSize(6.5).font('Helvetica').text(`Pressure ~month ${Math.round(pm30)}`, pmLabelX, chartY + chartH_2 - 38, { width: 72 });
       }
 
       // Break-even revenue note
@@ -1201,17 +1209,17 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       // ════════════════════════════════════════════════════════════════════
       doc.addPage(); hdr(doc, date); y = 42;
       y = secHead(doc, 11, 'How to Widen the Runway',
-        'Strategic adjustments to your monthly outflow or revenue targets that would materially extend your Tier 1 Runway.', y);
+        'Sensitivity analysis under severe contraction (-30%). Each lever shows how much additional runway is gained vs. the severe stress baseline.', y);
 
-      // Lever helper: format runway + impact for table display
+      // Lever helper: format runway + impact vs severe contraction baseline (psr30)
       const leverImpact = (newPsr: number) => {
-        const newR = newPsr >= 999 ? 'Sustainable' : `${Math.round(newPsr)} mo`;
-        if (psrBase >= 999 && newPsr >= 999) return { runway: newR, impact: 'No change', color: C.muted };
-        if (newPsr >= 999) return { runway: newR, impact: `Sustainable`, color: C.green };
-        const d = Math.round(newPsr - psrBase);
+        // Always show actual runway value (never "Sustainable" — that hides meaningful info)
+        const newR = newPsr >= 999 ? fmtRunwayShort(999) : fmtRunwayShort(Math.round(newPsr));
+        const d = newPsr >= 999 ? (psr30 >= 999 ? 0 : 999 - Math.round(psr30)) : Math.round(newPsr - psr30);
+        const impactStr = d === 0 ? 'No change' : `${d > 0 ? '+' : ''}${d} mo`;
         return {
           runway: newR,
-          impact: d === 0 ? 'No change' : `${d > 0 ? '+' : ''}${d} mo`,
+          impact: impactStr,
           color: d > 0 ? C.green : d < 0 ? C.red : C.muted,
         };
       };

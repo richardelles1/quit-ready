@@ -18,7 +18,7 @@ function fmtRunway(months: number): string {
   const mo = months % 12;
   if (yrs === 0) return `${mo} month${mo !== 1 ? 's' : ''}`;
   if (mo === 0) return `${yrs} year${yrs !== 1 ? 's' : ''}`;
-  return `${yrs} year${yrs !== 1 ? 's' : ''} ${mo} month${mo !== 1 ? 's' : ''}`;
+  return `${yrs} year${yrs !== 1 ? 's' : ''}, ${mo} month${mo !== 1 ? 's' : ''}`;
 }
 
 function fmtRunwayShort(months: number): string {
@@ -377,9 +377,10 @@ export default function Results() {
   const burnDelta = burnMinus1k < 999 && sev30 < 999 ? burnMinus1k - sev30 : null;
   const revDelta  = revPlus1k  < 999 && sev30 < 999 ? revPlus1k  - sev30 : null;
 
-  // Lever computations vs base case runway
-  const bL = (adj: number) => calcPrimaryRunway({ ...sim, tmib: Math.max(0, sim.tmib - adj) } as SimulationResult, 1.00);
-  const rL = (rampAdj: number) => calcPrimaryRunway({ ...sim, rampDuration: Math.max(0, sim.rampDuration - rampAdj) } as SimulationResult, 1.00);
+  // Lever computations — all vs severe contraction (0.70 revenue mult) so the delta is meaningful
+  const SEV_MULT = 0.70;
+  const bL = (adj: number) => calcPrimaryRunway({ ...sim, tmib: Math.max(0, sim.tmib - adj) } as SimulationResult, SEV_MULT);
+  const rL = (rampAdj: number) => calcPrimaryRunway({ ...sim, rampDuration: Math.max(0, sim.rampDuration - rampAdj) } as SimulationResult, SEV_MULT);
   const leverRows = [
     { category: 'Burn Reduction', levers: [
       { desc: 'Reduce burn by $1,000/month', psr: bL(1000) },
@@ -396,14 +397,14 @@ export default function Results() {
       { desc: 'Add $3,000/month supplemental income', psr: bL(3000) },
     ]},
   ];
+  // Compare lever result vs psr30 (severe stress baseline)
   const fmtLeverImpact = (newPsr: number) => {
-    if (psrBase >= 999 && newPsr >= 999) return { runway: 'Sustainable', impact: 'No change', cls: 'text-muted-foreground' };
-    if (newPsr >= 999) return { runway: 'Sustainable', impact: 'Sustainable', cls: 'text-green-600 font-bold' };
-    const d = Math.round(newPsr - psrBase);
+    const runway = newPsr >= 999 ? 'Sustainable Runway' : fmtRunway(Math.round(newPsr));
+    const d = newPsr >= 999 ? (psr30 >= 999 ? 0 : 999) : Math.round(newPsr - psr30);
     return {
-      runway: `${Math.round(newPsr)} months`,
+      runway,
       impact: d === 0 ? 'No change' : `${d > 0 ? '+' : ''}${d} months`,
-      cls: d > 0 ? 'text-green-600 font-bold' : 'text-muted-foreground',
+      cls: d > 0 ? 'text-green-600 font-bold' : d < 0 ? 'text-red-600' : 'text-muted-foreground',
     };
   };
 
@@ -843,7 +844,7 @@ export default function Results() {
           {/* ── 7. How to Widen the Runway ───────────────────────────── */}
           <SectionCard className="mb-8">
             <SectionHeader n={7}
-              sub="Computed sensitivity to structural adjustments. Each lever shows New Runway and impact vs. base case. Calculations only — not prescriptions.">
+              sub="Sensitivity analysis under severe contraction (-30%). Each lever shows new runway and impact vs. the severe stress baseline. Calculations only — not prescriptions.">
               How to Widen the Runway
             </SectionHeader>
             <div className="px-6 py-5 space-y-6">
@@ -901,14 +902,21 @@ export default function Results() {
                     <p className="text-sm font-bold text-foreground mb-1">{shock.name}</p>
                     <p className="text-xs text-muted-foreground mb-3 flex-1">{shock.desc}</p>
                     <div className="pt-3 border-t border-border mt-auto">
-                      <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-1">Tier 1 Runway</p>
-                      <p className="text-sm font-bold text-foreground">
-                        {psrBase >= 999 && shock.psr >= 999
-                          ? 'Sustainable'
-                          : psrBase < 999 && shock.psr < 999
-                          ? `${fmtRunway(psrBase)} \u2192 ${fmtRunway(shock.psr)} (${Math.round(shock.psr - psrBase) >= 0 ? '+' : ''}${Math.round(shock.psr - psrBase)} mo)`
-                          : `${fmtRunway(psrBase)} \u2192 ${fmtRunway(shock.psr)}`}
+                      <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-1">New Tier 1 Runway</p>
+                      <p className="text-sm font-bold text-foreground mb-0.5">
+                        {shock.psr >= 999 ? 'Sustainable Runway' : fmtRunway(Math.round(shock.psr))}
                       </p>
+                      {psrBase < 999 && shock.psr < 999 && (() => {
+                        const d = Math.round(shock.psr - psrBase);
+                        return (
+                          <p className={`text-xs ${d < 0 ? 'text-red-600' : 'text-green-600'}`}>
+                            Change from base: {d >= 0 ? '+' : ''}{d} months
+                          </p>
+                        );
+                      })()}
+                      {psrBase >= 999 && shock.psr < 999 && (
+                        <p className="text-xs text-muted-foreground">Base was Sustainable</p>
+                      )}
                     </div>
                   </div>
                 ))}

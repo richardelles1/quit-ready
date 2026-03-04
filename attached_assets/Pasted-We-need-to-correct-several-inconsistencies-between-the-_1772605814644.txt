@@ -1,0 +1,209 @@
+We need to correct several inconsistencies between the simulation UI results and the generated PDF report. The goal is to make the PDF report match the user-facing simulation results exactly and correct several sensitivity calculations. Do not rewrite the core simulation model. Only adjust the reporting layer, interpretation layer, and formatting where needed.
+
+---
+
+### 1. Unify UI and PDF Outputs
+
+The simulation UI and the generated PDF currently display different interpretations of the same results.
+
+Example:
+
+UI output:
+Emergency Expense → New Tier 1 Runway: 3 years, 3 months
+
+PDF output:
+57 mo > 39 mo (-18 mo)
+
+This raw delta format should not appear in the PDF.
+
+Update the PDF logic so that it uses the same interpreted runway values shown in the UI.
+
+For all shock scenarios:
+
+Replace formatting like:
+
+57 mo > 39 mo (-18 mo)
+
+with:
+
+New Tier 1 Runway  
+3 years, 3 months  
+Change from base: −18 months
+
+The PDF must display the final runway result first, with the delta only as a secondary note.
+
+---
+
+### 2. Standardize Time Formatting
+
+Across the entire report (UI and PDF):
+
+Whenever time is expressed as years and months, format it with a comma.
+
+Examples:
+
+Correct:
+4 years, 9 months  
+2 years, 8 months  
+1 year, 11 months
+
+Incorrect:
+4 years 9 months  
+2 yrs 8 mo
+
+Use full words (“years”, “months”) wherever space allows.
+
+Short form (mo) may be used in tables only.
+
+---
+
+### 3. Fix “How to Widen the Runway” Sensitivity Calculations
+
+The current PDF logic is incorrect.
+
+Example currently shown:
+
+Reduce burn by $1,000/month → Sustainable
+
+This is wrong.
+
+Instead, calculate how many months of Tier 1 runway are added under the severe contraction scenario.
+
+Example expected behavior:
+
+Reduce outflow by $1,000/month  
+Runway increases from 1 year, 11 months to 3 years, 5 months  
+Impact: +18 months
+
+The PDF should show:
+
+Reduce outflow by $1,000/month  
+New Runway: 3 years, 5 months  
+Impact: +18 months
+
+Do not display “Sustainable” for lever scenarios. Always show the new runway and the delta.
+
+---
+
+### 4. Fix Revenue Ramp Sensitivity
+
+The ramp timing sensitivity table is currently broken.
+
+Current output:
+
+Revenue begins 3 months earlier → 64 mo  
+Revenue begins 6 months earlier → 64 mo  
+Revenue begins 9 months earlier → 64 mo
+
+This indicates the ramp variable is not affecting the calculation.
+
+Correct behavior:
+
+Each ramp adjustment must produce different Tier 1 runway results.
+
+Ramp timing must influence:
+
+• capital depletion timing  
+• months of runway remaining
+
+Ensure the ramp parameter properly modifies the model when calculating runway.
+
+---
+
+### 5. Align Household Shock Scenarios With UI Interpretation
+
+The UI shows final runway values, but the PDF shows delta math.
+
+All shock scenarios in the PDF must display:
+
+Scenario Title  
+Description  
+New Tier 1 Runway (formatted as years, months)
+
+Example:
+
+Emergency Expense  
+$15,000 one-time capital hit
+
+New Tier 1 Runway  
+3 years, 3 months
+
+Optional secondary line:
+
+Change from base: −18 months
+
+Remove the arrow or delta formatting like:
+
+57 mo > 39 mo
+
+---
+
+### 6. Correct Liquidity Chart Annotation
+
+The chart currently labels:
+
+Tier 1 depletion ~month 17
+
+But the severe contraction scenario shows:
+
+Tier 1 Runway = 1 year, 11 months (≈ 23 months)
+
+Update the chart annotation so that:
+
+Tier 1 depletion month = the actual computed depletion point from the model.
+
+All chart labels must match calculated values exactly.
+
+---
+
+### 7. Ensure Scenario Comparison Table Uses Correct Formatting
+
+In the Scenario Comparison grid:
+
+Format all time values as:
+
+4 years, 9 months  
+2 years, 8 months  
+1 year, 11 months
+
+Do not use abbreviated forms unless column width requires it.
+
+Ensure the table values match the main scenario calculations exactly.
+
+---
+
+### 8. Maintain Core Simulation Model
+
+Do not modify the underlying financial simulation logic.
+
+Do not rewrite:
+
+• runway calculation functions  
+• capital depletion logic  
+• revenue ramp modeling
+
+Only modify:
+
+• report formatting  
+• interpretation layer  
+• sensitivity calculations in the reporting layer  
+• display formatting
+
+The objective is consistency between the simulation UI and the PDF report, along with corrected sensitivity outputs.
+
+---
+
+### 9. Final Validation
+
+After updates, confirm:
+
+1. UI and PDF show identical runway results for all scenarios.
+2. Shock scenarios display final runway values (not delta math).
+3. Runway lever calculations produce month-based impacts.
+4. Ramp timing produces different runway results.
+5. Chart depletion labels match model outputs.
+6. All year/month values use the format:
+
+X years, Y months
+
+Once these changes are complete, regenerate the report to confirm all sections match the simulation results exactly.
