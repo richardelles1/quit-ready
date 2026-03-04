@@ -938,10 +938,10 @@ export default function Results() {
                 {[
                   { name: 'Emergency Expense', desc: '$15,000 one-time capital hit', psr: psrEmergency },
                   { name: 'Unexpected Tax Bill', desc: '$10,000 one-time capital hit', psr: psrTaxBill },
-                  { name: 'Healthcare Cost Increase', desc: '+$500/month recurring cost', psr: psrHealthcare },
                   { name: 'Business Launch Delay', desc: '+3 months to revenue ramp', psr: psrRampDelay3 },
-                  { name: 'New Child in Household', desc: '+$1,000/month recurring cost', psr: psrNewChild },
-                  ...(psrPartnerLoss !== null ? [{ name: 'Partner Income Loss', desc: 'Loss of all partner income', psr: psrPartnerLoss }] : []),
+                  { name: 'Healthcare Cost Increase', desc: '+$500/month recurring cost', psr: psrHealthcare },
+                  ...(psrPartnerLoss !== null ? [{ name: 'Partner Income Loss', desc: 'Loss of all partner income for 6 months', psr: psrPartnerLoss }] : []),
+                  { name: 'New Child in Household', desc: '+$1,500/month recurring cost', psr: psrNewChild },
                 ].map(shock => (
                   <div key={shock.name} className="p-4 rounded-lg border border-border bg-muted/5 flex flex-col h-full">
                     <p className="text-sm font-bold text-foreground mb-1">{shock.name}</p>
@@ -967,7 +967,7 @@ export default function Results() {
                 <thead>
                   <tr className="border-b border-border">
                     <th className="text-left py-2 font-semibold uppercase tracking-wider text-muted-foreground pr-3">Metric</th>
-                    {['Base', 'Moderate (15%)', 'Severe (30%)', '+3mo Ramp', ...(sim.isDualIncome ? ['Partner Loss'] : []), 'New Child'].map(c => (
+                    {['Base', 'Moderate (-15%)', 'Severe (-30%)', '+3mo Ramp', ...(sim.isDualIncome ? ['Partner Loss'] : []), 'New Child'].map(c => (
                       <th key={c} className="text-center py-2 font-semibold uppercase tracking-wider text-muted-foreground px-2">{c}</th>
                     ))}
                   </tr>

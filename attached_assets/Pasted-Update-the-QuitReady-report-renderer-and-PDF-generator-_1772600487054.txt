@@ -1,0 +1,157 @@
+Update the QuitReady report renderer and PDF generator to address layout, logic, and formatting issues discovered in QA testing.
+
+Implement the following changes.
+
+⸻
+
+SHOCK SCENARIO GRID FIX
+
+Replace the current two-column stacked layout in the “Household Shock Scenarios” section with a balanced grid layout.
+
+Render shocks in a responsive grid with equal rows.
+
+Structure:
+
+Row 1
+Emergency Expense | Unexpected Tax Bill
+
+Row 2
+Business Launch Delay | Healthcare Cost Increase
+
+Row 3
+Partner Income Loss | New Child
+
+Then render:
+
+Combined Shock (Partner Loss + New Child)
+
+as a full-width row below the grid.
+
+Ensure all shock cards share equal height and consistent padding.
+
+This removes the large blank region currently appearing in the center of the page.
+
+⸻
+
+SHOCK EVENT LOGIC CORRECTION
+
+Shock scenarios should exist for both single and dual-income households except partner-specific events.
+
+Always show:
+
+Emergency Expense
+Unexpected Tax Bill
+Business Launch Delay
+Healthcare Cost Increase
+New Child
+
+Only show when partner income > 0:
+
+Partner Income Loss
+Combined Partner Loss + New Child
+
+Do not remove other shocks when partner income is zero.
+
+⸻
+
+PAGE DENSITY IMPROVEMENT
+
+Increase table readability and fill unused space on Page 1.
+
+Increase:
+
+scenario table font size by 5%
+row padding by 6px
+column spacing slightly
+
+Ensure the scenario summary table visually fills the center portion of the page.
+
+⸻
+
+HEADER WRAPPING FIX
+
+Shorten long scenario labels to prevent multi-line wrapping.
+
+Replace:
+
+“Moderate income contraction (-15%)”
+
+with
+
+“Moderate Contraction (-15%)”
+
+Replace:
+
+“Severe income contraction (-30%)”
+
+with
+
+“Severe Contraction (-30%)”
+
+Ensure headers render on a single line where possible.
+
+⸻
+
+NUMERIC ALIGNMENT
+
+All financial tables must right-align numeric values.
+
+Apply consistent formatting:
+
+Category text left aligned
+Dollar values right aligned
+Percentages right aligned
+
+Example format:
+
+Living Expenses           $5,000
+Debt Payments             $4,000
+Healthcare                $1,450
+Tax Reserve               $2,800
+Business Costs              $500
+
+This improves financial readability and professionalism.
+
+⸻
+
+RUNWAY LABEL CLEANUP
+
+Replace stacked labels like:
+
+Tier 1 Runway
+Sustainable Runway
+
+with:
+
+Tier 1 Runway: Sustainable
+
+Apply same format to all runway labels.
+
+⸻
+
+CHART SPACING ADJUSTMENT
+
+On the Revenue vs Liquidity page increase vertical spacing between:
+
+Break-Even Revenue
+Base Case Runway
+Severe Runway
+Difference
+
+Add approximately 10-14px additional vertical spacing to improve visual balance.
+
+⸻
+
+PDF OUTPUT CONSISTENCY
+
+Ensure the PDF generator uses identical layout rules as the on-screen report renderer:
+
+same spacing
+same table alignment
+same shock scenario ordering
+
+Avoid layout drift between report view and exported PDF.
+
+⸻
+
+End of prompt.

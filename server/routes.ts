@@ -592,25 +592,25 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       y += 46;
 
       // Mini scenario snapshot
-      doc.rect(L, y, W, 22).fill(C.navy);
-      [['Scenario', L + 8], ['Tier 1 Runway', L + 175], ['Full Capital Depth', L + 310], ['Tier 2 Required?', L + 400]].forEach(([h, x]) => {
-        doc.fillColor(C.white).fontSize(7.5).font('Helvetica-Bold').text(h as string, x as number, y + 7);
+      doc.rect(L, y, W, 26).fill(C.navy);
+      [['Scenario', L + 8], ['Tier 1 Runway', L + 172], ['Full Capital Depth', L + 326], ['Tier 2 Required?', L + 434]].forEach(([h, x]) => {
+        doc.fillColor(C.white).fontSize(8).font('Helvetica-Bold').text(h as string, x as number, y + 9);
       });
-      y += 22;
+      y += 26;
       [
         { label: 'Expected conditions', psr: psrBase, full: frBase, r3: t3Cap > 0 && psrBase < frBase },
-        { label: 'Moderate income contraction (-15%)', psr: psr15, full: fr15, r3: t3Cap > 0 && psr15 < fr15 },
-        { label: 'Severe income contraction (-30%)', psr: psr30, full: fr30, r3: t3Cap > 0 && psr30 < fr30 },
+        { label: 'Moderate Contraction (-15%)', psr: psr15, full: fr15, r3: t3Cap > 0 && psr15 < fr15 },
+        { label: 'Severe Contraction (-30%)', psr: psr30, full: fr30, r3: t3Cap > 0 && psr30 < fr30 },
       ].forEach((sc, i) => {
-        doc.rect(L, y, W, 24).fill(i % 2 === 0 ? C.light : C.mid);
-        doc.fillColor(C.coal).fontSize(9).font('Helvetica').text(sc.label, L + 8, y + 7, { width: 165 });
-        doc.fillColor(C.navy).fontSize(9).font('Helvetica-Bold').text(fmtRunwayShort(sc.psr), L + 175, y + 7);
-        doc.fillColor(C.coal).fontSize(9).font('Helvetica').text(fmtRunwayShort(sc.full), L + 310, y + 7);
-        doc.fillColor(sc.r3 ? C.red : C.green).fontSize(9).font('Helvetica-Bold')
-          .text(sc.r3 ? 'Yes' : 'No', L + 400, y + 7);
-        y += 24;
+        doc.rect(L, y, W, 30).fill(i % 2 === 0 ? C.light : C.mid);
+        doc.fillColor(C.coal).fontSize(9.5).font('Helvetica').text(sc.label, L + 8, y + 10, { width: 160 });
+        doc.fillColor(C.navy).fontSize(9.5).font('Helvetica-Bold').text(fmtRunwayShort(sc.psr), L + 172, y + 10, { width: 146, align: 'right' });
+        doc.fillColor(C.coal).fontSize(9.5).font('Helvetica').text(fmtRunwayShort(sc.full), L + 326, y + 10, { width: 100, align: 'right' });
+        doc.fillColor(sc.r3 ? C.red : C.green).fontSize(9.5).font('Helvetica-Bold')
+          .text(sc.r3 ? 'Yes' : 'No', L + 434, y + 10, { width: 66, align: 'right' });
+        y += 30;
       });
-      y += 10;
+      y += 12;
 
       // Score interpretation
       const scoreInterpretation = score >= 86
@@ -724,8 +724,8 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
         doc.rect(L, y, W, h).fill(i % 2 === 0 ? C.light : C.mid);
         doc.fillColor(C.coal).fontSize(9).font('Helvetica-Bold').text(c.label, L + 8, y + 5, { width: 152 });
         doc.fillColor(C.muted).fontSize(7.5).font('Helvetica').text(definitions[i] ?? '', L + 165, y + 5, { width: 185, lineGap: 1 });
-        doc.fillColor(C.navy).fontSize(10).font('Helvetica-Bold').text(fmtM(c.val), L + 355, y + 12);
-        doc.fillColor(C.navy).fontSize(10).font('Helvetica-Bold').text(`${pct}%`, L + 448, y + 12);
+        doc.fillColor(C.navy).fontSize(10).font('Helvetica-Bold').text(fmtM(c.val), L + 350, y + 12, { width: 96, align: 'right' });
+        doc.fillColor(C.navy).fontSize(10).font('Helvetica-Bold').text(`${pct}%`, L + 454, y + 12, { width: 46, align: 'right' });
         y += h;
       });
 
@@ -860,8 +860,8 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
         const catColor = row.cat === 'Tier 2' ? C.amber : C.navy;
         doc.fillColor(C.coal).fontSize(9).font('Helvetica').text(row.label, L + 8, y + 7, { width: 198 });
         doc.fillColor(C.muted).fontSize(7.5).font('Helvetica').text(row.haircut, L + 210, y + 7, { width: 96 });
-        doc.fillColor(C.coal).fontSize(9).font('Helvetica').text(fmtM(row.raw), L + 310, y + 7);
-        doc.fillColor(catColor).fontSize(9).font('Helvetica-Bold').text(fmtM(row.counted), L + 420, y + 7);
+        doc.fillColor(C.coal).fontSize(9).font('Helvetica').text(fmtM(row.raw), L + 308, y + 7, { width: 106, align: 'right' });
+        doc.fillColor(catColor).fontSize(9).font('Helvetica-Bold').text(fmtM(row.counted), L + 418, y + 7, { width: 84, align: 'right' });
         y += 24;
       });
 
@@ -1003,99 +1003,53 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       y = secHead(doc, 8, 'Household Shock Scenarios',
         'Secondary events that compound the transition. These are not predictions. They are edge cases worth quantifying before making a major financial move.', y);
 
-      const shockRows = [
-        {
-          name: 'Emergency Expense',
-          desc: 'A one-time $15,000 emergency expense hitting Tier 1 Liquid Capital immediately.',
-          psr: psrEmergency, full: fullRunway(sim, 1.00), // simplistic full runway for now or compute it
-          needsT3: t3Cap > 0 && psrEmergency < frBase,
-          applicable: true,
-        },
-        {
-          name: 'Unexpected Tax Bill',
-          desc: 'A one-time $10,000 tax obligation hitting Tier 1 Liquid Capital immediately.',
-          psr: psrTaxBill, full: fullRunway(sim, 1.00),
-          needsT3: t3Cap > 0 && psrTaxBill < frBase,
-          applicable: true,
-        },
-        {
-          name: 'Business Launch Delay',
-          desc: 'A 3-month delay in reaching the revenue ramp target.',
-          psr: psrRampDelay, full: frRamp3,
-          needsT3: t3Cap > 0 && psrRampDelay < frRamp3,
-          applicable: true,
-        },
-        {
-          name: 'Healthcare Cost Increase',
-          desc: 'An unexpected $500/month increase in healthcare premiums or medical outflow.',
-          psr: psrHealthcareShock, full: fullRunway(sim, 1.00, undefined, () => 500),
-          needsT3: t3Cap > 0 && psrHealthcareShock < frBase,
-          applicable: true,
-        },
-        {
-          name: 'Partner income loss (6 months)',
-          desc: sim.isDualIncome && sim.partnerIncome > 0
-            ? `Partner income of ${fmtM(sim.partnerIncome)}/month stops for 6 months, then resumes. Burn increases by that amount during the loss period.`
-            : 'Not applicable. No partner income entered.',
-          psr: psrPartnerLoss, full: frPartnerLoss,
-          needsT3: t3Cap > 0 && psrPartnerLoss < frPartnerLoss,
-          applicable: sim.isDualIncome && sim.partnerIncome > 0,
-        },
-        {
-          name: 'New child',
-          desc: `Assumptions: ${fmtM(CHILD_ONETIME)} one-time setup cost + ${fmtM(CHILD_MONTHLY)}/month ongoing (childcare, supplies, insurance adjustments). These are estimates. Actual costs vary significantly.`,
-          psr: psrNewChild, full: fullRunway(sim, 1.00, undefined, () => CHILD_MONTHLY),
-          needsT3: t3Cap > 0 && psrNewChild < fullRunway(sim, 1.00, undefined, () => CHILD_MONTHLY),
-          applicable: true,
-        },
-        {
-          name: 'Combined: partner loss (6 months) + new child',
-          desc: 'Both shocks occurring simultaneously. The most conservative household stress test.',
-          psr: psrCombined, full: fullRunway(sim, 1.00, undefined, (m) => CHILD_MONTHLY + (m <= 6 && sim.isDualIncome ? (sim.partnerIncome ?? 0) : 0)),
-          needsT3: t3Cap > 0,
-          applicable: sim.isDualIncome,
-        },
-      ];
+      // Shock grid: fixed 2-col layout per spec.
+      // Row 1: Emergency Expense | Unexpected Tax Bill
+      // Row 2: Business Launch Delay | Healthcare Cost Increase
+      // Row 3: Partner Income Loss | New Child  (if dual income)
+      //    OR: New Child (single, half-width)   (if single income)
+      // Full-width row: Combined (only if dual income)
 
-      // --- Adaptive shock layout (T001) ---
-      const applicableShocks = shockRows.filter(s => s.applicable);
-      const rowSpacing = 16;
+      const rowSpacing = 14;
       const cardH = 90;
       const cardW = (W / 2) - 4;
+      const gap = 8;
 
-      for (let i = 0; i < applicableShocks.length; i += 2) {
-        const sh1 = applicableShocks[i];
-        const sh2 = applicableShocks[i + 1];
+      const drawCard = (sh: { name: string; desc: string; psr: number; needsT3: boolean },
+        cx: number, cy: number, cw: number, even: boolean) => {
+        doc.rect(cx, cy, cw, cardH).fill(even ? C.light : C.mid);
+        doc.fillColor(C.coal).fontSize(9).font('Helvetica-Bold').text(sh.name, cx + 8, cy + 8, { width: cw - 16 });
+        doc.fillColor(C.muted).fontSize(7.5).font('Helvetica').text(sh.desc, cx + 8, cy + 22, { width: cw - 16, lineGap: 1 });
+        doc.fillColor(C.muted).fontSize(7).font('Helvetica').text('Tier 1 Runway', cx + 8, cy + 58);
+        doc.fillColor(C.navy).fontSize(10).font('Helvetica-Bold').text(fmtRunwayShort(sh.psr), cx + 8, cy + 68);
+        doc.fillColor(C.muted).fontSize(7).font('Helvetica').text('Tier 2 Required?', cx + cw - 70, cy + 58);
+        doc.fillColor(sh.needsT3 ? C.red : C.green).fontSize(9).font('Helvetica-Bold')
+          .text(sh.needsT3 ? 'Yes' : 'No', cx + cw - 70, cy + 68);
+      };
 
-        // Render card 1
-        doc.rect(L, y, cardW, cardH).fill(i % 4 < 2 ? C.light : C.mid);
-        doc.fillColor(C.coal).fontSize(9).font('Helvetica-Bold').text(sh1.name, L + 8, y + 8, { width: cardW - 16 });
-        doc.fillColor(C.muted).fontSize(7.5).font('Helvetica').text(sh1.desc, L + 8, y + 22, { width: cardW - 16, lineGap: 1 });
-        
-        doc.fillColor(C.muted).fontSize(7).font('Helvetica').text('Tier 1 Runway', L + 8, y + 58);
-        doc.fillColor(C.navy).fontSize(10).font('Helvetica-Bold').text(fmtRunwayShort(sh1.psr), L + 8, y + 68);
-        
-        doc.fillColor(C.muted).fontSize(7).font('Helvetica').text('Tier 2 Required?', L + cardW - 65, y + 58);
-        doc.fillColor(sh1.needsT3 ? C.red : C.green).fontSize(9).font('Helvetica-Bold')
-          .text(sh1.needsT3 ? 'Yes' : 'No', L + cardW - 65, y + 68);
+      // Row 1: Emergency | Tax Bill
+      drawCard({ name: 'Emergency Expense', desc: 'A one-time $15,000 emergency expense hitting Tier 1 Liquid Capital immediately.', psr: psrEmergency, needsT3: t3Cap > 0 && psrEmergency < frBase }, L, y, cardW, true);
+      drawCard({ name: 'Unexpected Tax Bill', desc: 'A one-time $10,000 tax obligation hitting Tier 1 Liquid Capital immediately.', psr: psrTaxBill, needsT3: t3Cap > 0 && psrTaxBill < frBase }, L + cardW + gap, y, cardW, true);
+      y += cardH + rowSpacing;
 
-        // Render card 2 if exists
-        if (sh2) {
-          doc.rect(L + cardW + 8, y, cardW, cardH).fill(i % 4 < 2 ? C.light : C.mid);
-          doc.fillColor(C.coal).fontSize(9).font('Helvetica-Bold').text(sh2.name, L + cardW + 16, y + 8, { width: cardW - 16 });
-          doc.fillColor(C.muted).fontSize(7.5).font('Helvetica').text(sh2.desc, L + cardW + 16, y + 22, { width: cardW - 16, lineGap: 1 });
-          
-          doc.fillColor(C.muted).fontSize(7).font('Helvetica').text('Tier 1 Runway', L + cardW + 16, y + 58);
-          doc.fillColor(C.navy).fontSize(10).font('Helvetica-Bold').text(fmtRunwayShort(sh2.psr), L + cardW + 16, y + 68);
-          
-          doc.fillColor(C.muted).fontSize(7).font('Helvetica').text('Tier 2 Required?', L + cardW*2 - 57, y + 58);
-          doc.fillColor(sh2.needsT3 ? C.red : C.green).fontSize(9).font('Helvetica-Bold')
-            .text(sh2.needsT3 ? 'Yes' : 'No', L + cardW*2 - 57, y + 68);
-        }
+      // Row 2: Launch Delay | Healthcare
+      drawCard({ name: 'Business Launch Delay', desc: 'A 3-month delay in reaching the revenue ramp target.', psr: psrRampDelay, needsT3: t3Cap > 0 && psrRampDelay < frRamp3 }, L, y, cardW, false);
+      drawCard({ name: 'Healthcare Cost Increase', desc: 'An unexpected $500/month increase in healthcare premiums or medical outflow.', psr: psrHealthcareShock, needsT3: t3Cap > 0 && psrHealthcareShock < frBase }, L + cardW + gap, y, cardW, false);
+      y += cardH + rowSpacing;
 
+      // Row 3: Partner Loss | New Child (dual), or New Child alone (single)
+      if (sim.isDualIncome && sim.partnerIncome > 0) {
+        drawCard({ name: 'Partner Income Loss', desc: `Partner income of ${fmtM(sim.partnerIncome)}/month stops for 6 months, then resumes. Burn increases by that amount during the loss period.`, psr: psrPartnerLoss, needsT3: t3Cap > 0 && psrPartnerLoss < frPartnerLoss }, L, y, cardW, true);
+        drawCard({ name: 'New Child', desc: `${fmtM(CHILD_ONETIME)} one-time setup + ${fmtM(CHILD_MONTHLY)}/month ongoing (childcare, supplies, insurance). Estimates only. Actual costs vary.`, psr: psrNewChild, needsT3: t3Cap > 0 && psrNewChild < fullRunway(sim, 1.00, undefined, () => CHILD_MONTHLY) }, L + cardW + gap, y, cardW, true);
+        y += cardH + rowSpacing;
+        // Full-width: Combined
+        drawCard({ name: 'Combined: Partner Income Loss + New Child', desc: 'Both shocks occurring simultaneously. Partner income lost for 6 months while new child costs begin. The most conservative household stress test.', psr: psrCombined, needsT3: t3Cap > 0 }, L, y, W, false);
+        y += cardH + rowSpacing;
+      } else {
+        drawCard({ name: 'New Child', desc: `${fmtM(CHILD_ONETIME)} one-time setup + ${fmtM(CHILD_MONTHLY)}/month ongoing (childcare, supplies, insurance). Estimates only. Actual costs vary.`, psr: psrNewChild, needsT3: t3Cap > 0 && psrNewChild < fullRunway(sim, 1.00, undefined, () => CHILD_MONTHLY) }, L, y, cardW, true);
         y += cardH + rowSpacing;
       }
-      y += 6;
+      y += 4;
 
       y = insight(doc, 'The Pattern Behind Household Shocks',
         'These scenarios matter because they are correlated. Difficult personal events tend to cluster. A partner job loss during a transition period is not unusual. A new child changes financial structure for years. The question is not whether these will happen. It is whether the runway is wide enough to absorb one if it does.', y);
@@ -1194,7 +1148,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
         { label: 'Base Case, Tier 1 Runway', val: fmtRunway(psrBase) },
         { label: 'Severe (-30%), Tier 1 Runway', val: fmtRunway(psr30) },
         { label: 'Difference', val: psr30 >= 999 || psrBase >= 999 ? 'N/A' : `${psrBase - psr30} months` },
-      ], y);
+      ], y, 66);
 
       y = insight(doc, 'Reading This Chart',
         `The upper line shows Tier 1 Liquid Capital under expected revenue conditions. The lower line shows the same position under a 30% revenue shortfall. Under expected conditions, revenue ramps toward its target and savings stabilize. Under severe underperformance, savings continue declining until Tier 1 capital is exhausted${psr30 < 999 ? ` around month ${Math.round(psr30)}` : ''}. The difference between these paths is revenue timing and reliability, not the size of savings.`, y);
@@ -1264,8 +1218,8 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
 
       const cols = [
         { label: 'Base', psr: psrBase, full: frBase, r3: t3Cap > 0 && psrBase < frBase, pm: pmBase },
-        { label: 'Mild income contraction (-15%)', psr: psr15, full: fr15, r3: t3Cap > 0 && psr15 < fr15, pm: pm15 },
-        { label: 'Severe income contraction (-30%)', psr: psr30, full: fr30, r3: t3Cap > 0 && psr30 < fr30, pm: pm30 },
+        { label: 'Moderate Contraction (-15%)', psr: psr15, full: fr15, r3: t3Cap > 0 && psr15 < fr15, pm: pm15 },
+        { label: 'Severe Contraction (-30%)', psr: psr30, full: fr30, r3: t3Cap > 0 && psr30 < fr30, pm: pm30 },
         { label: 'Partner Loss', psr: psrPartnerLoss, full: frPartnerLoss, r3: t3Cap > 0 && psrPartnerLoss < frPartnerLoss, pm: pm30 },
         { label: 'New Child', psr: psrNewChild, full: 999, r3: t3Cap > 0, pm: pm30 },
       ];
