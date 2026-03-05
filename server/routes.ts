@@ -13,7 +13,7 @@ import { stripe } from "./services/stripeClient";
 const C = { navy:'#1e293b', coal:'#334155', muted:'#64748b', mid:'#f1f5f9',
   light:'#f8fafc', border:'#e2e8f0', white:'#ffffff',
   green:'#15803d', amber:'#b45309', red:'#dc2626', blue:'#1d4ed8' };
-const L = 52, W = 508, R = 560, TOTAL = 15;
+const L = 52, W = 508, R = 560, TOTAL = 16;
 
 // ─── Formatting utilities ──────────────────────────────────────────────────
 const fmtM = (n: number) => `$${Math.round(n).toLocaleString('en-US')}`;
@@ -210,6 +210,134 @@ function compositionBar(doc: PDFKit.PDFDocument, segments: {val:number;opacity:n
     x += bw;
   });
   return y + h + 4;
+}
+
+// ─── Revenue growth trajectory helpers ──────────────────────────────────────
+function projectRevenuePdf(
+  expectedRevenue: number,
+  rampDuration: number,
+  rates: [number, number, number],
+  months = 36,
+): number[] {
+  const revenue: number[] = [];
+  for (let m = 1; m <= months; m++) {
+    if (m <= rampDuration) {
+      revenue.push(rampDuration > 0 ? expectedRevenue * (m / rampDuration) : expectedRevenue);
+    } else if (m === rampDuration + 1) {
+      revenue.push(expectedRevenue);
+    } else {
+      const postStab = m - rampDuration - 1;
+      const prev = revenue[m - 2] ?? expectedRevenue;
+      const g = postStab <= 12 ? rates[0] : postStab <= 24 ? rates[1] : rates[2];
+      revenue.push(prev * (1 + g));
+    }
+  }
+  return revenue;
+}
+
+function growthBreakEvenPdf(revenues: number[], tmibVal: number): number | null {
+  const idx = revenues.findIndex(r => r >= tmibVal);
+  return idx >= 0 ? idx + 1 : null;
+}
+
+function growthChart(
+  doc: PDFKit.PDFDocument,
+  conservative: number[],
+  moderate: number[],
+  ambitious: number[],
+  tmibVal: number,
+  cx: number, cy: number, cw: number, ch: number,
+) {
+  const yMax = Math.max(tmibVal * 1.25, moderate[35] * 1.15);
+  const months = 36;
+
+  const toX = (m: number) => cx + (m / months) * cw;
+  const toY = (v: number) => cy + ch - Math.max(0, Math.min(v / yMax, 1)) * ch;
+
+  // Background
+  doc.rect(cx, cy, cw, ch).fill(C.light);
+
+  // Horizontal grid lines
+  for (let i = 1; i <= 4; i++) {
+    const gy = cy + (i / 4) * ch;
+    const gv = yMax * (1 - i / 4);
+    doc.moveTo(cx, gy).lineTo(cx + cw, gy).strokeColor(C.border).lineWidth(0.5).stroke();
+    doc.fillColor(C.muted).fontSize(7).font('Helvetica')
+      .text(fmtM(gv), cx - 52, gy - 4, { width: 50, align: 'right' });
+  }
+  doc.fillColor(C.muted).fontSize(7).font('Helvetica')
+    .text(fmtM(0), cx - 52, cy + ch - 4, { width: 50, align: 'right' });
+
+  // X-axis labels
+  [0, 6, 12, 18, 24, 30, 36].forEach(m => {
+    const px = toX(m);
+    doc.fillColor(C.muted).fontSize(7).font('Helvetica')
+      .text(`Mo ${m}`, px - 10, cy + ch + 4, { width: 24, align: 'center' });
+  });
+
+  // TMIB dashed line (red) — simulated dash via short segments
+  const tmibY = toY(tmibVal);
+  let dx = cx;
+  const dashLen = 5, gapLen = 4;
+  doc.strokeColor(C.red).lineWidth(1);
+  while (dx < cx + cw) {
+    const endX = Math.min(dx + dashLen, cx + cw);
+    doc.moveTo(dx, tmibY).lineTo(endX, tmibY).stroke();
+    dx += dashLen + gapLen;
+  }
+  doc.fillColor(C.red).fontSize(6.5).font('Helvetica-Bold')
+    .text('Break-even (TMIB)', cx + cw - 80, tmibY - 9, { width: 78, align: 'right' });
+
+  // Draw three revenue lines
+  const seriesDef: Array<{data: number[]; color: string; width: number}> = [
+    { data: conservative, color: C.muted,  width: 1.5 },
+    { data: moderate,     color: C.navy,   width: 2   },
+    { data: ambitious,    color: C.green,  width: 1.5 },
+  ];
+  seriesDef.forEach(({ data, color, width }) => {
+    let started = false;
+    data.forEach((v, i) => {
+      const px = toX(i + 1);
+      const py = toY(v);
+      if (!started) { doc.moveTo(px, py); started = true; } else { doc.lineTo(px, py); }
+    });
+    doc.strokeColor(color).lineWidth(width).stroke();
+  });
+
+  // Break-even dots
+  const beColors = [C.muted, C.navy, C.green];
+  [conservative, moderate, ambitious].forEach((data, si) => {
+    const beIdx = data.findIndex(r => r >= tmibVal);
+    if (beIdx >= 0 && beIdx < 36) {
+      const px = toX(beIdx + 1);
+      const py = toY(tmibVal);
+      doc.circle(px, py, 3).fill(beColors[si]);
+    }
+  });
+
+  // Legend (top-right)
+  const legX = cx + cw - 122;
+  const legY = cy + 8;
+  const legItems = [
+    { label: 'Conservative (+3%)', color: C.muted },
+    { label: 'Moderate (+5%)',     color: C.navy  },
+    { label: 'Ambitious (+8%)',    color: C.green },
+  ];
+  legItems.forEach((item, i) => {
+    doc.rect(legX, legY + i * 12, 10, 4).fill(item.color);
+    doc.fillColor(C.coal).fontSize(6.5).font('Helvetica')
+      .text(item.label, legX + 13, legY + i * 12, { width: 108 });
+  });
+  // TMIB legend entry
+  const tmibLegY = legY + legItems.length * 12 + 2;
+  let dlx = legX;
+  for (let seg = 0; seg < 3; seg++) {
+    doc.moveTo(dlx, tmibLegY + 2).lineTo(dlx + 4, tmibLegY + 2)
+      .strokeColor(C.red).lineWidth(1).stroke();
+    dlx += 7;
+  }
+  doc.fillColor(C.red).fontSize(6.5).font('Helvetica')
+    .text('Break-even (TMIB)', legX + 13, tmibLegY - 1, { width: 108 });
 }
 
 function lineChart(doc: PDFKit.PDFDocument, base: number[], severe: number[], maxCap: number,
@@ -1519,10 +1647,50 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       ftr(doc, 12);
 
       // ════════════════════════════════════════════════════════════════════
-      // PAGE 13. DECISION INTERPRETATION
+      // PAGE 13. REVENUE GROWTH TRAJECTORY
       // ════════════════════════════════════════════════════════════════════
       doc.addPage(); hdr(doc, date); y = 42;
-      y = secHead(doc, 13, 'Decision Interpretation',
+      y = secHead(doc, 13, 'Revenue Growth Trajectory',
+        'Projected revenue across three bounded growth trajectories beginning after ramp stabilization. Break-even is when projected revenue meets total monthly outflow (TMIB).', y);
+
+      const conservRev  = projectRevenuePdf(sim.expectedRevenue, sim.rampDuration, [0.03, 0.015, 0.005]);
+      const moderateRev = projectRevenuePdf(sim.expectedRevenue, sim.rampDuration, [0.05, 0.025, 0.01]);
+      const ambitiousRev = projectRevenuePdf(sim.expectedRevenue, sim.rampDuration, [0.08, 0.04, 0.02]);
+      const conservBE  = growthBreakEvenPdf(conservRev, sim.tmib);
+      const modBE      = growthBreakEvenPdf(moderateRev, sim.tmib);
+      const ambBE      = growthBreakEvenPdf(ambitiousRev, sim.tmib);
+
+      const gtChartH = 165;
+      growthChart(doc, conservRev, moderateRev, ambitiousRev, sim.tmib, L, y + 6, W, gtChartH);
+      y += gtChartH + 26;
+
+      // Break-even stat boxes — 3 side by side
+      const beBoxW = Math.floor((W - 12) / 3);
+      const beColors2 = [C.muted, C.navy, C.green];
+      const beLabels = ['Conservative', 'Moderate', 'Ambitious'];
+      const beVals   = [conservBE, modBE, ambBE];
+      beLabels.forEach((label, i) => {
+        const bx = L + i * (beBoxW + 6);
+        doc.rect(bx, y, beBoxW, 50).fill(i % 2 === 0 ? C.light : C.mid);
+        doc.rect(bx, y, 3, 50).fill(beColors2[i]);
+        doc.fillColor(C.muted).fontSize(7.5).font('Helvetica-Bold')
+          .text(label.toUpperCase(), bx + 10, y + 9, { width: beBoxW - 14 });
+        const beText = beVals[i] ? `Month ${beVals[i]}` : 'Not reached in 36 mo';
+        doc.fillColor(C.coal).fontSize(11).font('Helvetica-Bold')
+          .text(beText, bx + 10, y + 24, { width: beBoxW - 14 });
+      });
+      y += 62;
+
+      y = insight(doc, 'Interpretation',
+        'These projections illustrate how revenue could evolve after launch under three bounded growth trajectories. The break-even threshold represents the level of revenue required to replace the income and obligations currently supported by employment. Growth assumptions are intentionally constrained to avoid unrealistic optimism and should be interpreted as illustrative scenarios rather than predictions.', y);
+
+      ftr(doc, 13);
+
+      // ════════════════════════════════════════════════════════════════════
+      // PAGE 14. DECISION INTERPRETATION
+      // ════════════════════════════════════════════════════════════════════
+      doc.addPage(); hdr(doc, date); y = 42;
+      y = secHead(doc, 14, 'Decision Interpretation',
         `Structural Breakpoint Score: ${score}/100. ${scoreLabel}. A plain-language summary of what this analysis means.`, y);
 
       const riskBlocks = [
@@ -1621,13 +1789,21 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
         y += h + 8;
       });
 
-      ftr(doc, 13);
+      // Revenue growth outlook takeaway
+      const growthTakeaway = modBE
+        ? `Under moderate growth assumptions, projected revenue would reach break-even around Month ${modBE}, after which the transition begins rebuilding financial stability.`
+        : conservBE
+        ? `Under conservative growth assumptions, revenue break-even is projected around Month ${conservBE}. Moderate or stronger execution would accelerate this timeline.`
+        : 'At projected growth rates, the break-even threshold is not reached within the 36-month model window. Reducing fixed obligations or strengthening revenue would close this gap.';
+      y = insight(doc, 'Revenue Growth Outlook', growthTakeaway, y);
+
+      ftr(doc, 14);
 
       // ════════════════════════════════════════════════════════════════════
-      // PAGE 14. GLOSSARY
+      // PAGE 15. GLOSSARY
       // ════════════════════════════════════════════════════════════════════
       doc.addPage(); hdr(doc, date); y = 42;
-      y = secHead(doc, 14, 'Glossary of Terms',
+      y = secHead(doc, 15, 'Glossary of Terms',
         'Plain-language definitions for every metric and concept used in this report.', y);
 
       const glossaryTerms = [
@@ -1690,14 +1866,14 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
         doc.fillColor(C.coal).fontSize(8.5).font('Helvetica').text(entry.def, L + 12, y + 21, { width: W - 24, lineGap: 1.5 });
         y += h + 4;
       });
-      ftr(doc, 14);
+      ftr(doc, 15);
 
       // ════════════════════════════════════════════════════════════════════
-      // PAGE 15. IMPORTANT NOTICE (DISCLAIMER)
+      // PAGE 16. IMPORTANT NOTICE (DISCLAIMER)
       // ════════════════════════════════════════════════════════════════════
       doc.addPage(); hdr(doc, date); y = 42;
       doc.rect(L, y, W, 1).fill(C.border); y += 8;
-      doc.fillColor('#94a3b8').fontSize(7.5).font('Helvetica').text(`PAGE 15 OF ${TOTAL}`, L, y); y += 11;
+      doc.fillColor('#94a3b8').fontSize(7.5).font('Helvetica').text(`PAGE 16 OF ${TOTAL}`, L, y); y += 11;
       doc.fillColor(C.navy).fontSize(16).font('Times-Bold').text('Important Notice', L, y, { width: W }); y += 30;
 
       const disclaimerParas = [
@@ -1720,7 +1896,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
         y += doc.heightOfString(para, { width: W, lineGap: 2 }) + 14;
       });
 
-      ftr(doc, 15);
+      ftr(doc, 16);
       doc.end();
 
     } catch (err) {

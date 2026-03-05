@@ -50,7 +50,7 @@ export function estimateACASubsidizedPremium(
   else if (fplPct < 3.0)  capRate = 0.07;
   else capRate = 0.085;
 
-  const monthlyCapped = (annualIncome * capRate) / 12;
+  const monthlyCapped = Math.round((annualIncome * capRate) / 12);
   return Math.min(fullPremium, Math.max(0, monthlyCapped));
 }
 
@@ -211,13 +211,13 @@ export function calculateSimulation(data: InsertSimulation) {
   if (coverageRatio < 0.50) structuralBreakpointScore = Math.min(structuralBreakpointScore, 45);
 
   return {
-    tmib,
-    accessibleCapital,
-    selfEmploymentTax,
-    businessCostBaseline,
-    estimatedHealthcarePlanCost,
-    healthcareDelta,
-    healthcareMonthlyCost,
+    tmib: Math.round(tmib),
+    accessibleCapital: Math.round(accessibleCapital),
+    selfEmploymentTax: Math.round(selfEmploymentTax),
+    businessCostBaseline: Math.round(businessCostBaseline),
+    estimatedHealthcarePlanCost: Math.round(estimatedHealthcarePlanCost),
+    healthcareDelta: Math.round(healthcareDelta),
+    healthcareMonthlyCost: Math.round(healthcareMonthlyCost),
     baseRunway,
     runway15Down,
     runway30Down,

@@ -43,6 +43,134 @@ function pct100(values: number[]): number[] {
   return floored;
 }
 
+// ─── Revenue growth trajectory helpers ─────────────────────────────────────
+const GROWTH_RATES = {
+  conservative: [0.03, 0.015, 0.005] as const,
+  moderate:     [0.05, 0.025, 0.01]  as const,
+  ambitious:    [0.08, 0.04,  0.02]  as const,
+};
+
+function projectRevenue(
+  expectedRevenue: number,
+  rampDuration: number,
+  rates: readonly [number, number, number],
+  months = 36,
+): number[] {
+  const revenue: number[] = [];
+  for (let m = 1; m <= months; m++) {
+    if (m <= rampDuration) {
+      revenue.push(rampDuration > 0 ? expectedRevenue * (m / rampDuration) : expectedRevenue);
+    } else if (m === rampDuration + 1) {
+      revenue.push(expectedRevenue);
+    } else {
+      const postStab = m - rampDuration - 1;
+      const prev = revenue[m - 2] ?? expectedRevenue;
+      const g = postStab <= 12 ? rates[0] : postStab <= 24 ? rates[1] : rates[2];
+      revenue.push(prev * (1 + g));
+    }
+  }
+  return revenue;
+}
+
+function growthBreakEven(revenues: number[], tmib: number): number | null {
+  const idx = revenues.findIndex(r => r >= tmib);
+  return idx >= 0 ? idx + 1 : null;
+}
+
+function GrowthTrajectoryChart({ sim }: { sim: SimulationResult }) {
+  const SVG_W = 520, SVG_H = 170, months = 36;
+  const PAD_L = 58, PAD_B = 26;
+  const chartW = SVG_W - PAD_L - 8;
+  const chartH = SVG_H - PAD_B;
+
+  const conserv  = projectRevenue(sim.expectedRevenue, sim.rampDuration, GROWTH_RATES.conservative);
+  const moderate = projectRevenue(sim.expectedRevenue, sim.rampDuration, GROWTH_RATES.moderate);
+  const ambitious = projectRevenue(sim.expectedRevenue, sim.rampDuration, GROWTH_RATES.ambitious);
+
+  const chartMax = Math.max(sim.tmib * 1.25, moderate[35] * 1.15);
+
+  const conservBE  = growthBreakEven(conserv, sim.tmib);
+  const moderateBE = growthBreakEven(moderate, sim.tmib);
+  const ambitiousBE = growthBreakEven(ambitious, sim.tmib);
+
+  const toX = (m: number) => PAD_L + (m / months) * chartW;
+  const toY = (v: number) => chartH - Math.max(0, Math.min(v / chartMax, 1)) * chartH;
+
+  function toPath(pts: number[]): string {
+    return pts.map((v, i) => `${i === 0 ? 'M' : 'L'} ${toX(i + 1).toFixed(1)},${toY(v).toFixed(1)}`).join(' ');
+  }
+
+  const fmtTick = (v: number) => v >= 1000000 ? `$${(v/1000000).toFixed(1)}M` : v >= 1000 ? `$${Math.round(v/1000)}k` : `$${Math.round(v)}`;
+  const yTicks = [0.25, 0.5, 0.75, 1.0];
+  const tmibY = toY(sim.tmib);
+
+  const lines = [
+    { pts: conserv,  be: conservBE,  color: '#64748b', sw: '1.5', dash: '5 3' },
+    { pts: moderate, be: moderateBE, color: '#1e293b', sw: '2.5', dash: undefined },
+    { pts: ambitious,be: ambitiousBE,color: '#15803d', sw: '1.5', dash: '3 2' },
+  ];
+
+  return (
+    <div className="relative">
+      <svg viewBox={`0 0 ${SVG_W} ${SVG_H}`} className="w-full" style={{ height: 210 }}>
+        {/* Grid lines */}
+        {yTicks.map(p => (
+          <g key={p}>
+            <line x1={PAD_L} y1={toY(chartMax * p)} x2={SVG_W - 8} y2={toY(chartMax * p)}
+              stroke="#f1f5f9" strokeWidth="1" />
+            <text x={PAD_L - 4} y={toY(chartMax * p) + 3} textAnchor="end" fontSize="7.5" fill="#94a3b8"
+              fontFamily="system-ui">{fmtTick(chartMax * p)}</text>
+          </g>
+        ))}
+        {/* X-axis grid + labels */}
+        {[0, 6, 12, 18, 24, 30, 36].map(m => (
+          <g key={m}>
+            <line x1={toX(m)} y1={0} x2={toX(m)} y2={chartH} stroke="#f1f5f9" strokeWidth="1" />
+            <text x={toX(m)} y={SVG_H - 8} textAnchor="middle" fontSize="7.5" fill="#94a3b8"
+              fontFamily="system-ui">{m}</text>
+          </g>
+        ))}
+        {/* TMIB break-even line */}
+        <line x1={PAD_L} y1={tmibY} x2={SVG_W - 8} y2={tmibY}
+          stroke="#ef4444" strokeWidth="1.5" strokeDasharray="5 4" />
+        <text x={SVG_W - 10} y={tmibY - 3} textAnchor="end" fontSize="7" fill="#ef4444"
+          fontFamily="system-ui" fontWeight="bold">Break-even (TMIB)</text>
+        {/* Revenue trajectory lines */}
+        {lines.map(({ pts, color, sw, dash }) => (
+          <path key={color} d={toPath(pts)} fill="none" stroke={color} strokeWidth={sw}
+            strokeLinecap="round" strokeLinejoin="round"
+            {...(dash ? { strokeDasharray: dash } : {})} />
+        ))}
+        {/* Break-even dots */}
+        {lines.map(({ be, color }) => be !== null && be <= 36 && (
+          <circle key={color + '-be'} cx={toX(be)} cy={toY(sim.tmib)} r="4"
+            fill={color} stroke="white" strokeWidth="1.5" />
+        ))}
+      </svg>
+      {/* Legend */}
+      <div className="flex flex-wrap gap-x-5 gap-y-1.5 mt-2 text-xs text-muted-foreground">
+        <div className="flex items-center gap-1.5">
+          <div className="w-5 h-px" style={{ borderTop: '1.5px dashed #64748b' }} />
+          <span>Conservative (+3%/mo)</span>
+        </div>
+        <div className="flex items-center gap-1.5">
+          <div className="w-5 h-0.5 rounded" style={{ backgroundColor: '#1e293b' }} />
+          <span>Moderate (+5%/mo)</span>
+        </div>
+        <div className="flex items-center gap-1.5">
+          <div className="w-5 h-px" style={{ borderTop: '1.5px dashed #15803d' }} />
+          <span>Ambitious (+8%/mo)</span>
+        </div>
+        <div className="flex items-center gap-1.5">
+          <div className="w-4 h-px" style={{ borderTop: '1.5px dashed #ef4444' }} />
+          <span className="text-red-500">Break-even threshold (TMIB)</span>
+        </div>
+        <span className="text-muted-foreground/40 ml-auto">X: months · Y: monthly revenue</span>
+      </div>
+    </div>
+  );
+}
+
 // ─── Client-side runway calculations ──────────────────────────────────────
 function calcRunwayClient(capital: number, outflow: number, revenue: number, ramp: number, vol: number): number {
   if (outflow <= 0) return 999;
@@ -487,7 +615,7 @@ export default function Results() {
               <ul className="text-left space-y-2.5 mb-6">
                 {[
                   '15-section interactive report',
-                  '15-page downloadable PDF',
+                  '16-page downloadable PDF',
                   'Stress scenario modeling (3 revenue paths)',
                   'Household shock scenario analysis',
                   'Sensitivity levers and structural action factors',
@@ -1179,7 +1307,7 @@ export default function Results() {
             </div>
           </SectionCard>
 
-          {/* ── 9. Scenario Comparison ───────────────────────────── */}
+          {/* ── 9. Scenario Comparison ──────────────────────────── */}
           <SectionCard className="mb-8">
             <SectionHeader n={9}
               sub="All scenarios side by side. Tier 1 Runway = when cash + brokerage runs out. Full Capital Depth uses all accessible savings including restricted assets.">
@@ -1234,9 +1362,40 @@ export default function Results() {
             </div>
           </SectionCard>
 
-          {/* ── 10. Decision Interpretation ───────────────────────────── */}
+          {/* ── 10. Revenue Growth Trajectory ───────────────────────── */}
           <SectionCard className="mb-8">
-            <SectionHeader n={10}>Decision Interpretation</SectionHeader>
+            <SectionHeader n={10}
+              sub="Projected revenue across three bounded growth trajectories beginning after ramp stabilization. The dashed red line is your total monthly outflow — the break-even threshold.">
+              Revenue Growth Trajectory
+            </SectionHeader>
+            <div className="px-6 py-5">
+              <GrowthTrajectoryChart sim={sim} />
+              {/* Break-even stat cards */}
+              <div className="grid grid-cols-3 gap-3 mt-6" data-testid="growth-breakeven-cards">
+                {[
+                  { label: 'Conservative', color: '#64748b', be: growthBreakEven(projectRevenue(sim.expectedRevenue, sim.rampDuration, GROWTH_RATES.conservative), sim.tmib) },
+                  { label: 'Moderate',     color: '#1e293b', be: growthBreakEven(projectRevenue(sim.expectedRevenue, sim.rampDuration, GROWTH_RATES.moderate),     sim.tmib) },
+                  { label: 'Ambitious',    color: '#15803d', be: growthBreakEven(projectRevenue(sim.expectedRevenue, sim.rampDuration, GROWTH_RATES.ambitious),    sim.tmib) },
+                ].map(({ label, color, be }) => (
+                  <div key={label} className="rounded-lg border border-border bg-muted/30 px-4 py-3 relative overflow-hidden">
+                    <div className="absolute left-0 top-0 bottom-0 w-0.5" style={{ backgroundColor: color }} />
+                    <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground mb-1 pl-2">{label}</p>
+                    <p className="text-xl font-bold text-foreground pl-2" data-testid={`growth-breakeven-${label.toLowerCase()}`}>
+                      {be !== null ? `Month ${be}` : 'Not reached within 36 mo.'}
+                    </p>
+                  </div>
+                ))}
+              </div>
+              {/* Narrative framing */}
+              <p className="text-xs text-muted-foreground leading-relaxed mt-5 max-w-3xl">
+                These projections illustrate how revenue could evolve after launch under three bounded growth trajectories. The break-even threshold represents the level of revenue required to replace the income and obligations currently supported by employment. Growth assumptions are intentionally constrained to avoid unrealistic optimism and should be interpreted as illustrative scenarios rather than predictions.
+              </p>
+            </div>
+          </SectionCard>
+
+          {/* ── 11. Decision Interpretation ──────────────────────────── */}
+          <SectionCard className="mb-8">
+            <SectionHeader n={11}>Decision Interpretation</SectionHeader>
             <div className="px-7 py-6 space-y-6">
 
               {/* Classification badge */}
@@ -1319,12 +1478,28 @@ export default function Results() {
                 </ul>
               </div>
 
+              {/* Revenue growth outlook takeaway */}
+              <div className="pt-4 border-t border-border">
+                <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground mb-3">Revenue growth outlook</p>
+                <p className="text-sm text-foreground leading-relaxed">
+                  {(() => {
+                    const modBE = growthBreakEven(projectRevenue(sim.expectedRevenue, sim.rampDuration, GROWTH_RATES.moderate), sim.tmib);
+                    const consBE = growthBreakEven(projectRevenue(sim.expectedRevenue, sim.rampDuration, GROWTH_RATES.conservative), sim.tmib);
+                    return modBE
+                      ? `Under moderate growth assumptions, projected revenue would reach break-even around Month ${modBE}, after which the transition begins rebuilding financial stability.`
+                      : consBE
+                      ? `Under conservative growth assumptions, revenue break-even is projected around Month ${consBE}. Moderate or stronger execution would accelerate this timeline.`
+                      : 'At projected growth rates, the break-even threshold is not reached within the 36-month model window. Reducing fixed obligations or strengthening revenue would close this gap.';
+                  })()}
+                </p>
+              </div>
+
             </div>
           </SectionCard>
 
-          {/* ── 11. Glossary ────────────────────────────────────────── */}
+          {/* ── 12. Glossary ────────────────────────────────────────── */}
           <SectionCard className="mb-8">
-            <SectionHeader n={11}>Glossary of Key Terms</SectionHeader>
+            <SectionHeader n={12}>Glossary of Key Terms</SectionHeader>
             <div className="px-7 py-6 space-y-4">
               {[
                 { term: "Sustainable Runway", def: "Capital is not the limiting factor under the modeled scenario. Revenue stabilizes the financial position before savings are depleted, so no fixed depletion date applies." },
