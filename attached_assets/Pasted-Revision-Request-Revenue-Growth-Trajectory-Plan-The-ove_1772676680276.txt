@@ -1,0 +1,122 @@
+Revision Request — Revenue Growth Trajectory Plan
+
+The overall plan is approved. The section architecture, narrative placement, and additive design approach are correct. We would like to proceed with implementation with several refinements to ensure the modeling logic, visualization clarity, and report formatting are fully aligned with the rest of the QuitReady report.
+
+Please revise the implementation plan with the following adjustments.
+
+1. Growth Model Adjustment — Stabilization Month
+
+After the ramp period completes, revenue should stabilize at the projected steady-state level for one month before growth begins.
+
+This reflects a more realistic early-stage operating pattern where revenue stabilizes briefly before scaling.
+
+Updated sequence:
+
+Ramp period  
+Revenue grows linearly from $0 → expectedRevenue across rampDuration months.
+
+Stabilization month  
+The first month after ramp completion holds revenue constant at expectedRevenue.
+
+Growth phase  
+Growth trajectories begin after the stabilization month.
+
+Example timeline:
+
+Month 1–rampDuration → ramp growth  
+Month rampDuration + 1 → stabilization (expectedRevenue)  
+Month rampDuration + 2 onward → growth begins
+
+Update the projection logic accordingly so that growth rates begin after the stabilization month rather than immediately after ramp completion.
+
+2. Chart Scaling Adjustment
+
+Ensure the TMIB threshold remains visually meaningful on the chart even when revenue growth becomes large.
+
+Instead of scaling the chart using the ambitious trajectory endpoint, base the vertical scale primarily on the moderate trajectory.
+
+Replace:
+
+chartMax = Math.max(tmib * 1.25, ambitious[35])
+
+With logic equivalent to:
+
+chartMax = Math.max(tmib * 1.25, moderate[35] * 1.15)
+
+This prevents extremely high ambitious growth projections from compressing the chart and keeps the break-even threshold visually readable.
+
+3. Visual Structure of the Section
+
+Maintain a single chart containing all three trajectories. This is the correct visualization because it allows direct comparison between conservative, moderate, and ambitious growth paths relative to the TMIB break-even threshold.
+
+The section should follow the same visual pattern used throughout the report:
+
+Section Title  
+Chart  
+Break-even summary cards  
+Short explanatory paragraph
+
+The break-even summary should appear as three stat cards aligned horizontally:
+
+Conservative  
+Month X
+
+Moderate  
+Month Y
+
+Ambitious  
+Month Z
+
+If break-even is not reached within the 36-month model window, display:
+
+“Not reached within 36 months.”
+
+4. Narrative Framing Improvement
+
+Update the explanatory paragraph to more clearly connect the chart to the user's core decision.
+
+Replace the existing paragraph with:
+
+“These projections illustrate how revenue could evolve after launch under three bounded growth trajectories. The break-even threshold represents the level of revenue required to replace the income and obligations currently supported by employment. Growth assumptions are intentionally constrained to avoid unrealistic optimism and should be interpreted as illustrative scenarios rather than predictions.”
+
+5. Formatting Consistency Requirements
+
+Ensure the new section visually matches the formatting system used throughout the web report and PDF.
+
+Specifically:
+
+• Maintain identical spacing and padding conventions used in other sections.  
+• Use the same card structure and typography scale for break-even stat cards as existing stat elements in the report.  
+• Ensure bullet point spacing and paragraph spacing match the report's established rhythm.  
+• Ensure chart margins align with other report visuals.  
+• Ensure PDF rendering mirrors the web layout with consistent spacing and section structure.
+
+The goal is for the new section to feel like a natural continuation of the report rather than an inserted element.
+
+6. No Changes to Existing Logic
+
+Confirm that the following remain unchanged:
+
+• structuralBreakpointScore calculation  
+• risk classification bands  
+• runway calculations  
+• scenario comparison logic  
+• wizard inputs  
+• existing section content
+
+The growth trajectory section remains purely additive and interpretive.
+
+7. Section Placement
+
+Maintain the existing proposed placement:
+
+Scenario Comparison  
+→ Revenue Growth Trajectory (new section)  
+→ Decision Interpretation  
+→ Glossary
+
+This preserves the narrative arc:
+
+Current Position → Stress Conditions → Growth Potential → Final Interpretation.
+
+Please update the implementation plan accordingly before proceeding with development.

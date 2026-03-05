@@ -1,0 +1,146 @@
+Objective
+Add a new analytical section to the QuitReady report that models revenue growth trajectories after the ramp period. This section should extend the report’s insight without modifying the existing simulator logic, risk score, runway calculations, or classification bands.
+
+The existing simulator answers the conservative question:
+“If revenue stabilizes at your projected level, can your capital sustain the transition?”
+
+The new section should answer the complementary question:
+“If revenue grows gradually after launch, when might the transition realistically reach break-even and begin rebuilding financial stability?”
+
+This new section must be purely additive and must not alter the current scoring or classification system.
+
+Structural Constraints
+Do NOT modify or influence:
+- structuralBreakpointScore calculation
+- risk classification bands (0–49 Fragile, 50–69 Moderate, 70–85 Stable, 86–100 Strong)
+- existing runway calculations
+- scenario comparison table
+- existing narrative explanation logic
+
+The growth projection is an additional analytical lens only.
+
+Data Inputs
+Use only existing simulator inputs already available in the report pipeline:
+- expectedRevenue
+- rampDuration
+- volatilityPercent
+- tmib (Total Monthly Income Burden)
+- existing capital values
+- baseRunway or liquidity data already calculated
+
+Do not introduce any new frontend inputs.
+
+Growth Modeling
+After the ramp period completes, revenue should grow using bounded growth curves to avoid unrealistic optimism.
+
+Model three trajectories:
+
+Conservative
+Months 1–12 after ramp → 3% monthly growth
+Months 13–24 → 1.5% monthly growth
+Months 25–36 → 0.5% monthly growth
+
+Moderate
+Months 1–12 after ramp → 5% monthly growth
+Months 13–24 → 2.5% monthly growth
+Months 25–36 → 1% monthly growth
+
+Ambitious
+Months 1–12 after ramp → 8% monthly growth
+Months 13–24 → 4% monthly growth
+Months 25–36 → 2% monthly growth
+
+Implementation Function
+Create a revenue projection function that returns a 36-month array of projected revenue values beginning at ramp completion.
+
+Example implementation:
+
+function projectRevenue(expectedRevenue, rampDuration, growthRates, months = 36) {
+  const revenue = []
+  for (let m = 1; m <= months; m++) {
+    if (m <= rampDuration) {
+      revenue.push(expectedRevenue * (m / rampDuration))
+      continue
+    }
+    const prev = revenue[m - 2] || expectedRevenue
+    let growth
+    if (m <= 12) growth = growthRates[0]
+    else if (m <= 24) growth = growthRates[1]
+    else growth = growthRates[2]
+    revenue.push(prev * (1 + growth))
+  }
+  return revenue
+}
+
+Break-Even Analysis
+For each trajectory:
+
+1. Calculate monthly net cashflow:
+
+netCashflow = projectedRevenue - tmib
+
+2. Identify break-even month:
+First month where projectedRevenue ≥ tmib.
+
+3. Identify capital stabilization point:
+First month where capital drawdown stops.
+
+4. Identify recovery point:
+Month where cumulative capital begins rebuilding.
+
+These calculations must not alter the main simulator results.
+
+Report Section
+Create a new standalone report section titled:
+
+“Revenue Growth Trajectory”
+
+Placement options:
+- After the Scenario Comparison section
+- Or immediately before the final narrative explanation
+
+The section should visually stand on its own.
+
+Section Content
+1. Chart
+Plot projected revenue across 36 months for:
+
+Conservative
+Moderate
+Ambitious
+
+Include a horizontal line representing TMIB (break-even threshold).
+
+2. Key Insights
+Display concise computed results such as:
+
+Break-even month for each trajectory.
+Month when capital drawdown stabilizes.
+Month when buffer begins rebuilding.
+
+3. Narrative Framing
+Language must clearly state:
+
+“These projections illustrate how financial stability could evolve if revenue grows gradually after launch. Growth assumptions are intentionally bounded to avoid unrealistic optimism and should be interpreted as illustrative scenarios rather than predictions.”
+
+Integration With Final Conclusions Page
+Add one or two short takeaways to the final conclusions section summarizing the growth analysis.
+
+Example:
+
+Takeaway Example 1:
+“Under moderate growth assumptions, projected revenue would reach break-even around Month X, after which the transition begins rebuilding financial stability.”
+
+Takeaway Example 2:
+“If growth follows a conservative trajectory, capital support remains necessary through approximately Month Y before the transition becomes self-sustaining.”
+
+These statements should be short enough to fit within the existing conclusions layout and PDF output.
+
+Acceptance Criteria
+- Existing score calculations remain unchanged.
+- Existing report sections render exactly as before.
+- New growth trajectory section appears as its own page/section.
+- Growth projections use only existing data inputs.
+- Break-even and recovery months are correctly calculated.
+- Final conclusions page reflects the outcome of the trajectory analysis with one or two concise summary statements.
+- PDF generation includes the new section and conclusion takeaways.
