@@ -710,8 +710,13 @@ export default function Results() {
                 {createCheckoutSession.isPending ? 'Redirecting to checkout…' : 'Unlock Full Report'}
               </Button>
 
-              <p className="text-[11px] text-muted-foreground/60 leading-relaxed">
-                Instant access. No subscription. No SSN or bank logins required.
+              <p className="text-[11px] text-muted-foreground/60 leading-relaxed mb-2">
+                One-time payment. No subscription. No SSN or bank logins required.
+              </p>
+              <p className="text-[11px] text-muted-foreground/50 leading-relaxed" data-testid="text-paywall-terms">
+                By purchasing, you accept our{" "}
+                <a href="/terms" target="_blank" rel="noopener noreferrer" className="underline underline-offset-2 hover:text-muted-foreground transition-colors">Terms of Use</a>.
+                {" "}This report is a mathematical simulation, not financial advice.
               </p>
             </div>
 

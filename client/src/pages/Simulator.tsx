@@ -6,6 +6,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import Layout from "../components/Layout";
 import ErrorBoundary from "../components/ErrorBoundary";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { simulationFormSchema, SimulationFormValues, useCreateSimulation } from "../hooks/use-simulations";
 import { useToast } from "@/hooks/use-toast";
 import { ChevronLeft, Info, Check, AlertTriangle } from "lucide-react";
@@ -185,6 +186,8 @@ function SimulatorInner() {
   const [screenIndex, setScreenIndex] = useState(0);
   const [businessChoice, setBusinessChoice] = useState<BusinessChoice | null>(null);
   const [showHealthcareOverride, setShowHealthcareOverride] = useState(false);
+  const [termsAccepted, setTermsAccepted] = useState(false);
+  const [termsError, setTermsError] = useState(false);
   const { toast } = useToast();
   const createSimulation = useCreateSimulation();
 
@@ -285,6 +288,11 @@ function SimulatorInner() {
   };
 
   const onSubmit = () => {
+    if (!termsAccepted) {
+      setTermsError(true);
+      return;
+    }
+    setTermsError(false);
     createSimulation.mutate({
       ...values,
       currentSalary: values.currentSalary ?? 0,
@@ -790,9 +798,30 @@ function SimulatorInner() {
                   disabled={screenIndex === 10 && businessChoice === null}
                   data-testid="button-next">{continueLabel}</Button>
               ) : (
-                <Button type="button" disabled={createSimulation.isPending} onClick={onSubmit} data-testid="button-submit">
-                  {createSimulation.isPending ? 'Running analysis...' : 'Run Stress Test'}
-                </Button>
+                <div className="flex flex-col items-end gap-2">
+                  <div className="flex items-start gap-2">
+                    <Checkbox
+                      id="terms-accept"
+                      checked={termsAccepted}
+                      onCheckedChange={(checked) => {
+                        setTermsAccepted(!!checked);
+                        if (checked) setTermsError(false);
+                      }}
+                      data-testid="checkbox-terms-accept"
+                      className="mt-0.5"
+                    />
+                    <label htmlFor="terms-accept" className="text-xs text-muted-foreground leading-relaxed cursor-pointer">
+                      I understand this is a mathematical simulation, not financial advice, and I accept the{" "}
+                      <a href="/terms" target="_blank" rel="noopener noreferrer" className="underline underline-offset-2 hover:text-foreground transition-colors">Terms of Use</a>.
+                    </label>
+                  </div>
+                  {termsError && (
+                    <p className="text-xs text-destructive">Please accept the Terms of Use to continue.</p>
+                  )}
+                  <Button type="button" disabled={createSimulation.isPending} onClick={onSubmit} data-testid="button-run-simulation">
+                    {createSimulation.isPending ? 'Running analysis...' : 'Run Stress Test'}
+                  </Button>
+                </div>
               )}
             </div>
           </div>

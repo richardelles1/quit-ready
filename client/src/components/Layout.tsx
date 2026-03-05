@@ -167,6 +167,13 @@ export default function Layout({ children }: { children: ReactNode }) {
             </div>
             <div>
               <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-3">Legal</p>
+              <ul className="space-y-2 mb-3">
+                <li>
+                  <Link href="/terms">
+                    <span className="text-xs text-muted-foreground hover:text-foreground transition-colors cursor-pointer" data-testid="link-footer-terms">Terms of Use</span>
+                  </Link>
+                </li>
+              </ul>
               <p className="text-xs text-muted-foreground leading-relaxed">
                 This tool is an educational financial simulation. It is not financial, tax, or legal advice. Consult a qualified professional before making any major financial decisions.
               </p>

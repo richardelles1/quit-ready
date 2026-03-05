@@ -14,6 +14,7 @@ import SampleReport from "./pages/SampleReport";
 import BlogIndex from "./pages/BlogIndex";
 import BlogPost from "./pages/BlogPost";
 import RerunRedirect from "./pages/RerunRedirect";
+import Terms from "./pages/Terms";
 
 function Router() {
   return (
@@ -28,6 +29,7 @@ function Router() {
       <Route path="/blog/:slug" component={BlogPost} />
       <Route path="/results/:id" component={Results} />
       <Route path="/rerun/:token" component={RerunRedirect} />
+      <Route path="/terms" component={Terms} />
       <Route component={NotFound} />
     </Switch>
   );

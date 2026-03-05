@@ -24,11 +24,11 @@ const features = [
 const faqs = [
   {
     question: "Why $19.99 and not free?",
-    answer: "Building a high-fidelity financial engine that accounts for U.S. self-employment tax logic, ACA subsidy cliffs, and multi-scenario stress testing requires significant engineering and research. The $19.99 fee allows us to maintain the tool, keep the data models updated with the latest tax year guidelines, and remain completely independent—meaning we don't sell your data to lead-gen firms or insurance brokers."
+    answer: "Building a deterministic financial simulation that accurately models U.S. self-employment tax, ACA subsidy cliffs, and multi-scenario stress testing across 36 months requires significant engineering and ongoing research. The $19.99 fee allows us to maintain the tool, keep the calculations updated with the latest tax year guidelines, and remain completely independent — meaning we don't sell your data to lead-gen firms or insurance brokers."
   },
   {
     question: "Can I share my report?",
-    answer: "Yes. Once you purchase your report, you'll receive a unique link and a downloadable 17-page PDF. You can share this with your spouse, business partner, or financial advisor. The PDF is yours to keep forever."
+    answer: "Yes. Once you purchase your report, you'll receive a unique link and a downloadable 17-page PDF. You can share this with your spouse, business partner, or financial advisor. The PDF is yours to keep permanently. Web report access is tied to the service remaining active."
   },
   {
     question: "What if my numbers change?",
@@ -109,14 +109,14 @@ export default function Pricing() {
         <section className="py-16 px-4 sm:px-6 lg:px-8 max-w-5xl mx-auto border-t border-border">
           <div className="grid md:grid-cols-2 gap-12 items-center">
             <div>
-              <h2 className="text-3xl font-bold mb-6">High-fidelity math, fractional cost.</h2>
+              <h2 className="text-3xl font-bold mb-6">Structural math, fraction of the cost.</h2>
               <p className="text-lg text-muted-foreground mb-6">
                 One hour with a fee-only financial planner can cost anywhere from $250 to $400. Even then, you might not get a multi-scenario stress test of your specific career transition.
               </p>
               <div className="bg-muted p-6 rounded-lg border border-border">
                 <p className="font-semibold text-foreground mb-2">The QuitReady Advantage:</p>
                 <p className="text-sm text-muted-foreground">
-                  We've encoded the structural math used by financial analysts directly into our engine. You get the same depth of analysis instantly, for less than the cost of a lunch.
+                  QuitReady applies the same structural financial modeling frameworks — burn rate, liquidity tiering, scenario stress testing — that underpin serious transition analysis, encoded into a deterministic engine you can run yourself in minutes.
                 </p>
               </div>
             </div>
