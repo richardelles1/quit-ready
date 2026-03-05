@@ -4,6 +4,7 @@ import { Download, AlertTriangle, AlertCircle, Lock, CheckCircle2 } from "lucide
 import logoPath from "@assets/626986E9-B8B4-462B-8F52-CB974B10376C_1772581585428.png";
 import Layout from "../components/Layout";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { useSimulation, useDownloadSimulationPdf, useCreateCheckoutSession, SimulationResult } from "../hooks/use-simulations";
 import { useToast } from "@/hooks/use-toast";
 
@@ -512,6 +513,8 @@ export default function Results() {
   }, [id, isError]);
 
   const [downloadError, setDownloadError] = React.useState(false);
+  const [purchaserEmail, setPurchaserEmail] = React.useState('');
+  const [emailError, setEmailError] = React.useState('');
   const handleDownload = () => {
     if (!id) return;
     setDownloadError(false);
@@ -532,8 +535,14 @@ export default function Results() {
 
   const handleUnlock = () => {
     if (!id) return;
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!purchaserEmail.trim() || !emailRegex.test(purchaserEmail.trim())) {
+      setEmailError('Please enter a valid email address so we can send your report.');
+      return;
+    }
+    setEmailError('');
     createCheckoutSession.mutate(
-      { simulationId: id },
+      { simulationId: id, purchaserEmail: purchaserEmail.trim() },
       {
         onError: (err) => {
           if (err.message === 'already_paid') {
@@ -700,6 +709,29 @@ export default function Results() {
                 <p className="text-xs font-medium text-muted-foreground">17-page PDF · Instant download · One-time</p>
               </div>
 
+              <div className="mb-4 text-left">
+                <label htmlFor="purchaser-email" className="block text-xs font-medium text-foreground mb-1.5">
+                  Email address <span className="text-muted-foreground font-normal">(we'll send your report here)</span>
+                </label>
+                <Input
+                  id="purchaser-email"
+                  type="email"
+                  placeholder="you@example.com"
+                  value={purchaserEmail}
+                  onChange={(e) => {
+                    setPurchaserEmail(e.target.value);
+                    if (emailError) setEmailError('');
+                  }}
+                  onKeyDown={(e) => { if (e.key === 'Enter') handleUnlock(); }}
+                  className={emailError ? 'border-destructive' : ''}
+                  data-testid="input-purchaser-email"
+                  autoComplete="email"
+                />
+                {emailError && (
+                  <p className="text-[11px] text-destructive mt-1">{emailError}</p>
+                )}
+              </div>
+
               <Button
                 onClick={handleUnlock}
                 disabled={createCheckoutSession.isPending}
@@ -707,7 +739,7 @@ export default function Results() {
                 size="lg"
                 data-testid="button-unlock-report"
               >
-                {createCheckoutSession.isPending ? 'Redirecting to checkout…' : 'Unlock Full Report'}
+                {createCheckoutSession.isPending ? 'Redirecting to checkout…' : 'Unlock Full Report — $19.99'}
               </Button>
 
               <p className="text-[11px] text-muted-foreground/60 leading-relaxed mb-2">
