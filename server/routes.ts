@@ -258,58 +258,9 @@ function lineChart(doc: PDFKit.PDFDocument, base: number[], severe: number[], ma
 // ─── Route registration ────────────────────────────────────────────────────
 export async function registerRoutes(httpServer: Server, app: Express): Promise<Server> {
 
-  // ─── Stripe Webhook (must be before express.json parses body) ───────────
-  // server/index.ts captures rawBody via verify() on express.json — use req.rawBody
-  app.post('/api/stripe/webhook', async (req, res) => {
-    const sig = req.headers['stripe-signature'] as string;
-    const rawBody = (req as any).rawBody as Buffer | undefined;
-
-    if (!rawBody) {
-      return res.status(400).send('Missing raw body');
-    }
-
-    let event: import('stripe').default.Event;
-    try {
-      event = stripe.webhooks.constructEvent(
-        rawBody,
-        sig,
-        process.env.STRIPE_WEBHOOK_SECRET!
-      );
-    } catch (err: any) {
-      console.error('Webhook signature verification failed:', err.message);
-      return res.status(400).send(`Webhook Error: ${err.message}`);
-    }
-
-    if (event.type === 'checkout.session.completed') {
-      const session = event.data.object as import('stripe').default.Checkout.Session;
-      const simulationId = parseInt(session.metadata?.simulationId ?? '', 10);
-      const stripeSessionId = session.id;
-      const stripePaymentIntentId = (session.payment_intent as string) ?? null;
-
-      if (isNaN(simulationId)) {
-        console.error('Webhook: missing or invalid simulationId in metadata');
-        return res.status(200).json({ received: true });
-      }
-
-      // Idempotency — deduplicate by stripeSessionId
-      const existing = await storage.getSimulationByStripeSession(stripeSessionId);
-      if (existing) {
-        return res.status(200).json({ received: true });
-      }
-
-      await storage.markSimulationPaid(
-        simulationId,
-        stripeSessionId,
-        stripePaymentIntentId,
-        session.customer_details?.email ?? undefined,
-        session.customer_details?.name ?? undefined
-      );
-    }
-
-    res.status(200).json({ received: true });
-  });
-
   // ─── Stripe Checkout Session ─────────────────────────────────────────────
+  // NOTE: Stripe webhook is registered in server/index.ts BEFORE express.json()
+  // so that express.raw() preserves the body for signature verification.
   app.post('/api/stripe/create-checkout-session', async (req, res) => {
     try {
       const { simulationId, purchaserEmail, purchaserName } = req.body;
