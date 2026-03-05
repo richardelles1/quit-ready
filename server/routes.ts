@@ -38,6 +38,23 @@ function fmtRunwayShort(months: number): string {
   return `${yrs} yr${yrs !== 1 ? 's' : ''} ${mo} mo`;
 }
 
+// Nice-number axis: rounds rawMax up to a clean multiple for chart Y ticks
+function niceAxis(rawMax: number): { niceMax: number; step: number } {
+  if (rawMax <= 0) return { niceMax: 4000, step: 1000 };
+  const roughStep = rawMax / 4;
+  const mag = Math.pow(10, Math.floor(Math.log10(roughStep)));
+  const norm = roughStep / mag;
+  let niceNorm: number;
+  if (norm <= 1) niceNorm = 1;
+  else if (norm <= 2) niceNorm = 2;
+  else if (norm <= 2.5) niceNorm = 2.5;
+  else if (norm <= 5) niceNorm = 5;
+  else niceNorm = 10;
+  const step = niceNorm * mag;
+  const niceMax = Math.ceil(rawMax / step) * step;
+  return { niceMax, step };
+}
+
 // Distribute rounding so percentages sum to exactly 100
 function pct100(values: number[]): number[] {
   const sum = values.reduce((a, b) => a + b, 0);
@@ -250,22 +267,22 @@ function growthChart(
   tmibVal: number,
   cx: number, cy: number, cw: number, ch: number,
 ) {
-  const yMax = Math.max(tmibVal * 1.25, moderate[35] * 1.15);
+  const rawYMax = Math.max(tmibVal * 1.25, moderate[35] * 1.15);
+  const { niceMax: gcMax, step: gcStep } = niceAxis(rawYMax);
   const months = 36;
 
   const toX = (m: number) => cx + (m / months) * cw;
-  const toY = (v: number) => cy + ch - Math.max(0, Math.min(v / yMax, 1)) * ch;
+  const toY = (v: number) => cy + ch - Math.max(0, Math.min(v / gcMax, 1)) * ch;
 
   // Background
   doc.rect(cx, cy, cw, ch).fill(C.light);
 
-  // Horizontal grid lines
-  for (let i = 1; i <= 4; i++) {
-    const gy = cy + (i / 4) * ch;
-    const gv = yMax * (1 - i / 4);
+  // Horizontal grid lines at nice round numbers
+  for (let v = gcStep; v <= gcMax; v += gcStep) {
+    const gy = cy + ch - (v / gcMax) * ch;
     doc.moveTo(cx, gy).lineTo(cx + cw, gy).strokeColor(C.border).lineWidth(0.5).stroke();
     doc.fillColor(C.muted).fontSize(7).font('Helvetica')
-      .text(fmtM(gv), cx - 52, gy - 4, { width: 50, align: 'right' });
+      .text(fmtM(v), cx - 52, gy - 4, { width: 50, align: 'right' });
   }
   doc.fillColor(C.muted).fontSize(7).font('Helvetica')
     .text(fmtM(0), cx - 52, cy + ch - 4, { width: 50, align: 'right' });
@@ -344,16 +361,17 @@ function growthChart(
 
 function lineChart(doc: PDFKit.PDFDocument, base: number[], severe: number[], maxCap: number,
   cx: number, cy: number, cw: number, ch: number, totalMonths: number) {
+  const { niceMax: lcMax, step: lcStep } = niceAxis(maxCap);
   // Background
   doc.rect(cx, cy, cw, ch).fill(C.light);
-  // Grid lines (4 horizontal)
-  for (let i = 1; i <= 4; i++) {
-    const gy = cy + (i / 4) * ch;
+  // Grid lines at nice round numbers
+  for (let v = lcStep; v <= lcMax; v += lcStep) {
+    const gy = cy + ch - (v / lcMax) * ch;
     doc.moveTo(cx, gy).lineTo(cx + cw, gy).strokeColor(C.border).lineWidth(0.5).stroke();
     doc.fillColor(C.muted).fontSize(7).font('Helvetica')
-      .text(fmtM(maxCap * (1 - i / 4)), cx - 52, gy - 4, { width: 50, align: 'right' });
+      .text(fmtM(v), cx - 52, gy - 4, { width: 50, align: 'right' });
   }
-  // Y-axis label
+  // Y-axis zero label
   doc.fillColor(C.muted).fontSize(7).font('Helvetica').text(fmtM(0), cx - 52, cy + ch - 4, { width: 50, align: 'right' });
   // X-axis labels
   [0, 6, 12, 18, 24, 30, 36].forEach(m => {
@@ -366,15 +384,15 @@ function lineChart(doc: PDFKit.PDFDocument, base: number[], severe: number[], ma
   let started = false;
   base.forEach((cap, m) => {
     const px = cx + (m / totalMonths) * cw;
-    const py = cy + ch - (Math.min(cap, maxCap) / Math.max(1, maxCap)) * ch;
+    const py = cy + ch - (Math.min(cap, lcMax) / lcMax) * ch;
     if (!started) { doc.moveTo(px, py); started = true; } else { doc.lineTo(px, py); }
   });
   doc.strokeColor(C.navy).lineWidth(2).stroke();
-  // Draw severe case line (dashed effect via short strokes)
+  // Draw severe case line
   started = false;
   severe.forEach((cap, m) => {
     const px = cx + (m / totalMonths) * cw;
-    const py = cy + ch - (Math.min(cap, maxCap) / Math.max(1, maxCap)) * ch;
+    const py = cy + ch - (Math.min(cap, lcMax) / lcMax) * ch;
     if (!started) { doc.moveTo(px, py); started = true; } else { doc.lineTo(px, py); }
   });
   doc.strokeColor(C.muted).lineWidth(1.5).stroke();
