@@ -63,6 +63,10 @@ export const simulations = pgTable("simulations", {
   stripePaymentIntentId: text("stripe_payment_intent_id"),
   purchaserEmail: text("purchaser_email"),
   purchaserName: text("purchaser_name"),
+
+  // Rerun discount token — single-use link for $4.99 repeat analysis
+  rerunToken: text("rerun_token"),
+  rerunTokenUsed: boolean("rerun_token_used").notNull().default(false),
 });
 
 export const insertSimulationSchema = createInsertSchema(simulations).omit({
@@ -90,6 +94,8 @@ export const insertSimulationSchema = createInsertSchema(simulations).omit({
   stripePaymentIntentId: true,
   purchaserEmail: true,
   purchaserName: true,
+  rerunToken: true,
+  rerunTokenUsed: true,
 }).extend({
   healthcareType: z.enum(['employer', 'cobra', 'aca', 'partner', 'none']),
   businessModelType: z.enum(['solo_bootstrap', 'contractor_heavy', 'agency_service', 'inventory_heavy', 'saas_product']),

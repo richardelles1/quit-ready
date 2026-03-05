@@ -444,6 +444,55 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     }
   });
 
+  // ─── Rerun Discount Route ────────────────────────────────────────────────
+  // Validates a single-use rerun token (from the post-purchase email) and
+  // creates a discounted $4.99 Stripe checkout session for a fresh simulation.
+  app.get('/api/rerun/:token', async (req, res) => {
+    try {
+      const { token } = req.params;
+      if (!token || token.length < 20) {
+        return res.status(400).json({ error: 'invalid_token' });
+      }
+
+      const sim = await storage.getSimulationByRerunToken(token);
+      if (!sim) {
+        return res.status(404).json({ error: 'token_not_found' });
+      }
+      if (sim.rerunTokenUsed) {
+        return res.status(410).json({ error: 'token_already_used' });
+      }
+
+      const origin = `https://${req.headers.host}`;
+
+      const session = await stripe.checkout.sessions.create({
+        mode: 'payment',
+        line_items: [{
+          price_data: {
+            currency: 'usd',
+            unit_amount: 499,
+            product_data: {
+              name: 'QuitReady — Rerun Analysis',
+              description: 'Discounted repeat analysis. Run a fresh simulation with updated numbers.',
+            },
+          },
+          quantity: 1,
+        }],
+        success_url: `${origin}/app?rerun=success`,
+        cancel_url: `${origin}/app`,
+        customer_email: sim.purchaserEmail || undefined,
+        metadata: { rerunFromSimulationId: String(sim.id), rerunToken: token },
+      });
+
+      // Mark the token as used immediately to prevent double-use
+      await storage.markRerunTokenUsed(sim.id);
+
+      res.json({ url: session.url });
+    } catch (err: any) {
+      console.error('Rerun checkout error:', err.message);
+      res.status(500).json({ error: 'stripe_error', message: err.message });
+    }
+  });
+
   app.post(api.simulations.create.path, async (req, res) => {
     try {
       const body = {

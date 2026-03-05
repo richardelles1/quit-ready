@@ -499,6 +499,18 @@ export default function Results() {
     };
   }, [sim?.id, sim?.paid]);
 
+  // Persist simulation ID locally so users can find their way back
+  React.useEffect(() => {
+    if (id && !isError) {
+      try {
+        const existing = JSON.parse(localStorage.getItem('quitready_reports') || '[]') as number[];
+        if (!existing.includes(id)) {
+          localStorage.setItem('quitready_reports', JSON.stringify([id, ...existing].slice(0, 5)));
+        }
+      } catch {}
+    }
+  }, [id, isError]);
+
   const [downloadError, setDownloadError] = React.useState(false);
   const handleDownload = () => {
     if (!id) return;

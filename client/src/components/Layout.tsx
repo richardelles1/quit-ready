@@ -1,6 +1,6 @@
-import { ReactNode, useState } from "react";
+import { ReactNode, useState, useEffect } from "react";
 import { Link, useLocation } from "wouter";
-import { Menu, X } from "lucide-react";
+import { Menu, X, FileText } from "lucide-react";
 import logoUrl from "@assets/626986E9-B8B4-462B-8F52-CB974B10376C_1772499495236.png";
 
 const navLinks = [
@@ -13,9 +13,51 @@ const navLinks = [
 export default function Layout({ children }: { children: ReactNode }) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [location] = useLocation();
+  const [lastReportId, setLastReportId] = useState<number | null>(null);
+  const [bannerDismissed, setBannerDismissed] = useState(false);
+
+  useEffect(() => {
+    try {
+      const stored = JSON.parse(localStorage.getItem('quitready_reports') || '[]') as number[];
+      if (stored.length > 0) setLastReportId(stored[0]);
+    } catch {}
+  }, []);
+
+  const isResultsPage = location.startsWith('/results/');
+  const showBanner = lastReportId && !isResultsPage && !bannerDismissed;
 
   return (
     <div className="min-h-screen flex flex-col bg-background">
+      {/* Return-to-report recovery banner */}
+      {showBanner && (
+        <div className="bg-muted border-b border-border px-4 py-2 flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2 min-w-0">
+            <FileText className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+            <p className="text-xs text-muted-foreground truncate">
+              You have a saved report from a previous session.
+            </p>
+          </div>
+          <div className="flex items-center gap-3 shrink-0">
+            <Link href={`/results/${lastReportId}`}>
+              <span
+                className="text-xs font-semibold text-foreground underline underline-offset-2 cursor-pointer whitespace-nowrap"
+                data-testid="link-return-to-report"
+              >
+                Return to report →
+              </span>
+            </Link>
+            <button
+              onClick={() => setBannerDismissed(true)}
+              className="text-muted-foreground hover:text-foreground transition-colors"
+              aria-label="Dismiss"
+              data-testid="button-dismiss-banner"
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        </div>
+      )}
+
       <header className="border-b border-border bg-card sticky top-0 z-50">
         <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-4">
           <Link href="/" className="hover:opacity-75 transition-opacity shrink-0">

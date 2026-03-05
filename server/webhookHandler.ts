@@ -1,7 +1,26 @@
 import type { Request, Response } from "express";
 import { stripe } from "./services/stripeClient";
 import { storage } from "./storage";
+import { sendReportEmail } from "./services/emailService";
 import type Stripe from "stripe";
+import crypto from "crypto";
+
+async function fetchPdfBuffer(simulationId: number, host: string): Promise<Buffer | null> {
+  try {
+    const port = process.env.PORT || 5000;
+    const url = `http://localhost:${port}/api/simulations/${simulationId}/download-pdf`;
+    const res = await fetch(url);
+    if (!res.ok) {
+      console.error(`PDF fetch failed: ${res.status} ${res.statusText}`);
+      return null;
+    }
+    const ab = await res.arrayBuffer();
+    return Buffer.from(ab);
+  } catch (err) {
+    console.error("PDF fetch exception:", err);
+    return null;
+  }
+}
 
 export async function stripeWebhookHandler(req: Request, res: Response) {
   const sig = req.headers['stripe-signature'] as string;
@@ -38,13 +57,41 @@ export async function stripeWebhookHandler(req: Request, res: Response) {
       return res.status(200).json({ received: true });
     }
 
+    // Generate a unique single-use rerun token
+    const rerunToken = crypto.randomBytes(24).toString('hex');
+
     await storage.markSimulationPaid(
       simulationId,
       stripeSessionId,
       stripePaymentIntentId,
       session.customer_details?.email ?? undefined,
-      session.customer_details?.name ?? undefined
+      session.customer_details?.name ?? undefined,
+      rerunToken
     );
+
+    // Send branded report email with PDF attached (non-blocking)
+    const email = session.customer_details?.email;
+    if (email) {
+      const origin = req.headers.origin as string
+        || `${req.protocol}://${req.get('host')}`;
+
+      // Fetch the generated PDF
+      const pdfBuffer = await fetchPdfBuffer(simulationId, origin);
+
+      // Get the full simulation record
+      const simulation = await storage.getSimulation(simulationId);
+
+      if (simulation && pdfBuffer) {
+        const result = await sendReportEmail(simulation, pdfBuffer, rerunToken, origin);
+        if (!result.success) {
+          console.error(`Email send failed for sim ${simulationId}:`, result.error);
+        } else {
+          console.log(`Report email sent to ${email} for sim ${simulationId}`);
+        }
+      } else {
+        console.warn(`Skipping email for sim ${simulationId}: simulation=${!!simulation}, pdf=${!!pdfBuffer}`);
+      }
+    }
   }
 
   res.status(200).json({ received: true });

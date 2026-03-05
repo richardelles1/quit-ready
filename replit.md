@@ -28,6 +28,29 @@ A deterministic, conservative financial stress engine for U.S. professionals mod
 - `client/src/pages/SampleReport.tsx` — Sample report preview
 - `client/src/pages/BlogIndex.tsx` — Blog listing
 - `client/src/pages/BlogPost.tsx` — Individual blog post page
+- `client/src/pages/RerunRedirect.tsx` — Handles /rerun/:token, validates token, redirects to $4.99 Stripe session
+- `server/services/emailService.ts` — Resend-powered branded post-purchase email with PDF attachment
+- `server/webhookHandler.ts` — Stripe webhook: marks paid, generates rerunToken, fetches PDF, sends email
+
+## Post-Purchase Flow
+
+1. User pays $19.99 via Stripe Checkout
+2. Webhook (`checkout.session.completed`) fires → marks simulation paid + generates `rerunToken` (48-char hex)
+3. PDF fetched via internal HTTP call to `/api/simulations/:id/download-pdf`
+4. Branded email sent via Resend to `purchaserEmail` with:
+   - HTML report summary (score, runway, burn)
+   - PDF attached (`QuitReady-Report-{id}.pdf`)
+   - Permanent report URL: `/results/:id`
+   - Unique rerun link: `/rerun/:token` → $4.99 discounted second analysis (single-use)
+5. localStorage saves simulation IDs in browser (`quitready_reports` key, max 5)
+6. Layout.tsx shows "Return to report →" recovery banner on any non-results page if localStorage has IDs
+
+## Rerun Token System
+
+- `rerunToken` (text) + `rerunTokenUsed` (boolean) stored on `simulations` table
+- `GET /api/rerun/:token` validates token, creates $4.99 Stripe checkout (`price_data`, not price ID)
+- Token marked used immediately when checkout session created (prevents double-use)
+- 410 response if token already used; 404 if not found
 
 ## Wizard Flow (15 screens, 0–14)
 

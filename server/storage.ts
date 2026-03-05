@@ -27,9 +27,12 @@ export interface IStorage {
     stripeSessionId: string,
     stripePaymentIntentId: string | null,
     email?: string,
-    name?: string
+    name?: string,
+    rerunToken?: string
   ): Promise<void>;
   getSimulationByStripeSession(stripeSessionId: string): Promise<Simulation | undefined>;
+  getSimulationByRerunToken(token: string): Promise<Simulation | undefined>;
+  markRerunTokenUsed(id: number): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -48,7 +51,8 @@ export class DatabaseStorage implements IStorage {
     stripeSessionId: string,
     stripePaymentIntentId: string | null,
     email?: string,
-    name?: string
+    name?: string,
+    rerunToken?: string
   ): Promise<void> {
     await db.update(simulations)
       .set({
@@ -58,6 +62,7 @@ export class DatabaseStorage implements IStorage {
         stripePaymentIntentId: stripePaymentIntentId ?? null,
         purchaserEmail: email ?? null,
         purchaserName: name ?? null,
+        rerunToken: rerunToken ?? null,
       })
       .where(eq(simulations.id, id));
   }
@@ -66,6 +71,18 @@ export class DatabaseStorage implements IStorage {
     const [result] = await db.select().from(simulations)
       .where(eq(simulations.stripeSessionId, stripeSessionId));
     return result;
+  }
+
+  async getSimulationByRerunToken(token: string): Promise<Simulation | undefined> {
+    const [result] = await db.select().from(simulations)
+      .where(eq(simulations.rerunToken, token));
+    return result;
+  }
+
+  async markRerunTokenUsed(id: number): Promise<void> {
+    await db.update(simulations)
+      .set({ rerunTokenUsed: true })
+      .where(eq(simulations.id, id));
   }
 }
 
