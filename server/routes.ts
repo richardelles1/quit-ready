@@ -471,8 +471,8 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
             currency: 'usd',
             unit_amount: 499,
             product_data: {
-              name: 'QuitReady — Rerun Analysis',
-              description: 'Discounted repeat analysis. Run a fresh simulation with updated numbers.',
+              name: 'QuitReady — New Analysis (Discount)',
+              description: 'Discounted second analysis. Enter a completely new set of numbers and generate a fresh 17-page report.',
             },
           },
           quantity: 1,

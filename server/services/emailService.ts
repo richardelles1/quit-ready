@@ -107,13 +107,13 @@ function htmlEmail(sim: Simulation, reportUrl: string, rerunUrl: string): string
                 </tr>
               </table>
 
-              <!-- Rerun offer -->
+              <!-- New analysis offer -->
               <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:24px;border:1.5px solid #e2e8f0;border-radius:8px;overflow:hidden;">
                 <tr>
                   <td style="background:#f8fafc;padding:16px 20px;">
-                    <p style="margin:0 0 6px;color:#0f172a;font-size:14px;font-weight:700;">Rerun with updated numbers — $4.99</p>
-                    <p style="margin:0 0 14px;color:#64748b;font-size:13px;line-height:1.5;">If your income target changes, you build up more savings, or you want to model a different healthcare option, run a fresh analysis at a discounted rate. This link is unique to your purchase and can only be used once.</p>
-                    <a href="${rerunUrl}" style="display:inline-block;background:#0f172a;color:#f8fafc;font-size:13px;font-weight:600;text-decoration:none;padding:10px 20px;border-radius:6px;">Run Updated Analysis → $4.99</a>
+                    <p style="margin:0 0 6px;color:#0f172a;font-size:14px;font-weight:700;">Run a new analysis with different numbers — $4.99</p>
+                    <p style="margin:0 0 14px;color:#64748b;font-size:13px;line-height:1.5;">If your savings situation changes, you land on a different income target, or you want to model a completely different scenario — you can run a brand new simulation at a discounted rate. You'll enter fresh numbers from scratch, just like the first time. This link is unique to your purchase and can only be used once.</p>
+                    <a href="${rerunUrl}" style="display:inline-block;background:#0f172a;color:#f8fafc;font-size:13px;font-weight:600;text-decoration:none;padding:10px 20px;border-radius:6px;">Run New Analysis → $4.99</a>
                   </td>
                 </tr>
               </table>

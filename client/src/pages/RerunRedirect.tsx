@@ -44,20 +44,20 @@ export default function RerunRedirect() {
         {error ? (
           <div className="max-w-md text-center space-y-4">
             <AlertCircle className="w-10 h-10 text-destructive mx-auto" />
-            <h1 className="text-lg font-semibold text-foreground">Rerun Link Issue</h1>
+            <h1 className="text-lg font-semibold text-foreground">Discount Link Issue</h1>
             <p className="text-sm text-muted-foreground leading-relaxed">{error}</p>
             <button
               onClick={() => setLocation("/app")}
               className="mt-4 text-sm font-medium text-foreground underline underline-offset-4"
               data-testid="button-rerun-go-home"
             >
-              Start a new simulation →
+              Start a new analysis at full price →
             </button>
           </div>
         ) : (
           <div className="text-center space-y-4">
             <Loader2 className="w-8 h-8 animate-spin text-muted-foreground mx-auto" />
-            <p className="text-sm text-muted-foreground">Preparing your discounted rerun session…</p>
+            <p className="text-sm text-muted-foreground">Preparing your discounted new analysis session…</p>
           </div>
         )}
       </div>
