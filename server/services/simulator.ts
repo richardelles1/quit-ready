@@ -162,37 +162,53 @@ export function calculateSimulation(data: InsertSimulation) {
     : 9.99;
 
   // 8. STRUCTURAL BREAKPOINT SCORE (0–100)
+
+  // runwayPts (0–35): capital depth in months
   let runwayPts = 0;
-  if (baseRunway < 6)        runwayPts = Math.round((baseRunway / 6) * 10);
-  else if (baseRunway < 12)  runwayPts = 10 + Math.round(((baseRunway - 6) / 6) * 15);
-  else if (baseRunway < 24)  runwayPts = 25 + Math.round(((baseRunway - 12) / 12) * 10);
-  else runwayPts = 35 + Math.min(5, Math.round((baseRunway - 24) / 12));
-  runwayPts = Math.min(40, runwayPts);
+  if (baseRunway < 6)        runwayPts = Math.round((baseRunway / 6) * 12);
+  else if (baseRunway < 12)  runwayPts = 12 + Math.round(((baseRunway - 6) / 6) * 10);
+  else if (baseRunway < 24)  runwayPts = 22 + Math.round(((baseRunway - 12) / 12) * 8);
+  else runwayPts = 30 + Math.min(5, Math.round((baseRunway - 24) / 12));
+  runwayPts = Math.min(35, runwayPts);
 
-  const rampScore = data.rampDuration <= 3 ? 0 : data.rampDuration <= 6 ? 0.5 : 1.0;
-  const volScore = data.volatilityPercent >= 30 ? 0 : data.volatilityPercent >= 20 ? 0.4 : data.volatilityPercent >= 15 ? 0.7 : 1.0;
-  const revPts = Math.round(25 * rampScore * volScore);
+  // coveragePts (0–30): income-to-TMIB coverage ratio — primary structural signal
+  const coverageRatio = tmib > 0 ? data.expectedRevenue / tmib : 1.0;
+  let coveragePts = 0;
+  if (coverageRatio >= 1.0)       coveragePts = 30;  // break-even or surplus
+  else if (coverageRatio >= 0.85) coveragePts = 24;  // 85–99%
+  else if (coverageRatio >= 0.70) coveragePts = 18;  // 70–84%
+  else if (coverageRatio >= 0.50) coveragePts = 10;  // 50–69%
+  else                            coveragePts = 0;   // <50%: critical gap
 
+  // debtPts (0–15): debt-to-accessible-capital ratio
   let debtPts = 0;
   if (debtExposureRatio >= 0.70)      debtPts = 2;
-  else if (debtExposureRatio >= 0.40) debtPts = 8;
-  else if (debtExposureRatio >= 0.20) debtPts = 14;
-  else debtPts = 20;
+  else if (debtExposureRatio >= 0.40) debtPts = 6;
+  else if (debtExposureRatio >= 0.20) debtPts = 10;
+  else                                debtPts = 15;
 
+  // healthcarePts (0–10): continuity of coverage
   const healthcarePtsMap: Record<string, number> = {
     partner: 10, employer: 8, aca: 6, cobra: 4, none: 0,
   };
   const healthcarePts = healthcarePtsMap[data.healthcareType] ?? 0;
 
-  let bizPts = 5;
-  if (data.expectedRevenue > 0) {
-    const density = businessCostBaseline / data.expectedRevenue;
-    if (density >= 0.50) bizPts = 1;
-    else if (density >= 0.25) bizPts = 3;
-    else bizPts = 5;
-  }
+  // stabilityPts (0–10): shorter ramp + lower volatility = better (fixed: was previously inverted)
+  const rampScore = data.rampDuration <= 3 ? 1.0
+    : data.rampDuration <= 6 ? 0.6
+    : data.rampDuration <= 9 ? 0.3
+    : 0;
+  const volScore = data.volatilityPercent < 15 ? 1.0
+    : data.volatilityPercent < 20 ? 0.7
+    : data.volatilityPercent < 30 ? 0.4
+    : 0;
+  const stabilityPts = Math.round(10 * rampScore * volScore);
 
-  const structuralBreakpointScore = Math.min(100, runwayPts + revPts + debtPts + healthcarePts + bizPts);
+  let structuralBreakpointScore = Math.min(100, runwayPts + coveragePts + debtPts + healthcarePts + stabilityPts);
+
+  // Hard ceilings: structural signals that soft factors cannot override
+  if (baseRunway < 3) structuralBreakpointScore = Math.min(structuralBreakpointScore, 35);
+  if (coverageRatio < 0.50) structuralBreakpointScore = Math.min(structuralBreakpointScore, 45);
 
   return {
     tmib,
