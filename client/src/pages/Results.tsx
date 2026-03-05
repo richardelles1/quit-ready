@@ -451,8 +451,8 @@ function SavingsCurve({ sim, pas: pasCap }: { sim: SimulationResult; pas: number
             <span>Tier 1 depletion point (-30% scenario)</span>
           </div>
         )}
-        <span className="text-muted-foreground/40 ml-auto">X: months · Y: Tier 1 Liquid Capital</span>
       </div>
+      <p className="text-[10px] text-muted-foreground/40 text-right mt-1">X: months · Y: Tier 1 Liquid Capital</p>
     </div>
   );
 }
@@ -979,18 +979,10 @@ export default function Results() {
 
             {/* Tier 1 Runway: visual anchor */}
             <div className={`mx-7 my-5 px-5 py-4 rounded-lg border-2 ${psrStatusBg}`}>
-              <div className="flex items-start justify-between gap-4">
-                <div>
-                  <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground mb-1">
-                    Tier 1 Runway, Severe Stress (-30% Revenue)
-                  </p>
-                  <p className="text-2xl font-bold font-serif text-foreground" data-testid="text-ll-status">
-                    {fmtRunway(psr30)}
-                  </p>
-                  <p className="text-xs text-muted-foreground mt-0.5">
-                    Tier 1 Liquid Capital: {fmt(pas)} (Cash + Brokerage)
-                  </p>
-                </div>
+              <div className="flex items-start justify-between gap-4 mb-2">
+                <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">
+                  Tier 1 Runway, Severe Stress (-30% Revenue)
+                </p>
                 <div className="shrink-0 text-right">
                   <p className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground mb-1.5">Typical ranges</p>
                   <p className="text-[9px] leading-snug text-muted-foreground"><span className="font-semibold text-red-600">Fragile:</span> 6 months or less</p>
@@ -998,6 +990,12 @@ export default function Results() {
                   <p className="text-[9px] leading-snug text-muted-foreground"><span className="font-semibold text-green-600">Strong buffer:</span> 18–24 months</p>
                 </div>
               </div>
+              <p className="text-2xl font-bold font-serif text-foreground" data-testid="text-ll-status">
+                {fmtRunway(psr30)}
+              </p>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                Tier 1 Liquid Capital: {fmt(pas)} (Cash + Brokerage)
+              </p>
               {psr30 >= 999 && (
                 <p className="text-xs text-muted-foreground leading-relaxed mt-3 pt-3 border-t border-border/40">
                   Because revenue reaches the modeled target, savings stabilize early in the transition. Capital is not the limiting factor in this scenario.
@@ -1177,7 +1175,7 @@ export default function Results() {
               sub="How Tier 1 Liquid Capital depletes over 36 months under base and severe scenarios.">
               Revenue vs. Savings Curve
             </SectionHeader>
-            <div className="px-6 pt-5 pb-2">
+            <div className="px-6 pt-5 pb-4">
               <SavingsCurve sim={sim} pas={pas} hc={hc} />
             </div>
             <div className="px-6 pb-5 space-y-2">
