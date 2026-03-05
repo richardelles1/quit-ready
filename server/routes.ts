@@ -2173,5 +2173,114 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     }
   });
 
+  // ── RSS feed ──────────────────────────────────────────────────────────────
+  app.get('/rss.xml', (req, res) => {
+    const baseUrl = `${req.protocol}://${req.get('host')}`;
+    const posts = [
+      {
+        slug: 'how-much-savings-to-quit-your-job',
+        title: 'How Much Savings Do You Really Need to Quit Your Job?',
+        description: 'Learn why the "6-month rule" undershoots for the self-employed — and how to calculate your real financial runway before leaving your W-2.',
+        pubDate: new Date('2025-01-20').toUTCString(),
+      },
+      {
+        slug: 'can-i-afford-to-quit-my-job',
+        title: "Can I Afford to Quit My Job? Here's the Actual Math",
+        description: 'The 5 numbers you need before quitting — including the healthcare cliff, the SE tax trap, and the revenue ramp reality check.',
+        pubDate: new Date('2025-01-27').toUTCString(),
+      },
+      {
+        slug: 'self-employment-healthcare-options',
+        title: 'Self-Employment Health Insurance: ACA, COBRA, and Partner Coverage Compared',
+        description: 'A plain-English comparison of your three healthcare options when leaving a W-2 job, with real cost examples.',
+        pubDate: new Date('2025-02-03').toUTCString(),
+      },
+      {
+        slug: 'financial-runway-calculator',
+        title: 'Financial Runway: How to Calculate It Before Quitting Your Job',
+        description: 'What financial runway actually means, why liquidity haircuts matter, and how to stress-test your plan across 4 scenarios.',
+        pubDate: new Date('2025-02-10').toUTCString(),
+      },
+      {
+        slug: 'quit-job-start-business-financial-checklist',
+        title: 'Quitting Your Job to Start a Business: The 10-Point Financial Checklist',
+        description: '10 concrete financial steps to complete before resigning — from calculating your TMIB to mapping your revenue ramp timeline.',
+        pubDate: new Date('2025-02-17').toUTCString(),
+      },
+    ];
+
+    const items = posts.map(p => `
+    <item>
+      <title><![CDATA[${p.title}]]></title>
+      <link>${baseUrl}/blog/${p.slug}</link>
+      <guid isPermaLink="true">${baseUrl}/blog/${p.slug}</guid>
+      <description><![CDATA[${p.description}]]></description>
+      <pubDate>${p.pubDate}</pubDate>
+    </item>`).join('');
+
+    const xml = `<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
+  <channel>
+    <title>QuitReady Blog — Financial Runway for Career Transitions</title>
+    <link>${baseUrl}/blog</link>
+    <description>Conservative financial analysis for U.S. professionals planning a W-2 exit. ACA, self-employment tax, and runway calculations — no motivational content.</description>
+    <language>en-us</language>
+    <lastBuildDate>${new Date().toUTCString()}</lastBuildDate>
+    <atom:link href="${baseUrl}/rss.xml" rel="self" type="application/rss+xml"/>
+    ${items}
+  </channel>
+</rss>`;
+
+    res.set('Content-Type', 'application/rss+xml; charset=utf-8');
+    res.send(xml);
+  });
+
+  // ── Dynamic sitemap ────────────────────────────────────────────────────────
+  app.get('/sitemap.xml', (req, res) => {
+    const baseUrl = `${req.protocol}://${req.get('host')}`;
+    const today = new Date().toISOString().split('T')[0];
+
+    const staticRoutes = [
+      { path: '/', priority: '1.0', changefreq: 'weekly' },
+      { path: '/how-it-works', priority: '0.8', changefreq: 'monthly' },
+      { path: '/pricing', priority: '0.8', changefreq: 'monthly' },
+      { path: '/sample-report', priority: '0.7', changefreq: 'monthly' },
+      { path: '/blog', priority: '0.9', changefreq: 'weekly' },
+    ];
+
+    const blogSlugs = [
+      'how-much-savings-to-quit-your-job',
+      'can-i-afford-to-quit-my-job',
+      'self-employment-healthcare-options',
+      'financial-runway-calculator',
+      'quit-job-start-business-financial-checklist',
+    ];
+
+    const staticUrls = staticRoutes.map(r => `
+  <url>
+    <loc>${baseUrl}${r.path}</loc>
+    <lastmod>${today}</lastmod>
+    <changefreq>${r.changefreq}</changefreq>
+    <priority>${r.priority}</priority>
+  </url>`).join('');
+
+    const blogUrls = blogSlugs.map(slug => `
+  <url>
+    <loc>${baseUrl}/blog/${slug}</loc>
+    <lastmod>${today}</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+  </url>`).join('');
+
+    const xml = `<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  ${staticUrls}
+  ${blogUrls}
+</urlset>`;
+
+    res.set('Content-Type', 'application/xml; charset=utf-8');
+    res.send(xml);
+  });
+
   return httpServer;
 }

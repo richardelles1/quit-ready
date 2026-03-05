@@ -605,7 +605,7 @@ export default function Results() {
               <img src={logoPath} alt="QuitReady" className="h-8 w-auto mx-auto mb-6" />
               <h1 className="text-3xl font-bold font-serif text-foreground mb-3">Your Analysis Is Ready</h1>
               <p className="text-sm text-muted-foreground max-w-md mx-auto leading-relaxed">
-                Two outputs from your structural position. Unlock to view the full 15-section report and download your branded PDF.
+                Two outputs from your structural position. Unlock to view the full 17-page report and download your branded PDF.
               </p>
             </div>
 
@@ -623,62 +623,83 @@ export default function Results() {
               </div>
             </div>
 
-            {/* Blurred preview */}
-            <div className="relative mb-8 rounded-lg overflow-hidden border border-border">
-              <div style={{ filter: 'blur(5px)', pointerEvents: 'none', userSelect: 'none' }}
-                className="bg-white p-6 space-y-4">
-                {['Where Your Money Goes', 'Revenue vs. Liquidity Curve', 'Shock Scenario Analysis', 'Scenario Comparison'].map(heading => (
-                  <div key={heading} className="space-y-2">
-                    <div className="h-4 bg-muted/60 rounded w-2/5" />
-                    <p className="text-sm font-bold text-foreground">{heading}</p>
-                    <div className="h-2 bg-muted/40 rounded w-full" />
-                    <div className="h-2 bg-muted/40 rounded w-4/5" />
-                    <div className="h-2 bg-muted/40 rounded w-3/5" />
-                  </div>
-                ))}
-              </div>
-              {/* Lock overlay */}
-              <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-white/60">
-                <div className="bg-foreground/90 text-white rounded-full p-3">
-                  <Lock className="w-5 h-5" />
+            {/* Blurred preview cards */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
+              <SectionCard className="h-48 relative overflow-hidden">
+                <SectionHeader n={4}>Stress Scenario Modeling</SectionHeader>
+                <div className="p-4 blur-[4px] opacity-40 select-none">
+                   <div className="space-y-3">
+                     <div className="h-2 bg-muted rounded w-full" />
+                     <div className="h-2 bg-muted rounded w-5/6" />
+                     <div className="h-2 bg-muted rounded w-4/6" />
+                   </div>
                 </div>
-                <p className="text-xs font-semibold text-foreground/70 uppercase tracking-wide">Full report locked</p>
-              </div>
+                <div className="absolute inset-0 flex items-center justify-center bg-white/20">
+                  <div className="bg-white/90 px-3 py-1 rounded-full border border-border flex items-center gap-1.5 shadow-sm">
+                    <Lock className="w-3 h-3 text-muted-foreground" />
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Locked · Full Report</span>
+                  </div>
+                </div>
+              </SectionCard>
+              <SectionCard className="h-48 relative overflow-hidden">
+                <SectionHeader n={5}>Revenue vs. Savings Curve</SectionHeader>
+                <div className="p-4 blur-[4px] opacity-40 select-none">
+                   <div className="w-full h-24 bg-muted/20 rounded flex items-end px-4 pb-2">
+                      <div className="w-1/4 h-3/4 bg-muted/40 rounded-t mr-1" />
+                      <div className="w-1/4 h-1/2 bg-muted/40 rounded-t mr-1" />
+                      <div className="w-1/4 h-2/3 bg-muted/40 rounded-t mr-1" />
+                      <div className="w-1/4 h-1/3 bg-muted/40 rounded-t" />
+                   </div>
+                </div>
+                <div className="absolute inset-0 flex items-center justify-center bg-white/20">
+                  <div className="bg-white/90 px-3 py-1 rounded-full border border-border flex items-center gap-1.5 shadow-sm">
+                    <Lock className="w-3 h-3 text-muted-foreground" />
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Locked · Full Report</span>
+                  </div>
+                </div>
+              </SectionCard>
             </div>
 
             {/* Paywall card */}
             <div className="border border-border rounded-xl bg-white shadow-sm p-8 max-w-sm mx-auto text-center" data-testid="paywall-card">
-              <p className="text-4xl font-bold text-foreground mb-1">$9.99</p>
-              <p className="text-xs text-muted-foreground mb-6">One-time unlock</p>
+              <div className="mb-6">
+                <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground mb-1">What's inside</p>
+                <ul className="text-left grid grid-cols-1 gap-y-1.5">
+                  {[
+                    'Executive Snapshot',
+                    'Structural Breakpoint Score',
+                    'Savings Runway Summary',
+                    'Stress Scenario Modeling',
+                    'Revenue Growth Trajectory',
+                    'Decision Interpretation',
+                    'Structural Summary',
+                    '17-page Personalized PDF',
+                  ].map(item => (
+                    <li key={item} className="flex items-start gap-2 text-[13px] text-foreground/80">
+                      <CheckCircle2 className="w-3.5 h-3.5 text-green-600 shrink-0 mt-0.5" />
+                      <span>{item}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+
+              <div className="pt-6 border-t border-border mb-6">
+                <p className="text-4xl font-bold text-foreground mb-1">$19.99</p>
+                <p className="text-xs font-medium text-muted-foreground">17-page PDF · Instant download · One-time</p>
+              </div>
 
               <Button
                 onClick={handleUnlock}
                 disabled={createCheckoutSession.isPending}
-                className="w-full text-base py-6 mb-6"
+                className="w-full text-base py-6 mb-4"
                 size="lg"
                 data-testid="button-unlock-report"
               >
                 {createCheckoutSession.isPending ? 'Redirecting to checkout…' : 'Unlock Full Report'}
               </Button>
 
-              <ul className="text-left space-y-2.5 mb-6">
-                {[
-                  '15-section interactive report',
-                  '16-page downloadable PDF',
-                  'Stress scenario modeling (3 revenue paths)',
-                  'Household shock scenario analysis',
-                  'Sensitivity levers and structural action factors',
-                ].map(item => (
-                  <li key={item} className="flex items-start gap-2.5 text-sm text-muted-foreground">
-                    <CheckCircle2 className="w-4 h-4 text-green-600 shrink-0 mt-0.5" />
-                    <span>{item}</span>
-                  </li>
-                ))}
-              </ul>
-
-              <p className="text-xs text-muted-foreground mb-2">Instant access. No subscription. One-time analysis.</p>
               <p className="text-[11px] text-muted-foreground/60 leading-relaxed">
-                This is a structural financial simulation based on your inputs. It is not financial, tax, or legal advice.
+                Instant access. No subscription. No SSN or bank logins required.
               </p>
             </div>
 

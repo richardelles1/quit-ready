@@ -6,21 +6,28 @@ A deterministic, conservative financial stress engine for U.S. professionals mod
 
 - **Frontend**: React + TypeScript, Wouter routing, TanStack Query, React Hook Form + Zod, Framer Motion, shadcn/ui, Tailwind CSS
 - **Backend**: Express.js + TypeScript, Drizzle ORM, PostgreSQL
-- **PDF**: PDFKit (server-side, 15-page branded report)
-- **Payments**: Stripe Checkout (hosted), webhook-verified unlock, $9.99 one-time
+- **PDF**: PDFKit (server-side, 17-page branded report)
+- **Payments**: Stripe Checkout (hosted), webhook-verified unlock, $19.99 one-time
 
 ## Architecture
 
 - `shared/schema.ts` — Drizzle table + Zod validation schemas
 - `shared/routes.ts` — API contract definitions
 - `server/services/simulator.ts` — Deterministic math engine (TMIB, ACA subsidy, accessible capital, runway, score)
-- `server/routes.ts` — API routes + 15-page PDF generation + Stripe checkout + webhook
+- `server/routes.ts` — API routes + 17-page PDF generation + Stripe checkout + webhook
 - `server/services/stripeClient.ts` — Stripe SDK lazy-init client
 - `server/storage.ts` — Database storage layer
 - `client/src/pages/Home.tsx` — Landing page
 - `client/src/pages/Simulator.tsx` — 16-screen 3-phase wizard
 - `client/src/pages/Results.tsx` — 7-section advisor-voice results report
 - `client/src/hooks/use-simulations.ts` — API hooks + SimulationResult type
+- `client/src/hooks/use-seo.ts` — SEO hook for meta tags and JSON-LD
+- `client/src/data/blog-posts.ts` — Static blog content
+- `client/src/pages/Pricing.tsx` — Pricing page
+- `client/src/pages/HowItWorks.tsx` — How it works page
+- `client/src/pages/SampleReport.tsx` — Sample report preview
+- `client/src/pages/BlogIndex.tsx` — Blog listing
+- `client/src/pages/BlogPost.tsx` — Individual blog post page
 
 ## Wizard Flow (15 screens, 0–14)
 
@@ -100,7 +107,7 @@ A deterministic, conservative financial stress engine for U.S. professionals mod
 - Pre-render validation in Results.tsx (console.warn) + routes.ts (console.error on PDF)
 - restrictedClarification sentence appears in Section 9 when reliesOnRestricted = true
 
-## PDF Report (14 pages — current)
+## PDF Report (17 pages — current)
 1. Executive Snapshot — income/outflow/surplus tiles, PAS status pill, 3-scenario mini grid
 2. Income Strength & Stability — income table, vs-outflow bar, narrative
 3. Monthly Outflow Breakdown — 5 components, pct100() percentages, composition bar, partner offset
@@ -115,6 +122,9 @@ A deterministic, conservative financial stress engine for U.S. professionals mod
 12. Scenario Comparison Grid — 5 columns (Base/Mild/Severe/Partner Loss/New Child) × 3 rows
 13. Risk Profile Summary — 4 plain-language blocks (position, risk driver, pressure, execution sensitivity)
 14. Final Synthesis — 4 paragraphs (stability, risk driver, pressure timeline, two stabilizers)
+15. Appendix: Detailed Data Tables
+16. Appendix: Methodology & Assumptions
+17. Appendix: Legal Disclaimer & Resources
 
 ## Design Principles
 - Institutional minimalism — navy/charcoal/slate palette, Inter + Times-Bold serif headings
@@ -136,4 +146,4 @@ A deterministic, conservative financial stress engine for U.S. professionals mod
 ## API Endpoints
 - `POST /api/simulations` — Run simulation, store results
 - `GET /api/simulations/:id` — Retrieve simulation
-- `GET /api/simulations/:id/pdf` — Download 6-page branded PDF
+- `GET /api/simulations/:id/pdf` — Download 17-page branded PDF
