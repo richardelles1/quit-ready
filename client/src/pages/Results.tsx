@@ -233,6 +233,24 @@ function SectionCard({ children, className = "" }: { children: React.ReactNode; 
   return <div className={`border border-border rounded-lg shadow-sm bg-white dark:bg-card overflow-hidden ${className}`}>{children}</div>;
 }
 
+function ScoreRing({ score, accent }: { score: number; accent: string }) {
+  const R = 44, cx = 60, cy = 60;
+  const circ = 2 * Math.PI * R;
+  const filled = (score / 100) * circ;
+  return (
+    <svg width="120" height="120" viewBox="0 0 120 120" aria-label={`Score: ${score} out of 100`}>
+      <circle cx={cx} cy={cy} r={R} fill="none" stroke="#e2e8f0" strokeWidth="10" />
+      <circle cx={cx} cy={cy} r={R} fill="none" stroke={accent} strokeWidth="10"
+        strokeDasharray={`${filled} ${circ}`} strokeLinecap="round"
+        transform={`rotate(-90 ${cx} ${cy})`} />
+      <text x={cx} y={cy - 5} textAnchor="middle" fontSize="23" fontWeight="700"
+        fill="#1e293b" fontFamily="Georgia, serif">{score}</text>
+      <text x={cx} y={cy + 13} textAnchor="middle" fontSize="7.5" fill="#64748b"
+        fontFamily="sans-serif" letterSpacing="0.05em">OUT OF 100</text>
+    </svg>
+  );
+}
+
 function SectionHeader({ children, sub, n }: { children: React.ReactNode; sub?: string; n?: number }) {
   return (
     <div className="px-7 py-5 border-b border-border bg-muted/10">
@@ -1608,9 +1626,140 @@ export default function Results() {
             </div>
           </SectionCard>
 
-          {/* ── 12. Glossary ────────────────────────────────────────── */}
+          {/* ── 12. Structural Summary ──────────────────────────────── */}
+          {(() => {
+            const summaryAccent = score >= 86 ? '#16a34a' : score >= 70 ? '#1e3a5f' : score >= 50 ? '#d97706' : '#dc2626';
+            const summaryAccentBorder = score >= 86 ? 'border-green-600' : score >= 70 ? 'border-[#1e3a5f]' : score >= 50 ? 'border-amber-500' : 'border-red-600';
+            const summaryAccentBg = score >= 86 ? 'bg-green-50' : score >= 70 ? 'bg-blue-50' : score >= 50 ? 'bg-amber-50' : 'bg-red-50';
+
+            const webSafetyBullets = [
+              `Tier 1 Liquid Capital: ${fmt(pas)} — supports ${psrBase >= 999 ? 'sustainable runway' : fmtRunway(psrBase)} at expected revenue.`,
+              sim.isDualIncome && partnerOff > 0
+                ? `Partner income of ${fmt(partnerOff)}/month reduces the monthly gap and extends all runway figures.`
+                : 'No partner income modeled. All transition costs fall on new business revenue and savings drawdown.',
+              psr30 >= 999
+                ? 'Even under severe contraction (−30%), savings stabilize before Tier 1 capital is exhausted.'
+                : psr30 >= 18
+                ? `Under severe contraction (−30%), Tier 1 capital holds for ${fmtRunway(psr30)} — a workable stress window.`
+                : `Under severe contraction (−30%), Tier 1 capital would be exhausted in ${fmtRunway(psr30)}. Revenue timing is critical.`,
+            ];
+
+            const webExecBullets = [
+              sim.rampDuration > 0
+                ? `Revenue ramp: ${sim.rampDuration} months. ${moderateBEm ? `Break-even reached at Month ${moderateBEm} under the moderate growth trajectory.` : 'Break-even not reached within 36 months at the moderate trajectory.'}`
+                : `No revenue ramp modeled. ${moderateBEm ? `Break-even reached at Month ${moderateBEm}.` : 'Break-even not reached within 36 months.'}`,
+              moderateBEm
+                ? `The transition becomes self-funding once revenue reaches ${fmt(sim.tmib)}/month. Capital drawdown stops at that point.`
+                : `Revenue must reach ${fmt(sim.tmib)}/month to become self-funding. No modeled trajectory reaches this within 36 months.`,
+              sim.rampDuration > 0
+                ? `Execution speed in the first ${sim.rampDuration} months is the primary outcome variable in this structure.`
+                : 'Revenue reliability from day one is the primary structural variable. Pre-secured clients reduce capital dependency.',
+            ];
+
+            const fixedPctWeb = grossOutflow > 0 ? Math.round(((sim.monthlyDebtPayments ?? 0) / grossOutflow) * 100) : 0;
+            const hcPctWeb    = grossOutflow > 0 ? Math.round(((sim.healthcareDelta ?? sim.healthcareMonthlyCost) / grossOutflow) * 100) : 0;
+            const webRiskBullets = fixedPctWeb > 25
+              ? [
+                  `Fixed debt payments represent ${fixedPctWeb}% of gross outflow at ${fmt(sim.monthlyDebtPayments)}/month.`,
+                  'These obligations remain constant under stress and cannot be reduced when revenue underperforms.',
+                  'Eliminating or refinancing one debt category before the transition has the largest structural impact.',
+                ]
+              : hcPctWeb > 18
+              ? [
+                  `Healthcare transition cost (${fmt(sim.healthcareDelta ?? sim.healthcareMonthlyCost)}/month) represents ${hcPctWeb}% of gross outflow.`,
+                  'Partner coverage or income-based ACA subsidies could meaningfully reduce this structural burden.',
+                  'If revenue underperforms, healthcare is the highest-leverage cost category to model for reduction.',
+                ]
+              : sim.rampDuration > 8
+              ? [
+                  `Revenue ramp of ${sim.rampDuration} months is the primary risk — the longest window where savings cover the full monthly gap.`,
+                  'Entering with even one paying client compresses the ramp and reduces capital drawdown meaningfully.',
+                  'Reducing the ramp by 3 months materially improves every runway and scenario figure in this report.',
+                ]
+              : [
+                  `Revenue reliability is the primary risk. Under −30% contraction, Tier 1 Runway drops to ${psr30 >= 999 ? 'Sustainable' : fmtRunway(psr30)}.`,
+                  'The structure is most exposed in the first months before the revenue ramp reaches full capacity.',
+                  'Entering with pre-existing revenue or a confirmed client is the most effective structural hedge available.',
+                ];
+
+            const webClosing = score >= 86
+              ? 'The financial structure modeled in this report is well-capitalized for the transition. Capital depth provides resilience across all stress scenarios without requiring Tier 2 access. The outcome is determined primarily by execution, not by financial constraints.'
+              : score >= 70
+              ? 'The financial structure supports the transition under expected conditions. Capital is adequate, but revenue timing remains the key variable. Entering with pre-existing revenue reduces dependency on the ramp timeline.'
+              : score >= 50
+              ? 'The financial structure is workable, but the margin is limited. Revenue underperformance or an extended ramp would compress the available window. Reducing fixed obligations before leaving would materially improve this position.'
+              : 'The capital structure requires strengthening before this transition is financially safe. Increasing Tier 1 capital, reducing fixed monthly obligations, or securing revenue commitments are the highest-leverage actions available.';
+
+            const blocks = [
+              { title: 'Financial Safety',       accent: '#1e3a5f', bullets: webSafetyBullets },
+              { title: 'Execution Window',        accent: '#15803d', bullets: webExecBullets  },
+              { title: 'Structural Risk Factors', accent: '#d97706', bullets: webRiskBullets  },
+            ];
+
+            return (
+              <SectionCard className="mb-8">
+                <SectionHeader n={12} sub="A final synthesis of what this analysis reveals about the financial transition position.">
+                  Structural Summary
+                </SectionHeader>
+                <div className="px-7 py-7 space-y-7">
+
+                  {/* Score ring + metric pills */}
+                  <div className="flex flex-col items-center gap-5">
+                    <ScoreRing score={score} accent={summaryAccent} />
+                    <div>
+                      <p className={`text-center text-xs font-bold uppercase tracking-[0.16em] mb-1`} style={{ color: summaryAccent }}>
+                        {getScoreLabel(score)}
+                      </p>
+                      <p className="text-center text-[11px] text-muted-foreground">Structural Breakpoint Score</p>
+                    </div>
+                    <div className="flex flex-wrap justify-center gap-3 w-full">
+                      {[
+                        { label: 'Tier 1 Runway',       val: psrBase >= 999 ? 'Sustainable' : fmtRunway(psrBase), color: '' },
+                        { label: 'Break-Even Revenue',  val: `${fmt(sim.tmib)}/mo`, color: '' },
+                        { label: 'Severe Stress −30%',  val: psr30 >= 999 ? 'Sustainable' : fmtRunway(psr30),
+                          color: psr30 < 12 ? 'text-red-700' : psr30 < 24 ? 'text-amber-700' : '' },
+                      ].map(m => (
+                        <div key={m.label} className="flex flex-col items-center px-5 py-3 bg-muted/10 rounded-lg border border-border flex-1 min-w-[120px]"
+                          data-testid={`summary-metric-${m.label.toLowerCase().replace(/\s+/g, '-')}`}>
+                          <p className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground mb-1 text-center">{m.label}</p>
+                          <p className={`text-base font-bold font-serif ${m.color || 'text-foreground'}`}>{m.val}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Three content blocks */}
+                  <div className="space-y-4 pt-2 border-t border-border">
+                    {blocks.map(({ title, accent, bullets }) => (
+                      <div key={title} className="border-l-[3px] pl-4 py-1" style={{ borderColor: accent }}>
+                        <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground mb-2">{title}</p>
+                        <ul className="space-y-1.5">
+                          {bullets.map((b, i) => (
+                            <li key={i} className="flex gap-2.5 text-sm text-muted-foreground leading-relaxed">
+                              <span className="shrink-0 mt-0.5" style={{ color: accent }}>•</span>
+                              <span>{b}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Closing statement */}
+                  <div className={`p-5 rounded-lg border-l-4 bg-muted/5 ${summaryAccentBorder}`}
+                    data-testid="summary-closing-statement">
+                    <p className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground mb-2">Closing Structural Assessment</p>
+                    <p className="text-sm leading-relaxed text-foreground font-serif italic">{webClosing}</p>
+                  </div>
+
+                </div>
+              </SectionCard>
+            );
+          })()}
+
+          {/* ── 13. Glossary ────────────────────────────────────────── */}
           <SectionCard className="mb-8">
-            <SectionHeader n={12}>Glossary of Key Terms</SectionHeader>
+            <SectionHeader n={13}>Glossary of Key Terms</SectionHeader>
             <div className="px-7 py-6 space-y-4">
               {[
                 { term: "Sustainable Runway", def: "Capital is not the limiting factor under the modeled scenario. Revenue stabilizes the financial position before savings are depleted, so no fixed depletion date applies." },

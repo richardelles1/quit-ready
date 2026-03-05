@@ -13,7 +13,7 @@ import { stripe } from "./services/stripeClient";
 const C = { navy:'#1e293b', coal:'#334155', muted:'#64748b', mid:'#f1f5f9',
   light:'#f8fafc', border:'#e2e8f0', white:'#ffffff',
   green:'#15803d', amber:'#b45309', red:'#dc2626', blue:'#1d4ed8' };
-const L = 52, W = 508, R = 560, TOTAL = 16;
+const L = 52, W = 508, R = 560, TOTAL = 17;
 
 // ─── Formatting utilities ──────────────────────────────────────────────────
 const fmtM = (n: number) => `$${Math.round(n).toLocaleString('en-US')}`;
@@ -1894,10 +1894,183 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       ftr(doc, 14);
 
       // ════════════════════════════════════════════════════════════════════
-      // PAGE 15. GLOSSARY
+      // PAGE 15. STRUCTURAL SUMMARY
       // ════════════════════════════════════════════════════════════════════
       doc.addPage(); hdr(doc, date); y = 42;
-      y = secHead(doc, 15, 'Glossary of Terms',
+      y = secHead(doc, 15, 'Structural Summary',
+        'A final synthesis of what this analysis reveals about the financial transition position.', y);
+
+      // Score-driven accent color
+      const scoreAccent = score >= 86 ? C.green : score >= 70 ? C.navy : score >= 50 ? C.amber : C.red;
+
+      // ── Score hero band ──────────────────────────────────────────────
+      doc.rect(L, y, W, 58).fill(C.navy);
+      doc.fillColor('#94a3b8').fontSize(7).font('Helvetica-Bold')
+        .text('STRUCTURAL BREAKPOINT SCORE', L + 14, y + 10, { width: W / 2 - 14 });
+      doc.fillColor(C.white).fontSize(14).font('Times-Bold')
+        .text(scoreLabel, L + 14, y + 23, { width: W * 0.55 - 14 });
+      doc.fillColor(scoreAccent).fontSize(30).font('Times-Bold')
+        .text(`${score}`, L + W * 0.6, y + 10, { width: W * 0.4 - 14, align: 'right' });
+      doc.fillColor('#94a3b8').fontSize(9).font('Helvetica')
+        .text('/ 100', L + W * 0.6, y + 43, { width: W * 0.4 - 14, align: 'right' });
+      y += 64;
+
+      // ── Score band bar ───────────────────────────────────────────────
+      const scoreBands2 = [
+        { color: C.red,    pct: 0.50 },
+        { color: C.amber,  pct: 0.20 },
+        { color: C.navy,   pct: 0.16 },
+        { color: C.green,  pct: 0.14 },
+      ];
+      let sbx = L;
+      scoreBands2.forEach(b => {
+        const bw2 = Math.round(W * b.pct);
+        doc.save().fillOpacity(0.35).rect(sbx, y, bw2, 8).fill(b.color).restore();
+        sbx += bw2;
+      });
+      // Position dot
+      const dotX = L + Math.round((score / 100) * W);
+      doc.circle(dotX, y + 4, 5).fill(scoreAccent);
+      y += 20;
+
+      // ── Stat row (3 cards) ───────────────────────────────────────────
+      y = statRow(doc, [
+        { label: 'Tier 1 Runway',        val: fmtRunway(psrBase) },
+        { label: 'Break-Even Revenue',   val: `${fmtM(sim.tmib)}/mo` },
+        { label: 'Severe Stress \u22123 0%', val: fmtRunway(psr30),
+          color: psr30 < 12 ? C.red : psr30 < 24 ? C.amber : C.navy },
+      ], y, 52);
+      y += 8;
+
+      // ── Section 1: Financial Safety ──────────────────────────────────
+      const safetyBullets = [
+        `Tier 1 Liquid Capital: ${fmtM(pasCap)} — supports ${fmtRunway(psrBase)} at expected revenue under current outflow.`,
+        sim.isDualIncome && partnerOff > 0
+          ? `Partner income of ${fmtM(partnerOff)}/month reduces the monthly gap and extends all runway figures.`
+          : 'No partner income in the model. All transition costs depend on new business revenue and savings.',
+        psr30 >= 999
+          ? 'Even under severe contraction (\u221230%), savings stabilize before Tier 1 capital is exhausted.'
+          : psr30 >= 18
+          ? `Under severe contraction (\u221230%), Tier 1 capital holds for ${fmtRunway(psr30)} \u2014 a workable stress window.`
+          : `Under severe contraction (\u221230%), Tier 1 capital is exhausted in ${fmtRunway(psr30)}. Revenue timing is critical.`,
+      ];
+      {
+        const bw3 = W - 28;
+        const bHts = safetyBullets.map(b =>
+          doc.font('Helvetica').fontSize(8.5).heightOfString(`\u2022  ${sanitize(b)}`, { width: bw3, lineGap: 2 }));
+        const h = bHts.reduce((s, hh) => s + hh + 3, 0) + 38;
+        doc.rect(L, y, W, h).fill(C.mid);
+        doc.rect(L, y, 3, h).fill(C.navy);
+        doc.fillColor(C.muted).fontSize(7.5).font('Helvetica-Bold').text('1. FINANCIAL SAFETY', L + 12, y + 10);
+        let by = y + 26;
+        safetyBullets.forEach((b, i) => {
+          doc.fillColor(C.coal).fontSize(8.5).font('Helvetica')
+            .text(`\u2022  ${sanitize(b)}`, L + 14, by, { width: bw3, lineGap: 2 });
+          by += bHts[i] + 3;
+        });
+        y += h + 8;
+      }
+
+      // ── Section 2: Execution Window ──────────────────────────────────
+      const execBullets = [
+        sim.rampDuration > 0
+          ? `Revenue ramp: ${sim.rampDuration} months. ${modBE ? `Break-even reached at Month ${modBE} under the moderate growth trajectory.` : 'Break-even not reached within 36 months at the moderate trajectory.'}`
+          : `No revenue ramp modeled. ${modBE ? `Break-even reached at Month ${modBE}.` : 'Break-even not reached within 36 months.'}`,
+        modBE
+          ? `The transition becomes self-funding once revenue reaches ${fmtM(sim.tmib)}/month. Capital drawdown stops.`
+          : `Revenue must reach ${fmtM(sim.tmib)}/month to become self-funding. No modeled trajectory reaches this within 36 months.`,
+        sim.rampDuration > 0
+          ? `Execution speed in the first ${sim.rampDuration} months is the primary outcome variable. Pre-existing clients compress this window.`
+          : 'Revenue reliability from day one is the primary structural variable. Pre-secured clients reduce capital dependency.',
+      ];
+      {
+        const bw3 = W - 28;
+        const bHts = execBullets.map(b =>
+          doc.font('Helvetica').fontSize(8.5).heightOfString(`\u2022  ${sanitize(b)}`, { width: bw3, lineGap: 2 }));
+        const h = bHts.reduce((s, hh) => s + hh + 3, 0) + 38;
+        doc.rect(L, y, W, h).fill(C.light);
+        doc.rect(L, y, 3, h).fill(C.green);
+        doc.fillColor(C.muted).fontSize(7.5).font('Helvetica-Bold').text('2. EXECUTION WINDOW', L + 12, y + 10);
+        let by = y + 26;
+        execBullets.forEach((b, i) => {
+          doc.fillColor(C.coal).fontSize(8.5).font('Helvetica')
+            .text(`\u2022  ${sanitize(b)}`, L + 14, by, { width: bw3, lineGap: 2 });
+          by += bHts[i] + 3;
+        });
+        y += h + 8;
+      }
+
+      // ── Section 3: Structural Risk ───────────────────────────────────
+      const fixedPct3 = grossOutflow > 0 ? Math.round(((sim.monthlyDebtPayments ?? 0) / grossOutflow) * 100) : 0;
+      const hcPct3    = grossOutflow > 0 ? Math.round((hc / grossOutflow) * 100) : 0;
+      const riskBullets3 = fixedPct3 > 25
+        ? [
+            `Fixed debt payments represent ${fixedPct3}% of gross outflow at ${fmtM(sim.monthlyDebtPayments)}/month.`,
+            'These obligations are constant under stress and cannot be reduced when revenue underperforms.',
+            'Eliminating or refinancing one debt category before the transition has the largest structural impact.',
+          ]
+        : hcPct3 > 18
+        ? [
+            `Healthcare transition cost (${fmtM(hc)}/month) represents ${hcPct3}% of gross outflow.`,
+            'Partner coverage or income-based ACA subsidies could meaningfully reduce this structural burden.',
+            'If revenue underperforms, healthcare is the highest-leverage cost to model for reduction.',
+          ]
+        : sim.rampDuration > 8
+        ? [
+            `Revenue ramp of ${sim.rampDuration} months is the primary risk \u2014 the longest window where savings cover the full gap.`,
+            'Entering with even one paying client would compress the ramp and reduce capital drawdown meaningfully.',
+            'Reducing the ramp by 3 months materially improves every runway and scenario figure in this report.',
+          ]
+        : [
+            `Revenue reliability is the primary risk. Under \u221230% contraction, Tier 1 Runway drops to ${fmtRunway(psr30)}.`,
+            'The structure is most exposed in months 1\u20136, before the revenue ramp reaches full capacity.',
+            'Entering with pre-existing revenue or a confirmed client is the most effective structural hedge available.',
+          ];
+      {
+        const bw3 = W - 28;
+        const bHts = riskBullets3.map(b =>
+          doc.font('Helvetica').fontSize(8.5).heightOfString(`\u2022  ${sanitize(b)}`, { width: bw3, lineGap: 2 }));
+        const h = bHts.reduce((s, hh) => s + hh + 3, 0) + 38;
+        doc.rect(L, y, W, h).fill(C.mid);
+        doc.rect(L, y, 3, h).fill(C.amber);
+        doc.fillColor(C.muted).fontSize(7.5).font('Helvetica-Bold').text('3. STRUCTURAL RISK FACTORS', L + 12, y + 10);
+        let by = y + 26;
+        riskBullets3.forEach((b, i) => {
+          doc.fillColor(C.coal).fontSize(8.5).font('Helvetica')
+            .text(`\u2022  ${sanitize(b)}`, L + 14, by, { width: bw3, lineGap: 2 });
+          by += bHts[i] + 3;
+        });
+        y += h + 8;
+      }
+
+      // ── Closing Statement (navy bg, score-accent left, white italic) ──
+      const closingText15 = score >= 86
+        ? `The financial structure modeled in this report is well-capitalized for the transition. Capital depth provides resilience across all stress scenarios without requiring Tier 2 access. The outcome is determined primarily by execution, not by financial constraints.`
+        : score >= 70
+        ? `The financial structure supports the transition under expected conditions. Capital is adequate, but revenue timing remains the key variable. Entering with pre-existing revenue reduces dependency on the ramp timeline.`
+        : score >= 50
+        ? `The financial structure is workable, but the margin is limited. Revenue underperformance or an extended ramp would compress the available window. Reducing fixed obligations before leaving would materially improve this position.`
+        : `The capital structure requires strengthening before this transition is financially safe. Increasing Tier 1 capital, reducing fixed monthly obligations, or securing revenue commitments are the highest-leverage actions available.`;
+      {
+        const bw3 = W - 28;
+        const textH = doc.font('Times-Italic').fontSize(10).heightOfString(sanitize(closingText15), { width: bw3, lineGap: 2 });
+        const h = textH + 44;
+        doc.rect(L, y, W, h).fill(C.navy);
+        doc.rect(L, y, 3, h).fill(scoreAccent);
+        doc.fillColor('#94a3b8').fontSize(7).font('Helvetica-Bold')
+          .text('CLOSING STRUCTURAL ASSESSMENT', L + 14, y + 10);
+        doc.fillColor(C.white).fontSize(10).font('Times-Italic')
+          .text(sanitize(closingText15), L + 14, y + 26, { width: bw3, lineGap: 2 });
+        y += h + 6;
+      }
+
+      ftr(doc, 15);
+
+      // ════════════════════════════════════════════════════════════════════
+      // PAGE 16. GLOSSARY
+      // ════════════════════════════════════════════════════════════════════
+      doc.addPage(); hdr(doc, date); y = 42;
+      y = secHead(doc, 16, 'Glossary of Terms',
         'Plain-language definitions for every metric and concept used in this report.', y);
 
       const glossaryTerms = [
@@ -1960,15 +2133,14 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
         doc.fillColor(C.coal).fontSize(8.5).font('Helvetica').text(entry.def, L + 12, y + 21, { width: W - 24, lineGap: 1.5 });
         y += h + 4;
       });
-      ftr(doc, 15);
+      ftr(doc, 16);
 
       // ════════════════════════════════════════════════════════════════════
-      // PAGE 16. IMPORTANT NOTICE (DISCLAIMER)
+      // PAGE 17. IMPORTANT NOTICE (DISCLAIMER)
       // ════════════════════════════════════════════════════════════════════
       doc.addPage(); hdr(doc, date); y = 42;
-      doc.rect(L, y, W, 1).fill(C.border); y += 8;
-      doc.fillColor('#94a3b8').fontSize(7.5).font('Helvetica').text(`PAGE 16 OF ${TOTAL}`, L, y); y += 11;
-      doc.fillColor(C.navy).fontSize(16).font('Times-Bold').text('Important Notice', L, y, { width: W }); y += 30;
+      y = secHead(doc, 17, 'Important Notice', null, y);
+      y += 8;
 
       const disclaimerParas = [
         'This report is a structural financial simulation generated by QuitReady. It is based solely on the inputs provided by the user. It does not constitute financial advice, tax advice, investment advice, or legal advice of any kind.',
@@ -1990,7 +2162,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
         y += doc.heightOfString(para, { width: W, lineGap: 2 }) + 14;
       });
 
-      ftr(doc, 16);
+      ftr(doc, 17);
       doc.end();
 
     } catch (err) {
