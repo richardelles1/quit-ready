@@ -1,0 +1,271 @@
+Use this exact prompt in the Replit Plan tool.
+
+No commentary. Just paste.
+
+⸻
+
+Create a website shell and marketing layer around the existing QuitReady application without modifying the core simulator, report engine, or Stripe checkout flow.
+
+The objective is to prepare the site for launch by adding the marketing pages, SEO structure, report previews, and improved paywall experience while preserving the current user flow and application logic.
+
+This work is strictly site structure and presentation. Do not alter the simulation math, scoring model, Stripe integration, or PDF generation logic.
+
+The report product is now an 18-page personalized financial readiness report. The marketing site should communicate the value of the report without revealing the full report contents in a way that undermines the paywall.
+
+The website should follow a clean, modern SaaS-style structure and reuse the existing visual language already present in the app.
+
+⸻
+
+OBJECTIVE
+
+Create the full QuitReady website shell and marketing structure including:
+
+• homepage
+• how it works page
+• sample report page
+• pricing page
+• blog scaffold for SEO
+• application entry point
+
+The application itself should live at:
+
+/app
+
+All marketing pages should exist at the root level.
+
+⸻
+
+SITE STRUCTURE
+
+Create the following routes:
+
+/
+
+Homepage
+
+/how-it-works
+
+Explanation of the product and workflow
+
+/sample-report
+
+Preview of the report with screenshots and explanation
+
+/pricing
+
+Pricing explanation and value proposition
+
+/blog
+
+SEO article index
+
+/blog/[slug]
+
+Individual blog article template
+
+/app
+
+Existing report generator (do not modify logic)
+
+⸻
+
+HOMEPAGE STRUCTURE
+
+Build a conversion-focused landing page with the following sections:
+
+Hero Section
+Headline communicating the value of financial clarity before quitting a job
+Primary CTA: “Generate Your Report”
+
+Problem Section
+Explain the risk of quitting a job without understanding financial runway
+
+How It Works
+Three steps:
+	1.	Enter financial snapshot
+	2.	Analyze your transition risk
+	3.	Receive an 18-page personalized readiness report
+
+Report Preview
+Display screenshots of charts and report pages
+
+Pricing Section
+Explain the one-time $19.99 report purchase
+
+Final CTA
+“Generate Your Report”
+
+⸻
+
+SAMPLE REPORT PAGE
+
+Create a page that shows visual previews of the report without revealing the entire product.
+
+Use screenshots or generated images of:
+
+• Structural Breakpoint Score
+• Runway analysis chart
+• Scenario comparison table
+• Revenue growth trajectory chart
+• Risk classification panel
+
+Include short explanations of what each section represents.
+
+Make clear that the full 18-page report is unlocked after purchase.
+
+⸻
+
+SAMPLE REPORT DATA
+
+Generate three example report scenarios to use for preview screenshots.
+
+Scenario 1
+Young professional with moderate savings
+Result: Moderately Exposed
+
+Scenario 2
+High savings household with long runway
+Result: Structurally Stable
+
+Scenario 3
+Overextended household with short runway
+Result: Structurally Fragile
+
+These scenarios are only for visual demonstration and should not be downloadable as full reports.
+
+⸻
+
+PRICING PAGE
+
+Explain the product clearly without giving away the entire methodology.
+
+Include:
+
+Headline explaining the value of the decision tool
+
+Pricing block
+
+$19.99
+One-time purchase
+Instant report generation
+Downloadable 18-page personalized PDF
+
+Feature highlights:
+
+• Structural Breakpoint Score
+• Financial Runway Analysis
+• Stress Scenario Modeling
+• Revenue Growth Trajectory Modeling
+• Decision Interpretation Summary
+
+Add a strong CTA linking to:
+
+/app
+
+⸻
+
+PAYWALL EXPERIENCE
+
+Improve the paywall presentation so users understand what they receive before purchasing.
+
+Add a preview section showing blurred or partial screenshots of the report pages.
+
+Add feature callouts explaining:
+
+• 18-page personalized analysis
+• scenario modeling
+• runway projections
+• risk classification
+• revenue growth modeling
+
+Keep the actual detailed report content behind the paywall.
+
+Do not reveal the entire report structure.
+
+⸻
+
+BLOG STRUCTURE FOR SEO
+
+Create a blog scaffold with placeholder articles using Lorem Ipsum text.
+
+Blog index page:
+/blog
+
+Individual article template:
+/blog/[slug]
+
+Generate placeholder articles for:
+
+How Much Savings Do You Need to Quit Your Job
+
+Can I Afford to Quit My Job
+
+Financial Runway Calculator
+
+Should I Quit My Job to Start a Business
+
+Is It Safe to Leave a Stable Job
+
+Articles should include headings and structure but placeholder body text.
+
+These will be replaced later with real SEO content.
+
+⸻
+
+VISUAL ASSETS
+
+Add placeholder image containers for report screenshots.
+
+Suggested filenames:
+
+report-preview.png
+runway-chart.png
+risk-score.png
+growth-chart.png
+scenario-table.png
+
+Use placeholders for now if screenshots are not yet generated.
+
+⸻
+
+DESIGN CONSISTENCY
+
+All new pages must match the existing app design system.
+
+Maintain consistent:
+
+spacing
+typography
+section headers
+card styling
+visual hierarchy
+
+Ensure layouts render well on both desktop and mobile.
+
+⸻
+
+IMPORTANT CONSTRAINTS
+
+Do not modify:
+
+simulation math
+scoring model
+Stripe payment logic
+PDF report generation
+existing app workflow
+
+This work is limited to marketing site structure and presentation.
+
+⸻
+
+SUCCESS CRITERIA
+
+The site should compile and run with:
+
+working navigation
+complete marketing page scaffold
+sample report previews
+SEO blog structure
+improved paywall explanation
+
+The application at /app should continue to function exactly as before.
