@@ -317,29 +317,29 @@ function growthChart(
     }
   });
 
-  // Legend (bottom-left — avoids overlap with high-climbing revenue lines)
-  const legX = cx + 8;
-  const legY = cy + ch - 44;
-  const legItems = [
+  // Legend — below X-axis (row 1: three trajectories; row 2: TMIB break-even)
+  const legY2 = cy + ch + 18;
+  const legItemsBelow = [
     { label: 'Conservative (+3%)', color: C.muted },
     { label: 'Moderate (+5%)',     color: C.navy  },
     { label: 'Ambitious (+8%)',    color: C.green },
   ];
-  legItems.forEach((item, i) => {
-    doc.rect(legX, legY + i * 12, 10, 4).fill(item.color);
+  const itemW = Math.floor(cw / 3);
+  legItemsBelow.forEach((item, i) => {
+    const ix = cx + i * itemW;
+    doc.rect(ix, legY2, 10, 4).fill(item.color);
     doc.fillColor(C.coal).fontSize(6.5).font('Helvetica')
-      .text(item.label, legX + 13, legY + i * 12, { width: 108 });
+      .text(item.label, ix + 14, legY2 - 1, { width: itemW - 18 });
   });
-  // TMIB legend entry
-  const tmibLegY = legY + legItems.length * 12 + 2;
-  let dlx = legX;
-  for (let seg = 0; seg < 3; seg++) {
-    doc.moveTo(dlx, tmibLegY + 2).lineTo(dlx + 4, tmibLegY + 2)
+  const legY3 = legY2 + 14;
+  let dlx2 = cx;
+  for (let seg = 0; seg < 4; seg++) {
+    doc.moveTo(dlx2, legY3 + 2).lineTo(dlx2 + 4, legY3 + 2)
       .strokeColor(C.red).lineWidth(1).stroke();
-    dlx += 7;
+    dlx2 += 7;
   }
   doc.fillColor(C.red).fontSize(6.5).font('Helvetica')
-    .text('Break-even (TMIB)', legX + 13, tmibLegY - 1, { width: 108 });
+    .text('Break-even (TMIB)', dlx2 + 4, legY3 - 1, { width: 120 });
 }
 
 function lineChart(doc: PDFKit.PDFDocument, base: number[], severe: number[], maxCap: number,
@@ -378,11 +378,12 @@ function lineChart(doc: PDFKit.PDFDocument, base: number[], severe: number[], ma
     if (!started) { doc.moveTo(px, py); started = true; } else { doc.lineTo(px, py); }
   });
   doc.strokeColor(C.muted).lineWidth(1.5).stroke();
-  // Legend
-  doc.rect(cx + cw - 120, cy + 6, 10, 4).fill(C.navy);
-  doc.fillColor(C.navy).fontSize(7).font('Helvetica').text('Base case', cx + cw - 107, cy + 4);
-  doc.rect(cx + cw - 120, cy + 16, 10, 4).fill(C.muted);
-  doc.fillColor(C.muted).fontSize(7).font('Helvetica').text('Severe (-30%)', cx + cw - 107, cy + 14);
+  // Legend — below X-axis (avoids overlap with base case line which starts near top)
+  const llY = cy + ch + 18;
+  doc.rect(cx, llY, 10, 4).fill(C.navy);
+  doc.fillColor(C.navy).fontSize(7).font('Helvetica').text('Base case', cx + 14, llY - 1, { width: 80 });
+  doc.rect(cx + 110, llY, 10, 4).fill(C.muted);
+  doc.fillColor(C.muted).fontSize(7).font('Helvetica').text('Severe (-30%)', cx + 124, llY - 1, { width: 100 });
 }
 
 // ─── Route registration ────────────────────────────────────────────────────
@@ -1383,7 +1384,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       const chartX = L + 60, chartY = y;
 
       lineChart(doc, baseData, severeData, maxCap, chartX, chartY, chartW, chartH_2, CHART_MONTHS);
-      y += chartH_2 + 30;
+      y += chartH_2 + 46;
 
       // Annotation: Tier 1 depletion point at psr30 (actual depletion, not pressure point)
       if (psr30 < 999 && psr30 <= CHART_MONTHS) {
@@ -1664,7 +1665,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
 
       const gtChartH = 165;
       growthChart(doc, conservRev, moderateRev, ambitiousRev, sim.tmib, L, y + 6, W, gtChartH);
-      y += gtChartH + 26;
+      y += gtChartH + 64;
 
       // Full-width stacked trajectory cards with bullet insights
       const gtCardDefs: Array<{ label: string; color: string; be: number | null; rev36: number; bullets: string[] }> = [
@@ -1676,7 +1677,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
               ? `Revenue crosses break-even (${fmtM(sim.tmib)}/mo) at Month ${conservBE} under a +3% initial growth rate.`
               : `Revenue does not reach the break-even threshold of ${fmtM(sim.tmib)}/mo within 36 months at the conservative rate.`,
             `By Month 36, projected revenue reaches ${fmtM(Math.round(conservRev[35]))} — ${Math.round((conservRev[35]/sim.tmib)*100)}% of total monthly outflow.`,
-            'Growth decelerates from +3%/mo post-ramp to +1.5% (months 13-24) and +0.5% (months 25-36). Sustainable, gradual scaling.',
+            '+3%/mo post-ramp, slowing to +1.5% (mo 13-24) and +0.5% (mo 25-36). Gradual, sustainable.',
             conservBE
               ? `Conservative break-even at Month ${conservBE} confirms structural viability at the slowest modeled execution pace.`
               : `Revenue falls ${fmtM(Math.round(sim.tmib - conservRev[35]))} short of TMIB by Month 36. Reducing fixed outflow before launch would close this gap.`,
@@ -1690,7 +1691,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
               ? `Revenue reaches break-even (${fmtM(sim.tmib)}/mo) at Month ${modBE}. The transition becomes fully self-funding at this point.`
               : `Revenue does not reach break-even within 36 months at the moderate trajectory. Reducing TMIB before launch would improve this.`,
             `By Month 36, projected revenue reaches ${fmtM(Math.round(moderateRev[35]))} — ${Math.round((moderateRev[35]/sim.tmib)*100)}% of total monthly outflow.`,
-            'Growth decelerates from +5%/mo post-ramp to +2.5% (months 13-24) and +1%/mo (months 25-36). Realistic mid-market scaling.',
+            '+5%/mo post-ramp, slowing to +2.5% (mo 13-24) and +1%/mo (mo 25-36). Realistic trajectory.',
             modBE
               ? `Month ${modBE} is the structural inflection point. After this, revenue covers all obligations and capital drawdown stops.`
               : 'Sustained early client acquisition in months 1-6 would materially improve the break-even timeline.',
@@ -1704,7 +1705,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
               ? `Revenue crosses break-even (${fmtM(sim.tmib)}/mo) at Month ${ambBE}. Fastest modeled path to a self-funding transition.`
               : `Even under ambitious assumptions, revenue does not reach break-even within 36 months. The gap is structural.`,
             `By Month 36, projected revenue reaches ${fmtM(Math.round(ambitiousRev[35]))} — ${Math.round((ambitiousRev[35]/sim.tmib)*100)}% of total monthly outflow (${Math.round(ambitiousRev[35]/sim.tmib)}x TMIB).`,
-            'Growth decelerates from +8%/mo to +4% (months 13-24) and +2%/mo (months 25-36). Requires consistent client acquisition.',
+            '+8%/mo post-ramp, slowing to +4% (mo 13-24) and +2%/mo (mo 25-36). Requires strong demand.',
             ambBE
               ? `At ${fmtM(Math.round(ambitiousRev[35]))} by Month 36, this trajectory builds a ${fmtM(Math.round(ambitiousRev[35] - sim.tmib))}/month surplus.`
               : 'Reducing one fixed expense category before launch would have an outsized structural impact across all trajectories.',
@@ -1845,7 +1846,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       // Revenue Growth Outlook — bullet block (matching riskBlock style)
       const growthBulletsP: string[] = [
         modBE
-          ? `Under moderate growth, revenue reaches break-even at Month ${modBE}. The transition becomes self-funding and capital drawdown stops.`
+          ? `Under moderate growth, break-even at Month ${modBE}. Transition becomes self-funding; capital drawdown stops.`
           : conservBE
           ? `Revenue reaches break-even at Month ${conservBE} under conservative assumptions. Faster execution accelerates this.`
           : `Revenue does not reach the break-even threshold of ${fmtM(sim.tmib)}/month within 36 months at any modeled trajectory.`,
