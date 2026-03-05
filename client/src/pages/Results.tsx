@@ -31,6 +31,16 @@ function fmtRunwayShort(months: number): string {
   return `${yrs} yr ${mo} mo`;
 }
 
+function fmtDelta(months: number): string {
+  if (months === 0) return 'No change';
+  const abs = Math.abs(months);
+  const yrs = Math.floor(abs / 12);
+  const mo = abs % 12;
+  let s = yrs > 0 ? `${yrs} yr${yrs !== 1 ? 's' : ''}` : '';
+  if (mo > 0) s += (s ? ', ' : '') + `${mo} mo`;
+  return (months < 0 ? '−' : '+') + s;
+}
+
 // Percentage breakdown that always sums to exactly 100
 function pct100(values: number[]): number[] {
   const sum = values.reduce((a, b) => a + b, 0);
@@ -104,11 +114,26 @@ function GrowthTrajectoryChart({ sim }: { sim: SimulationResult }) {
   const yTicks = [0.25, 0.5, 0.75, 1.0];
   const tmibY = toY(sim.tmib);
 
+  const CONSERV_COLOR  = '#94a3b8';
+  const MODERATE_COLOR = '#1e3a5f';
+  const AMBITIOUS_COLOR = '#16a34a';
+
   const lines = [
-    { pts: conserv,  be: conservBE,  color: '#64748b', sw: '1.5', dash: '5 3' },
-    { pts: moderate, be: moderateBE, color: '#1e293b', sw: '2.5', dash: undefined },
-    { pts: ambitious,be: ambitiousBE,color: '#15803d', sw: '1.5', dash: '3 2' },
+    { pts: conserv,   be: conservBE,   color: CONSERV_COLOR,  sw: '2',   label: 'Conservative' },
+    { pts: moderate,  be: moderateBE,  color: MODERATE_COLOR, sw: '2.5', label: 'Moderate' },
+    { pts: ambitious, be: ambitiousBE, color: AMBITIOUS_COLOR,sw: '2',   label: 'Ambitious' },
   ];
+
+  // Compute right-end y positions and stagger labels to avoid overlap
+  const endYs = lines.map(({ pts }) => toY(pts[35]));
+  const labelOffsets = [0, 0, 0];
+  for (let i = 0; i < 3; i++) {
+    for (let j = 0; j < i; j++) {
+      if (Math.abs(endYs[i] - endYs[j]) < 14) {
+        labelOffsets[i] = endYs[i] < endYs[j] ? -10 : 10;
+      }
+    }
+  }
 
   return (
     <div className="relative">
@@ -131,15 +156,21 @@ function GrowthTrajectoryChart({ sim }: { sim: SimulationResult }) {
           </g>
         ))}
         {/* TMIB break-even line */}
-        <line x1={PAD_L} y1={tmibY} x2={SVG_W - 8} y2={tmibY}
+        <line x1={PAD_L} y1={tmibY} x2={SVG_W - 90} y2={tmibY}
           stroke="#ef4444" strokeWidth="1.5" strokeDasharray="5 4" />
-        <text x={SVG_W - 10} y={tmibY - 3} textAnchor="end" fontSize="7" fill="#ef4444"
-          fontFamily="system-ui" fontWeight="bold">Break-even (TMIB)</text>
+        <text x={PAD_L + 4} y={tmibY - 4} textAnchor="start" fontSize="7" fill="#ef4444"
+          fontFamily="system-ui" fontWeight="bold">TMIB Break-even</text>
         {/* Revenue trajectory lines */}
-        {lines.map(({ pts, color, sw, dash }) => (
+        {lines.map(({ pts, color, sw }) => (
           <path key={color} d={toPath(pts)} fill="none" stroke={color} strokeWidth={sw}
-            strokeLinecap="round" strokeLinejoin="round"
-            {...(dash ? { strokeDasharray: dash } : {})} />
+            strokeLinecap="round" strokeLinejoin="round" />
+        ))}
+        {/* End-of-line labels at month 36 */}
+        {lines.map(({ pts, color, label }, i) => (
+          <text key={label} x={toX(36) - 2} y={endYs[i] + labelOffsets[i] - 5}
+            textAnchor="end" fontSize="8.5" fill={color} fontFamily="system-ui" fontWeight="bold">
+            {label}
+          </text>
         ))}
         {/* Break-even dots */}
         {lines.map(({ be, color }) => be !== null && be <= 36 && (
@@ -150,15 +181,15 @@ function GrowthTrajectoryChart({ sim }: { sim: SimulationResult }) {
       {/* Legend */}
       <div className="flex flex-wrap gap-x-5 gap-y-1.5 mt-2 text-xs text-muted-foreground">
         <div className="flex items-center gap-1.5">
-          <div className="w-5 h-px" style={{ borderTop: '1.5px dashed #64748b' }} />
+          <div className="w-5 h-0.5 rounded" style={{ backgroundColor: CONSERV_COLOR }} />
           <span>Conservative (+3%/mo)</span>
         </div>
         <div className="flex items-center gap-1.5">
-          <div className="w-5 h-0.5 rounded" style={{ backgroundColor: '#1e293b' }} />
+          <div className="w-5 h-0.5 rounded" style={{ backgroundColor: MODERATE_COLOR }} />
           <span>Moderate (+5%/mo)</span>
         </div>
         <div className="flex items-center gap-1.5">
-          <div className="w-5 h-px" style={{ borderTop: '1.5px dashed #15803d' }} />
+          <div className="w-5 h-0.5 rounded" style={{ backgroundColor: AMBITIOUS_COLOR }} />
           <span>Ambitious (+8%/mo)</span>
         </div>
         <div className="flex items-center gap-1.5">
@@ -774,6 +805,77 @@ export default function Results() {
   const psrNewChild = calcRunwayClient(pasCap, sim.tmib + 1000, sim.expectedRevenue, sim.rampDuration, sim.volatilityPercent);
   const psrPartnerLoss = sim.isDualIncome ? calcRunwayClient(pasCap, sim.tmib + partnerOff, sim.expectedRevenue, sim.rampDuration, sim.volatilityPercent) : null;
 
+  // Revenue growth trajectory data — computed once for reuse in Section 10 and 11
+  const conservRevData   = projectRevenue(sim.expectedRevenue, sim.rampDuration, GROWTH_RATES.conservative);
+  const moderateRevData  = projectRevenue(sim.expectedRevenue, sim.rampDuration, GROWTH_RATES.moderate);
+  const ambitiousRevData = projectRevenue(sim.expectedRevenue, sim.rampDuration, GROWTH_RATES.ambitious);
+  const conservBEm   = growthBreakEven(conservRevData, sim.tmib);
+  const moderateBEm  = growthBreakEven(moderateRevData, sim.tmib);
+  const ambitiousBEm = growthBreakEven(ambitiousRevData, sim.tmib);
+
+  // Build per-trajectory insight cards
+  const buildGrowthCards = () => {
+    const defs = [
+      {
+        label: 'Conservative',
+        rateLabel: '+3%/mo initial',
+        accentColor: '#94a3b8',
+        bgClass: 'bg-slate-50',
+        labelClass: 'text-slate-500',
+        be: conservBEm,
+        rev36: conservRevData[35],
+      },
+      {
+        label: 'Moderate',
+        rateLabel: '+5%/mo initial',
+        accentColor: '#1e3a5f',
+        bgClass: 'bg-blue-50',
+        labelClass: 'text-blue-900',
+        be: moderateBEm,
+        rev36: moderateRevData[35],
+      },
+      {
+        label: 'Ambitious',
+        rateLabel: '+8%/mo initial',
+        accentColor: '#16a34a',
+        bgClass: 'bg-green-50',
+        labelClass: 'text-green-800',
+        be: ambitiousBEm,
+        rev36: ambitiousRevData[35],
+      },
+    ];
+    return defs.map(({ label, rateLabel, accentColor, bgClass, labelClass, be, rev36 }) => {
+      const pct = Math.round((rev36 / sim.tmib) * 100);
+      const isConserv = label === 'Conservative';
+      const isMod     = label === 'Moderate';
+      const isAmbitious = label === 'Ambitious';
+      const bullets: string[] = [
+        be !== null
+          ? `Revenue crosses the break-even threshold (${fmt(sim.tmib)}/mo) at Month ${be}${isMod ? ' — the point where the transition becomes self-funding' : isAmbitious ? ' — the fastest modeled path to a self-funding transition' : ''}.`
+          : `Revenue does not reach the break-even threshold of ${fmt(sim.tmib)}/mo within 36 months at this growth rate.`,
+        `By Month 36, projected monthly revenue reaches ${fmt(Math.round(rev36))} — ${pct}% of your total monthly outflow (TMIB).`,
+        isConserv
+          ? 'Growth decelerates from +3%/mo post-ramp to +1.5% (months 13–24) and +0.5% (months 25–36) — a sustainable but gradual scaling curve.'
+          : isMod
+          ? 'Growth decelerates from +5%/mo post-ramp to +2.5% (months 13–24) and +1%/mo (months 25–36) — a realistic mid-market scaling trajectory.'
+          : 'Growth decelerates from +8%/mo post-ramp to +4% (months 13–24) and +2%/mo (months 25–36). Requires consistent client acquisition or scalable product demand.',
+        be !== null
+          ? (isConserv
+              ? `Conservative break-even at Month ${be} confirms the transition is structurally viable even at the slowest modeled execution pace.`
+              : isMod
+              ? `Month ${be} is the structural inflection point — after this, revenue exceeds all obligations and capital drawdown stops.`
+              : `At ${fmt(Math.round(rev36))} by Month 36, this trajectory generates ${Math.round(rev36 / sim.tmib)}x your monthly outflow — well into surplus territory.`)
+          : (isConserv
+              ? `At conservative growth, revenue falls ${fmt(Math.round(sim.tmib - rev36))} short of TMIB by Month 36. Reducing fixed outflow before launch would close this gap.`
+              : isMod
+              ? 'Sustained early client acquisition in months 1–6 would materially improve the break-even timeline.'
+              : 'Reducing the TMIB by eliminating a fixed expense category would have the greatest structural impact across all three trajectories.'),
+      ];
+      return { label, rateLabel, accentColor, bgClass, labelClass, be, bullets };
+    });
+  };
+  const growthCards = buildGrowthCards();
+
   return (
     <Layout>
       <div className="flex-1 bg-muted/20 py-12">
@@ -1280,25 +1382,26 @@ export default function Results() {
                   const d = psrBase < 999 && shock.psr < 999 ? Math.round(shock.psr - psrBase) : null;
                   const needsT2 = t3Total > 0 && shock.psr < sim.baseRunway;
                   return (
-                    <div key={shock.name} className="flex items-center justify-between p-4 rounded-lg border border-border bg-muted/5">
-                      <div className="flex-1 min-w-0 pr-4">
-                        <p className="text-sm font-bold text-foreground mb-0.5">{shock.name}</p>
-                        <p className="text-xs text-muted-foreground leading-relaxed">{shock.desc}</p>
-                      </div>
-                      <div className="shrink-0 text-right min-w-[140px]">
-                        <p className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground mb-0.5">New Tier 1 Runway</p>
-                        <p className="text-sm font-bold text-foreground">
-                          {shock.psr >= 999 ? 'Sustainable Runway' : fmtRunway(Math.round(shock.psr))}
-                        </p>
-                        {d !== null && (
-                          <p className={`text-xs mt-0.5 ${d < 0 ? 'text-[#C94B4B]' : 'text-green-600'}`}>
-                            Change from base: {d >= 0 ? '+' : ''}{d} months
+                    <div key={shock.name} className="p-4 rounded-lg border border-border bg-muted/5">
+                      <p className="text-sm font-bold text-foreground mb-1">{shock.name}</p>
+                      <p className="text-xs text-muted-foreground leading-relaxed mb-3">{shock.desc}</p>
+                      <div className="flex items-start gap-6 flex-wrap">
+                        <div>
+                          <p className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground mb-0.5">New Tier 1 Runway</p>
+                          <p className="text-sm font-bold text-foreground">
+                            {shock.psr >= 999 ? 'Sustainable Runway' : fmtRunway(Math.round(shock.psr))}
                           </p>
+                        </div>
+                        {d !== null && (
+                          <div>
+                            <p className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground mb-0.5">Change from Base</p>
+                            <p className={`text-sm font-semibold ${d < 0 ? 'text-[#C94B4B]' : 'text-green-600'}`}>{fmtDelta(d)}</p>
+                          </div>
                         )}
                         {psrBase >= 999 && shock.psr < 999 && (
-                          <p className="text-xs text-muted-foreground mt-0.5">Base was Sustainable</p>
+                          <p className="text-xs text-muted-foreground self-end">Base was Sustainable</p>
                         )}
-                        {needsT2 && <p className="text-[9px] text-amber-600 font-semibold mt-0.5">Tier 2 Required</p>}
+                        {needsT2 && <p className="text-[9px] text-amber-600 font-semibold self-end">Tier 2 Required</p>}
                       </div>
                     </div>
                   );
@@ -1310,55 +1413,41 @@ export default function Results() {
           {/* ── 9. Scenario Comparison ──────────────────────────── */}
           <SectionCard className="mb-8">
             <SectionHeader n={9}
-              sub="All scenarios side by side. Tier 1 Runway = when cash + brokerage runs out. Full Capital Depth uses all accessible savings including restricted assets.">
+              sub="All scenarios compared. Tier 1 Runway = when cash + brokerage runs out. Full Capital Depth uses all accessible savings including restricted assets.">
               Scenario Comparison
             </SectionHeader>
-            <div className="px-6 py-4 overflow-x-auto">
-              <table className="w-full text-xs min-w-[600px]">
+            <div className="px-6 py-4">
+              <table className="w-full text-xs">
                 <thead>
                   <tr className="border-b border-border">
-                    <th className="text-left py-2 font-semibold uppercase tracking-wider text-muted-foreground pr-3">Metric</th>
-                    {['Base Case', 'Moderate (-15%)', 'Severe (-30%)', '+3mo Ramp', ...(sim.isDualIncome ? ['Partner Loss'] : []), 'New Child'].map(c => (
-                      <th key={c} className="text-center py-2 font-semibold uppercase tracking-wider text-muted-foreground px-2">{c}</th>
-                    ))}
+                    <th className="text-left py-2 font-semibold uppercase tracking-wider text-muted-foreground pr-3 w-1/2">Scenario</th>
+                    <th className="text-center py-2 font-semibold uppercase tracking-wider text-muted-foreground px-3">Tier 1 Runway</th>
+                    <th className="text-center py-2 font-semibold uppercase tracking-wider text-muted-foreground px-3">Full Capital Depth</th>
                   </tr>
                 </thead>
                 <tbody>
                   {[
-                    { 
-                      label: 'Tier 1 Runway', 
-                      vals: [
-                        fmtRunway(psrBase), 
-                        fmtRunway(psr15), 
-                        fmtRunway(psr30), 
-                        fmtRunway(psrRampDelay),
-                        ...(psrPartnerLoss !== null ? [fmtRunway(psrPartnerLoss)] : []),
-                        fmtRunway(psrNewChild)
-                      ] 
-                    },
-                    { 
-                      label: 'Full Capital Depth', 
-                      vals: [
-                        fmtRunway(sim.baseRunway), 
-                        fmtRunway(sim.runway15Down), 
-                        fmtRunway(sim.runway30Down), 
-                        fmtRunway(sim.runwayRampDelay),
-                        ...(sim.isDualIncome ? [fmtRunway(calcRunwayClient(sim.accessibleCapital, sim.tmib + partnerOff, sim.expectedRevenue, sim.rampDuration, sim.volatilityPercent))] : []),
-                        fmtRunway(calcRunwayClient(sim.accessibleCapital, sim.tmib + 1000, sim.expectedRevenue, sim.rampDuration, sim.volatilityPercent))
-                      ] 
-                    },
-                  ].map((row, ri) => (
-                    <tr key={row.label} className={`border-b border-border last:border-0 ${ri % 2 === 0 ? '' : 'bg-muted/10'}`}>
-                      <td className="py-3 text-muted-foreground font-medium pr-3">{row.label}</td>
-                      {row.vals.map((val, ci) => (
-                        <td key={ci} className="py-3 text-center font-semibold text-foreground">
-                          {val}
-                        </td>
-                      ))}
+                    { label: 'Base Case', sub: 'Target revenue, no shocks', t1: psrBase, full: sim.baseRunway, isBase: true },
+                    { label: 'Moderate (−15%)', sub: 'Revenue 15% below target', t1: psr15, full: sim.runway15Down },
+                    { label: 'Severe (−30%)', sub: 'Revenue 30% below target', t1: psr30, full: sim.runway30Down },
+                    { label: '+3mo Ramp Delay', sub: 'Ramp extends 3 additional months', t1: psrRampDelay, full: sim.runwayRampDelay },
+                    ...(psrPartnerLoss !== null ? [{ label: 'Partner Income Loss', sub: 'Partner income stops for 6 months', t1: psrPartnerLoss, full: calcRunwayClient(sim.accessibleCapital, sim.tmib + partnerOff, sim.expectedRevenue, sim.rampDuration, sim.volatilityPercent) }] : []),
+                    { label: 'New Child', sub: '+$1,000/mo household cost added', t1: psrNewChild, full: calcRunwayClient(sim.accessibleCapital, sim.tmib + 1000, sim.expectedRevenue, sim.rampDuration, sim.volatilityPercent) },
+                  ].map((row) => (
+                    <tr key={row.label} className={`border-b border-border last:border-0 ${'isBase' in row && row.isBase ? 'bg-muted/20' : ''}`}>
+                      <td className={`py-3 pr-3 ${'isBase' in row && row.isBase ? 'border-l-2 border-l-[#1e3a5f] pl-2' : ''}`}>
+                        <p className="font-semibold text-foreground">{row.label}</p>
+                        <p className="text-[10px] text-muted-foreground">{row.sub}</p>
+                      </td>
+                      <td className="py-3 text-center font-semibold text-foreground px-3">{fmtRunway(row.t1)}</td>
+                      <td className="py-3 text-center font-semibold text-foreground px-3">{fmtRunway(row.full)}</td>
                     </tr>
                   ))}
                 </tbody>
               </table>
+              <p className="text-[10px] text-muted-foreground mt-3 leading-relaxed">
+                <strong>Tier 2 Required</strong> when Full Capital Depth exceeds Tier 1 Runway — meaning retirement accounts or home equity must be accessed to sustain the transition beyond the Tier 1 window.
+              </p>
             </div>
           </SectionCard>
 
@@ -1370,25 +1459,35 @@ export default function Results() {
             </SectionHeader>
             <div className="px-6 py-5">
               <GrowthTrajectoryChart sim={sim} />
-              {/* Break-even stat cards */}
-              <div className="grid grid-cols-3 gap-3 mt-6" data-testid="growth-breakeven-cards">
-                {[
-                  { label: 'Conservative', color: '#64748b', be: growthBreakEven(projectRevenue(sim.expectedRevenue, sim.rampDuration, GROWTH_RATES.conservative), sim.tmib) },
-                  { label: 'Moderate',     color: '#1e293b', be: growthBreakEven(projectRevenue(sim.expectedRevenue, sim.rampDuration, GROWTH_RATES.moderate),     sim.tmib) },
-                  { label: 'Ambitious',    color: '#15803d', be: growthBreakEven(projectRevenue(sim.expectedRevenue, sim.rampDuration, GROWTH_RATES.ambitious),    sim.tmib) },
-                ].map(({ label, color, be }) => (
-                  <div key={label} className="rounded-lg border border-border bg-muted/30 px-4 py-3 relative overflow-hidden">
-                    <div className="absolute left-0 top-0 bottom-0 w-0.5" style={{ backgroundColor: color }} />
-                    <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground mb-1 pl-2">{label}</p>
-                    <p className="text-xl font-bold text-foreground pl-2" data-testid={`growth-breakeven-${label.toLowerCase()}`}>
-                      {be !== null ? `Month ${be}` : 'Not reached within 36 mo.'}
-                    </p>
+              {/* Full-width stacked trajectory cards */}
+              <div className="space-y-4 mt-6" data-testid="growth-breakeven-cards">
+                {growthCards.map(({ label, rateLabel, accentColor, bgClass, labelClass, be, bullets }) => (
+                  <div key={label} className={`rounded-lg border border-border ${bgClass} relative overflow-hidden`}>
+                    <div className="absolute left-0 top-0 bottom-0 w-1" style={{ backgroundColor: accentColor }} />
+                    <div className="pl-5 pr-5 pt-4 pb-4">
+                      <div className="flex items-baseline justify-between mb-3 flex-wrap gap-2">
+                        <div>
+                          <span className={`text-[11px] font-bold uppercase tracking-[0.16em] ${labelClass}`}>{label}</span>
+                          <span className="text-[10px] text-muted-foreground ml-2">{rateLabel}</span>
+                        </div>
+                        <p className="text-sm font-bold text-foreground" data-testid={`growth-breakeven-${label.toLowerCase()}`}>
+                          {be !== null ? `Break-even: Month ${be}` : 'Break-even: Not within 36 months'}
+                        </p>
+                      </div>
+                      <ul className="space-y-1.5">
+                        {bullets.map((b, i) => (
+                          <li key={i} className="flex gap-2.5 text-sm text-muted-foreground leading-relaxed">
+                            <span className="shrink-0 mt-0.5" style={{ color: accentColor }}>&#8226;</span>
+                            <span>{b}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
                   </div>
                 ))}
               </div>
-              {/* Narrative framing */}
-              <p className="text-xs text-muted-foreground leading-relaxed mt-5 max-w-3xl">
-                These projections illustrate how revenue could evolve after launch under three bounded growth trajectories. The break-even threshold represents the level of revenue required to replace the income and obligations currently supported by employment. Growth assumptions are intentionally constrained to avoid unrealistic optimism and should be interpreted as illustrative scenarios rather than predictions.
+              <p className="text-xs text-muted-foreground/70 italic mt-4">
+                Growth assumptions are bounded and intentionally conservative — interpret as structural scenarios, not predictions.
               </p>
             </div>
           </SectionCard>
@@ -1478,20 +1577,32 @@ export default function Results() {
                 </ul>
               </div>
 
-              {/* Revenue growth outlook takeaway */}
+              {/* Revenue growth outlook takeaway — bullet form */}
               <div className="pt-4 border-t border-border">
                 <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground mb-3">Revenue growth outlook</p>
-                <p className="text-sm text-foreground leading-relaxed">
-                  {(() => {
-                    const modBE = growthBreakEven(projectRevenue(sim.expectedRevenue, sim.rampDuration, GROWTH_RATES.moderate), sim.tmib);
-                    const consBE = growthBreakEven(projectRevenue(sim.expectedRevenue, sim.rampDuration, GROWTH_RATES.conservative), sim.tmib);
-                    return modBE
-                      ? `Under moderate growth assumptions, projected revenue would reach break-even around Month ${modBE}, after which the transition begins rebuilding financial stability.`
-                      : consBE
-                      ? `Under conservative growth assumptions, revenue break-even is projected around Month ${consBE}. Moderate or stronger execution would accelerate this timeline.`
-                      : 'At projected growth rates, the break-even threshold is not reached within the 36-month model window. Reducing fixed obligations or strengthening revenue would close this gap.';
-                  })()}
-                </p>
+                <ul className="space-y-2">
+                  {((): string[] => {
+                    return [
+                      moderateBEm
+                        ? `Under moderate growth, revenue reaches break-even at Month ${moderateBEm} — the point where the transition becomes self-funding and capital drawdown stops.`
+                        : conservBEm
+                        ? `Revenue reaches break-even at Month ${conservBEm} under conservative assumptions. Faster execution would accelerate this meaningfully.`
+                        : `Revenue does not reach the break-even threshold of ${fmt(sim.tmib)}/month within 36 months at any modeled trajectory.`,
+                      ambitiousBEm !== null && ambitiousBEm < (moderateBEm ?? 999)
+                        ? `The ambitious trajectory reaches break-even ${(moderateBEm ?? 999) - ambitiousBEm} months ahead of the moderate pace — at Month ${ambitiousBEm}.`
+                        : `The gap between conservative and moderate break-even timelines reflects the compounding effect of early client acquisition on the financial position.`,
+                      `At Month 36, the moderate trajectory projects ${fmt(Math.round(moderateRevData[35]))}/month — ${Math.round((moderateRevData[35] / sim.tmib) * 100)}% of total monthly outflow.`,
+                      conservBEm === null
+                        ? `Even at conservative growth, the break-even target is not reached within 36 months. Reducing fixed outflow or entering with existing clients would close this gap.`
+                        : `The conservative path confirms structural viability at the slowest modeled growth rate — break-even at Month ${conservBEm}.`,
+                    ];
+                  })().map((b, i) => (
+                    <li key={i} className="flex gap-2.5 text-sm text-muted-foreground leading-relaxed">
+                      <span className="text-foreground/40 shrink-0 mt-0.5">&#8226;</span>
+                      <span>{b}</span>
+                    </li>
+                  ))}
+                </ul>
               </div>
 
             </div>
