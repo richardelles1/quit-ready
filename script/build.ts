@@ -23,7 +23,9 @@ const allowlist = [
   "openai",
   "passport",
   "passport-local",
+  "pdfkit",
   "pg",
+  "resend",
   "stripe",
   "uuid",
   "ws",
@@ -46,18 +48,29 @@ async function buildAll() {
   ];
   const externals = allDeps.filter((dep) => !allowlist.includes(dep));
 
-  await esbuild({
-    entryPoints: ["server/index.ts"],
-    platform: "node",
+  const sharedConfig = {
+    platform: "node" as const,
     bundle: true,
-    format: "cjs",
-    outfile: "dist/index.cjs",
+    format: "cjs" as const,
     define: {
       "process.env.NODE_ENV": '"production"',
     },
     minify: true,
     external: externals,
-    logLevel: "info",
+    logLevel: "info" as const,
+  };
+
+  await esbuild({
+    ...sharedConfig,
+    entryPoints: ["server/index.ts"],
+    outfile: "dist/index.cjs",
+  });
+
+  console.log("building handler for Vercel...");
+  await esbuild({
+    ...sharedConfig,
+    entryPoints: ["server/handler.ts"],
+    outfile: "dist/handler.cjs",
   });
 }
 

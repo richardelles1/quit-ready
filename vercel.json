@@ -1,6 +1,11 @@
 {
   "buildCommand": "npm run build",
   "outputDirectory": "dist/public",
+  "functions": {
+    "api/index.ts": {
+      "includeFiles": "dist/handler.cjs"
+    }
+  },
   "rewrites": [
     { "source": "/api/:path*", "destination": "/api/index" },
     { "source": "/(.*)", "destination": "/index.html" }
