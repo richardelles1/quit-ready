@@ -94,7 +94,7 @@ export interface SimulationResult {
 export function useCreateSimulation() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async (data: SimulationFormValues): Promise<SimulationResult> => {
+    mutationFn: async (data: SimulationFormValues & { rerunSession?: string }): Promise<SimulationResult> => {
       const res = await fetch('/api/simulations', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },

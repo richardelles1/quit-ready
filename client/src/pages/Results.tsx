@@ -618,138 +618,161 @@ export default function Results() {
 
     return (
       <Layout>
-        <div className="flex-1 bg-muted/20 py-16">
+        <div className="flex-1 bg-muted/20 py-10">
           <div className="max-w-2xl mx-auto px-4">
 
-            {/* Logo + headline */}
-            <div className="text-center mb-10">
-              <img src={logoPath} alt="QuitReady" className="h-8 w-auto mx-auto mb-6" />
-              <h1 className="text-3xl font-bold font-serif text-foreground mb-3">Your Analysis Is Ready</h1>
-              <p className="text-sm text-muted-foreground max-w-md mx-auto leading-relaxed">
-                Two outputs from your structural position. Unlock to view the full 17-page report and download your branded PDF.
+            {/* Header */}
+            <div className="text-center mb-7">
+              <div className="inline-flex items-center gap-1.5 bg-green-50 border border-green-200 text-green-700 text-[11px] font-semibold uppercase tracking-widest px-3 py-1 rounded-full mb-4">
+                <CheckCircle2 className="w-3 h-3" />
+                Analysis Complete
+              </div>
+              <h1 className="text-3xl font-bold font-serif text-foreground mb-2">Your Results Are Ready</h1>
+              <p className="text-sm text-muted-foreground max-w-sm mx-auto leading-relaxed">
+                Two live outputs from your numbers are shown below. Unlock the full 17-page report to see everything.
               </p>
             </div>
 
             {/* Two teaser stat cards */}
-            <div className="grid grid-cols-2 gap-4 mb-8" data-testid="paywall-teasers">
-              <div className="border border-border rounded-lg bg-white p-5 text-center shadow-sm" data-testid="teaser-runway">
-                <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground mb-2">Tier 1 Runway</p>
-                <p className="text-2xl font-bold font-serif text-foreground">{teaserRunway}</p>
-                <p className="text-xs text-muted-foreground mt-1.5">Base case, Tier 1 assets only</p>
+            <div className="grid grid-cols-2 gap-4 mb-5" data-testid="paywall-teasers">
+              <div className="border border-border rounded-xl bg-white shadow-sm overflow-hidden" data-testid="teaser-runway">
+                <div className="bg-slate-50 border-b border-border px-5 pt-4 pb-3">
+                  <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">Tier 1 Runway</p>
+                  <p className="text-3xl font-bold font-serif text-foreground mt-1">{teaserRunway}</p>
+                </div>
+                <div className="px-5 py-3">
+                  <p className="text-xs text-muted-foreground leading-snug">Base case, liquid assets only</p>
+                </div>
               </div>
-              <div className="border border-border rounded-lg bg-white p-5 text-center shadow-sm" data-testid="teaser-pressure">
-                <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground mb-2">Earliest Pressure Point</p>
-                <p className="text-2xl font-bold font-serif text-foreground">{teaserPressure}</p>
-                <p className="text-xs text-muted-foreground mt-1.5">First month needing non-liquid reserves if revenue stays flat</p>
+              <div className="border border-border rounded-xl bg-white shadow-sm overflow-hidden" data-testid="teaser-pressure">
+                <div className="bg-slate-50 border-b border-border px-5 pt-4 pb-3">
+                  <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">Earliest Pressure Point</p>
+                  <p className="text-3xl font-bold font-serif text-foreground mt-1">{teaserPressure}</p>
+                </div>
+                <div className="px-5 py-3">
+                  <p className="text-xs text-muted-foreground leading-snug">First month needing non-liquid reserves if revenue stays flat</p>
+                </div>
               </div>
             </div>
 
             {/* Blurred preview cards */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
-              <SectionCard className="h-48 relative overflow-hidden">
-                <SectionHeader n={4}>Stress Scenario Modeling</SectionHeader>
-                <div className="p-4 blur-[4px] opacity-40 select-none">
-                   <div className="space-y-3">
-                     <div className="h-2 bg-muted rounded w-full" />
-                     <div className="h-2 bg-muted rounded w-5/6" />
-                     <div className="h-2 bg-muted rounded w-4/6" />
-                   </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+              <div className="border border-border rounded-xl bg-white shadow-sm h-44 relative overflow-hidden">
+                <div className="px-5 pt-4 pb-2">
+                  <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground mb-1">Section 4</p>
+                  <p className="text-sm font-semibold text-foreground">Stress Scenario Modeling</p>
                 </div>
-                <div className="absolute inset-0 flex items-center justify-center bg-white/20">
-                  <div className="bg-white/90 px-3 py-1 rounded-full border border-border flex items-center gap-1.5 shadow-sm">
-                    <Lock className="w-3 h-3 text-muted-foreground" />
-                    <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Locked · Full Report</span>
+                <div className="px-5 blur-[5px] opacity-30 select-none pointer-events-none">
+                  <div className="space-y-2.5">
+                    <div className="h-2 bg-slate-300 rounded w-full" />
+                    <div className="h-2 bg-slate-300 rounded w-4/5" />
+                    <div className="h-2 bg-slate-300 rounded w-3/5" />
+                    <div className="h-2 bg-slate-300 rounded w-4/5" />
                   </div>
                 </div>
-              </SectionCard>
-              <SectionCard className="h-48 relative overflow-hidden">
-                <SectionHeader n={5}>Revenue vs. Savings Curve</SectionHeader>
-                <div className="p-4 blur-[4px] opacity-40 select-none">
-                   <div className="w-full h-24 bg-muted/20 rounded flex items-end px-4 pb-2">
-                      <div className="w-1/4 h-3/4 bg-muted/40 rounded-t mr-1" />
-                      <div className="w-1/4 h-1/2 bg-muted/40 rounded-t mr-1" />
-                      <div className="w-1/4 h-2/3 bg-muted/40 rounded-t mr-1" />
-                      <div className="w-1/4 h-1/3 bg-muted/40 rounded-t" />
-                   </div>
-                </div>
-                <div className="absolute inset-0 flex items-center justify-center bg-white/20">
-                  <div className="bg-white/90 px-3 py-1 rounded-full border border-border flex items-center gap-1.5 shadow-sm">
-                    <Lock className="w-3 h-3 text-muted-foreground" />
-                    <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Locked · Full Report</span>
+                <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-b from-white/10 to-white/60">
+                  <div className="bg-white border border-border shadow-md px-4 py-2 rounded-lg flex items-center gap-2">
+                    <Lock className="w-3.5 h-3.5 text-foreground/60" />
+                    <span className="text-xs font-semibold text-foreground/70">Full Report Only</span>
                   </div>
                 </div>
-              </SectionCard>
+              </div>
+              <div className="border border-border rounded-xl bg-white shadow-sm h-44 relative overflow-hidden">
+                <div className="px-5 pt-4 pb-2">
+                  <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground mb-1">Section 5</p>
+                  <p className="text-sm font-semibold text-foreground">Revenue vs. Savings Curve</p>
+                </div>
+                <div className="px-5 blur-[5px] opacity-30 select-none pointer-events-none">
+                  <div className="w-full h-20 flex items-end gap-1">
+                    <div className="flex-1 h-4/5 bg-slate-300 rounded-t" />
+                    <div className="flex-1 h-3/5 bg-slate-300 rounded-t" />
+                    <div className="flex-1 h-2/3 bg-slate-300 rounded-t" />
+                    <div className="flex-1 h-2/5 bg-slate-300 rounded-t" />
+                    <div className="flex-1 h-1/2 bg-slate-300 rounded-t" />
+                  </div>
+                </div>
+                <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-b from-white/10 to-white/60">
+                  <div className="bg-white border border-border shadow-md px-4 py-2 rounded-lg flex items-center gap-2">
+                    <Lock className="w-3.5 h-3.5 text-foreground/60" />
+                    <span className="text-xs font-semibold text-foreground/70">Full Report Only</span>
+                  </div>
+                </div>
+              </div>
             </div>
 
             {/* Paywall card */}
-            <div className="border border-border rounded-xl bg-white shadow-sm p-8 max-w-sm mx-auto text-center" data-testid="paywall-card">
-              <div className="mb-6">
-                <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground mb-1">What's inside</p>
-                <ul className="text-left grid grid-cols-1 gap-y-1.5">
+            <div className="border border-border rounded-xl bg-white shadow-sm overflow-hidden" data-testid="paywall-card">
+              {/* Top band */}
+              <div className="bg-slate-900 px-7 py-5 text-center">
+                <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400 mb-1">Unlock Full Report</p>
+                <p className="text-4xl font-bold text-white">$19.99</p>
+                <p className="text-xs text-slate-400 mt-1">17-page PDF · Instant download · One-time charge</p>
+              </div>
+
+              <div className="px-7 py-6">
+                {/* Feature grid */}
+                <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground mb-3">What's inside</p>
+                <ul className="grid grid-cols-2 gap-x-4 gap-y-2 mb-6">
                   {[
                     'Executive Snapshot',
-                    'Structural Breakpoint Score',
-                    'Savings Runway Summary',
-                    'Stress Scenario Modeling',
                     'Revenue Growth Trajectory',
+                    'Structural Breakpoint Score',
                     'Decision Interpretation',
+                    'Savings Runway Summary',
                     'Structural Summary',
+                    'Stress Scenario Modeling',
                     '17-page Personalized PDF',
                   ].map(item => (
-                    <li key={item} className="flex items-start gap-2 text-[13px] text-foreground/80">
+                    <li key={item} className="flex items-start gap-2 text-[12.5px] text-foreground/80">
                       <CheckCircle2 className="w-3.5 h-3.5 text-green-600 shrink-0 mt-0.5" />
                       <span>{item}</span>
                     </li>
                   ))}
                 </ul>
+
+                {/* Email input */}
+                <div className="mb-4">
+                  <label htmlFor="purchaser-email" className="block text-xs font-medium text-foreground mb-1.5">
+                    Email address <span className="text-muted-foreground font-normal">(your report is delivered here)</span>
+                  </label>
+                  <Input
+                    id="purchaser-email"
+                    type="email"
+                    placeholder="you@example.com"
+                    value={purchaserEmail}
+                    onChange={(e) => {
+                      setPurchaserEmail(e.target.value);
+                      if (emailError) setEmailError('');
+                    }}
+                    onKeyDown={(e) => { if (e.key === 'Enter') handleUnlock(); }}
+                    className={emailError ? 'border-destructive' : ''}
+                    data-testid="input-purchaser-email"
+                    autoComplete="email"
+                  />
+                  {emailError && (
+                    <p className="text-[11px] text-destructive mt-1">{emailError}</p>
+                  )}
+                </div>
+
+                <Button
+                  onClick={handleUnlock}
+                  disabled={createCheckoutSession.isPending}
+                  className="w-full text-base py-6 mb-3"
+                  size="lg"
+                  data-testid="button-unlock-report"
+                >
+                  {createCheckoutSession.isPending ? 'Redirecting to checkout…' : 'Unlock Full Report — $19.99'}
+                </Button>
+
+                <p className="text-center text-[11px] text-muted-foreground/60 leading-relaxed mb-1.5">
+                  One-time payment. No subscription. No SSN or bank logins required.
+                </p>
+                <p className="text-center text-[11px] text-muted-foreground/50 leading-relaxed" data-testid="text-paywall-terms">
+                  By purchasing, you accept our{" "}
+                  <a href="/terms" target="_blank" rel="noopener noreferrer" className="underline underline-offset-2 hover:text-muted-foreground transition-colors">Terms of Use</a>.
+                  {" "}This is a mathematical simulation, not financial advice.
+                </p>
               </div>
-
-              <div className="pt-6 border-t border-border mb-6">
-                <p className="text-4xl font-bold text-foreground mb-1">$19.99</p>
-                <p className="text-xs font-medium text-muted-foreground">17-page PDF · Instant download · One-time</p>
-              </div>
-
-              <div className="mb-4 text-left">
-                <label htmlFor="purchaser-email" className="block text-xs font-medium text-foreground mb-1.5">
-                  Email address <span className="text-muted-foreground font-normal">(we'll send your report here)</span>
-                </label>
-                <Input
-                  id="purchaser-email"
-                  type="email"
-                  placeholder="you@example.com"
-                  value={purchaserEmail}
-                  onChange={(e) => {
-                    setPurchaserEmail(e.target.value);
-                    if (emailError) setEmailError('');
-                  }}
-                  onKeyDown={(e) => { if (e.key === 'Enter') handleUnlock(); }}
-                  className={emailError ? 'border-destructive' : ''}
-                  data-testid="input-purchaser-email"
-                  autoComplete="email"
-                />
-                {emailError && (
-                  <p className="text-[11px] text-destructive mt-1">{emailError}</p>
-                )}
-              </div>
-
-              <Button
-                onClick={handleUnlock}
-                disabled={createCheckoutSession.isPending}
-                className="w-full text-base py-6 mb-4"
-                size="lg"
-                data-testid="button-unlock-report"
-              >
-                {createCheckoutSession.isPending ? 'Redirecting to checkout…' : 'Unlock Full Report — $19.99'}
-              </Button>
-
-              <p className="text-[11px] text-muted-foreground/60 leading-relaxed mb-2">
-                One-time payment. No subscription. No SSN or bank logins required.
-              </p>
-              <p className="text-[11px] text-muted-foreground/50 leading-relaxed" data-testid="text-paywall-terms">
-                By purchasing, you accept our{" "}
-                <a href="/terms" target="_blank" rel="noopener noreferrer" className="underline underline-offset-2 hover:text-muted-foreground transition-colors">Terms of Use</a>.
-                {" "}This report is a mathematical simulation, not financial advice.
-              </p>
             </div>
 
           </div>

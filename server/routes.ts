@@ -8,6 +8,7 @@ import { z } from "zod";
 import PDFDocument from "pdfkit";
 import type { Simulation } from "@shared/schema";
 import { stripe } from "./services/stripeClient";
+import { sendReportEmail } from "./services/emailService";
 
 // ─── Palette ───────────────────────────────────────────────────────────────
 const C = { navy:'#1e293b', coal:'#334155', muted:'#64748b', mid:'#f1f5f9',
@@ -477,7 +478,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
           },
           quantity: 1,
         }],
-        success_url: `${origin}/app?rerun=success`,
+        success_url: `${origin}/app?rerun_session={CHECKOUT_SESSION_ID}`,
         cancel_url: `${origin}/app`,
         customer_email: sim.purchaserEmail || undefined,
         metadata: { rerunFromSimulationId: String(sim.id), rerunToken: token },
@@ -539,6 +540,49 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
         breakpointMonth: computed.breakpointMonth,
         breakpointScenario: computed.breakpointScenario,
       });
+
+      // ── Rerun: verify $4.99 session and mark paid immediately ──────────────
+      const rerunSession = req.body.rerunSession as string | undefined;
+      if (rerunSession) {
+        try {
+          const stripeSession = await stripe.checkout.sessions.retrieve(rerunSession);
+          const isRerun = stripeSession.metadata?.rerunFromSimulationId != null;
+          const isPaid = stripeSession.payment_status === 'paid';
+          if (isPaid && isRerun) {
+            const paymentIntentId = typeof stripeSession.payment_intent === 'string'
+              ? stripeSession.payment_intent
+              : stripeSession.payment_intent?.id ?? null;
+            await storage.markSimulationPaid(
+              simulation.id,
+              stripeSession.id,
+              paymentIntentId,
+              stripeSession.customer_details?.email ?? undefined,
+              stripeSession.customer_details?.name ?? undefined,
+            );
+            // Fire-and-forget: generate rerun token and send report email
+            const origin = `https://${req.headers.host}`;
+            (async () => {
+              try {
+                const crypto = await import('crypto');
+                const newRerunToken = crypto.randomBytes(24).toString('hex');
+                const paidSim = await storage.getSimulation(simulation.id);
+                if (paidSim) {
+                  const pdfRes = await fetch(`${origin}/api/simulations/${paidSim.id}/pdf`);
+                  const pdfBuffer = pdfRes.ok ? Buffer.from(await pdfRes.arrayBuffer()) : null;
+                  await sendReportEmail(paidSim, pdfBuffer, newRerunToken, origin);
+                }
+              } catch (e: any) {
+                console.error('Rerun email error:', e.message);
+              }
+            })();
+            return res.status(201).json({ ...simulation, paid: true });
+          }
+        } catch (e: any) {
+          console.error('Rerun session verification error:', e.message);
+          // Fall through — simulation created but not marked paid; user will see paywall
+        }
+      }
+
       res.status(201).json(simulation);
     } catch (err) {
       if (err instanceof z.ZodError) {

@@ -183,6 +183,7 @@ export default function Simulator() {
 
 function SimulatorInner() {
   const [, setLocation] = useLocation();
+  const rerunSession = new URLSearchParams(window.location.search).get('rerun_session') ?? undefined;
   const [screenIndex, setScreenIndex] = useState(0);
   const [businessChoice, setBusinessChoice] = useState<BusinessChoice | null>(null);
   const [showHealthcareOverride, setShowHealthcareOverride] = useState(false);
@@ -297,6 +298,7 @@ function SimulatorInner() {
       ...values,
       currentSalary: values.currentSalary ?? 0,
       breakevenMonths: (values.rampDuration || 0) + 3,
+      rerunSession,
     }, {
       onSuccess: (result) => setLocation(`/results/${result.accessToken || result.id}`),
       onError: (err) => toast({ title: "Simulation failed", description: err.message, variant: "destructive" }),
