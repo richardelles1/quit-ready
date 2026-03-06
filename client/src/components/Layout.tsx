@@ -154,8 +154,8 @@ export default function Layout({ children }: { children: ReactNode }) {
                 {[
                   { href: "/blog", label: "Blog" },
                   { href: "/blog/can-i-afford-to-quit-my-job", label: "Can I Afford to Quit?" },
-                  { href: "/blog/financial-runway-calculator", label: "Financial Runway" },
-                  { href: "/blog/how-much-savings-to-quit-your-job", label: "How Much Savings?" },
+                  { href: "/blog/when-to-quit-your-day-job-for-entrepreneurship", label: "When to Quit Your Job" },
+                  { href: "/blog/quit-job-become-creator-financial-guide", label: "Creator Financial Guide" },
                 ].map(({ href, label }) => (
                   <li key={href}>
                     <Link href={href}>

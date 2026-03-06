@@ -41,7 +41,7 @@ export default function Home() {
                 If you quit your job,<br />what breaks first — and when?
               </h1>
               <p className="text-lg text-muted-foreground mb-10 leading-relaxed max-w-2xl">
-                Most people quit on optimism. QuitReady runs your actual numbers — healthcare costs, self-employment tax, savings depletion, revenue ramp — through a conservative stress model. You see the exact month things get hard, before you're in it.
+                Most people quit on optimism. QuitReady runs your actual numbers through a conservative stress model: healthcare costs, self-employment tax, savings depletion, and the revenue ramp. You see the exact month things get hard, before you're in it.
               </p>
               <div className="flex flex-col sm:flex-row gap-4 items-start flex-wrap">
                 <Link href="/app">
@@ -71,7 +71,7 @@ export default function Home() {
                 </CardHeader>
                 <CardContent>
                   <p className="text-sm text-muted-foreground leading-relaxed">
-                    Most people underestimate this one. Losing employer-sponsored coverage and transitioning to individual plans can cost <span className="text-foreground font-medium">$800–$1,500/month</span> depending on your state and family size — a number that changes your math entirely.
+                    Most people underestimate this one. Losing employer-sponsored coverage and transitioning to individual plans can cost <span className="text-foreground font-medium">$800–$1,500/month</span> depending on your state and family size. That single line item can rewrite your exit math.
                   </p>
                 </CardContent>
               </Card>
@@ -275,7 +275,7 @@ export default function Home() {
               QuitReady. Start Steady.
             </h2>
             <p className="text-muted mb-10 text-lg max-w-2xl mx-auto text-background/60">
-              Before you give notice, know your number. QuitReady stress-tests your actual finances against the three things that derail most exits — healthcare, tax, and revenue ramp — and tells you exactly where your structure holds.
+              Before you give notice, know your number. QuitReady stress-tests your actual finances against the three things that derail most exits: healthcare costs, self-employment tax, and the revenue ramp. You'll see exactly where your structure holds and where it doesn't.
             </p>
             <Link href="/app">
               <Button variant="outline" size="lg" className="gap-2 bg-transparent border-background/30 text-background h-12 px-8 hover:bg-background/10 no-default-hover-elevate" data-testid="button-generate-report-bottom">
