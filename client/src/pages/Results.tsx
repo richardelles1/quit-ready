@@ -805,9 +805,9 @@ export default function Results() {
   const psrRampDelay = calcPrimaryRunway(sim, 1.00, sim.rampDuration + 3);
 
   // Status classification
-  const psrStatusColor = psr30 < 6 ? 'text-red-700' : psr30 < 12 ? 'text-amber-700' : 'text-green-700';
-  const psrStatusBg    = psr30 < 6 ? 'bg-red-50 border-red-200' : psr30 < 12 ? 'bg-amber-50 border-amber-200' : 'bg-green-50 border-green-200';
-  const psrStatusLabel = psr30 < 6 ? 'Critical' : psr30 < 12 ? 'Caution' : 'Adequate';
+  const psrStatusColor = psrBase < 6 ? 'text-red-700' : psrBase < 12 ? 'text-amber-700' : 'text-green-700';
+  const psrStatusBg    = psrBase < 6 ? 'bg-red-50 border-red-200' : psrBase < 12 ? 'bg-amber-50 border-amber-200' : 'bg-green-50 border-green-200';
+  const psrStatusLabel = psrBase < 6 ? 'Critical' : psrBase < 12 ? 'Caution' : 'Adequate';
 
   // Runway chart scale
   const runways = [sim.baseRunway, sim.runway15Down, sim.runway30Down, sim.runwayRampDelay].filter(r => r < 999);
@@ -1074,7 +1074,7 @@ export default function Results() {
             <div className={`mx-7 my-5 px-5 py-4 rounded-lg border-2 ${psrStatusBg}`}>
               <div className="flex items-start justify-between gap-4 mb-2">
                 <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">
-                  Tier 1 Runway, Severe Stress (-30% Revenue)
+                  Tier 1 Runway, Base Case
                 </p>
                 <div className="shrink-0 text-right">
                   <p className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground mb-1.5">Typical ranges</p>
@@ -1084,12 +1084,12 @@ export default function Results() {
                 </div>
               </div>
               <p className="text-2xl font-bold font-serif text-foreground" data-testid="text-ll-status">
-                {fmtRunway(psr30)}
+                {fmtRunway(psrBase)}
               </p>
               <p className="text-xs text-muted-foreground mt-0.5">
                 Tier 1 Liquid Capital: {fmt(pas)} (Cash + Brokerage)
               </p>
-              {psr30 >= 999 && (
+              {psrBase >= 999 && (
                 <p className="text-xs text-muted-foreground leading-relaxed mt-3 pt-3 border-t border-border/40">
                   Because revenue reaches the modeled target, savings stabilize early in the transition. Capital is not the limiting factor in this scenario.
                 </p>

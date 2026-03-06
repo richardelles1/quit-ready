@@ -13,7 +13,7 @@ import { sendReportEmail } from "./services/emailService";
 // ─── Palette ───────────────────────────────────────────────────────────────
 const C = { navy:'#1e293b', coal:'#334155', muted:'#64748b', mid:'#f1f5f9',
   light:'#f8fafc', border:'#e2e8f0', white:'#ffffff',
-  green:'#15803d', amber:'#b45309', red:'#dc2626', blue:'#1d4ed8' };
+  green:'#15803d', amber:'#b45309', red:'#991b1b', blue:'#1d4ed8' };
 const L = 52, W = 508, R = 560, TOTAL = 17;
 
 // ─── Formatting utilities ──────────────────────────────────────────────────
@@ -559,22 +559,29 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
               stripeSession.customer_details?.email ?? undefined,
               stripeSession.customer_details?.name ?? undefined,
             );
-            // Fire-and-forget: generate rerun token and send report email
+            // Generate rerun token, store it, then send report email
             const origin = `https://${req.headers.host}`;
-            (async () => {
-              try {
-                const crypto = await import('crypto');
-                const newRerunToken = crypto.randomBytes(24).toString('hex');
-                const paidSim = await storage.getSimulation(simulation.id);
-                if (paidSim) {
-                  const pdfRes = await fetch(`${origin}/api/simulations/${paidSim.id}/pdf`);
-                  const pdfBuffer = pdfRes.ok ? Buffer.from(await pdfRes.arrayBuffer()) : null;
-                  await sendReportEmail(paidSim, pdfBuffer, newRerunToken, origin);
-                }
-              } catch (e: any) {
-                console.error('Rerun email error:', e.message);
+            try {
+              const cryptoMod = await import('crypto');
+              const newRerunToken = cryptoMod.randomBytes(24).toString('hex');
+              // Re-fetch the now-paid simulation and store the rerun token
+              const paidSim = await storage.getSimulation(simulation.id);
+              if (paidSim) {
+                await storage.markSimulationPaid(
+                  paidSim.id,
+                  paidSim.stripeSessionId!,
+                  paidSim.stripePaymentIntentId,
+                  paidSim.purchaserEmail ?? undefined,
+                  paidSim.purchaserName ?? undefined,
+                  newRerunToken,
+                );
+                const pdfRes = await fetch(`${origin}/api/simulations/${paidSim.id}/pdf`);
+                const pdfBuffer = pdfRes.ok ? Buffer.from(await pdfRes.arrayBuffer()) : null;
+                await sendReportEmail(paidSim, pdfBuffer, newRerunToken, origin);
               }
-            })();
+            } catch (e: any) {
+              console.error('Rerun email error:', e.message);
+            }
             return res.status(201).json({ ...simulation, paid: true });
           }
         } catch (e: any) {

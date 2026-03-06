@@ -17,10 +17,32 @@ function bandLabel(score: number) {
   return "Fragile";
 }
 
+function tier1RunwayMonths(sim: Simulation): number {
+  if (sim.tmib <= 0) return 999;
+  let cap = sim.cash + Math.round(sim.brokerage * 0.80);
+  const vol = 1 - sim.volatilityPercent / 100;
+  for (let m = 1; m <= 360; m++) {
+    const rf = sim.rampDuration > 0 && m <= sim.rampDuration ? 0.50 * (m / sim.rampDuration) : 1.0;
+    cap -= (sim.tmib - sim.expectedRevenue * rf * vol);
+    if (cap <= 0) return m;
+  }
+  return 999;
+}
+
+function fmtRunwayEmail(months: number): string {
+  if (months >= 999) return "30+ yrs";
+  if (months < 1) return "< 1 mo";
+  const yrs = Math.floor(months / 12);
+  const mo  = months % 12;
+  if (yrs === 0) return `${mo} mo`;
+  if (mo === 0)  return `${yrs} yr`;
+  return `${yrs} yr ${mo} mo`;
+}
+
 function htmlEmail(sim: Simulation, reportUrl: string, rerunUrl: string): string {
   const score = sim.structuralBreakpointScore;
   const band = bandLabel(score);
-  const runwayYears = sim.baseRunway > 0 ? (sim.baseRunway / 12).toFixed(1) : "N/A";
+  const t1Runway = fmtRunwayEmail(tier1RunwayMonths(sim));
 
   return `<!DOCTYPE html>
 <html lang="en">
@@ -57,15 +79,15 @@ function htmlEmail(sim: Simulation, reportUrl: string, rerunUrl: string): string
                     <table cellpadding="0" cellspacing="0">
                       <tr>
                         <td style="padding:4px 10px;background:#334155;border-radius:6px;text-align:center;">
-                          <p style="margin:0;color:#94a3b8;font-size:10px;font-weight:600;letter-spacing:1px;text-transform:uppercase;">Base Runway</p>
-                          <p style="margin:2px 0 0;color:#f8fafc;font-size:18px;font-weight:700;">${runwayYears} yrs</p>
+                          <p style="margin:0;color:#94a3b8;font-size:10px;font-weight:600;letter-spacing:1px;text-transform:uppercase;">Tier 1 Runway</p>
+                          <p style="margin:2px 0 0;color:#f8fafc;font-size:18px;font-weight:700;">${t1Runway}</p>
                         </td>
                       </tr>
                       <tr><td style="padding-top:8px;">
                         <table cellpadding="0" cellspacing="0">
                           <tr>
                             <td style="padding:4px 10px;background:#334155;border-radius:6px;text-align:center;">
-                              <p style="margin:0;color:#94a3b8;font-size:10px;font-weight:600;letter-spacing:1px;text-transform:uppercase;">Monthly Burn</p>
+                              <p style="margin:0;color:#94a3b8;font-size:10px;font-weight:600;letter-spacing:1px;text-transform:uppercase;">Net Monthly Gap</p>
                               <p style="margin:2px 0 0;color:#f8fafc;font-size:18px;font-weight:700;">${formatCurrency(sim.tmib)}</p>
                             </td>
                           </tr>
