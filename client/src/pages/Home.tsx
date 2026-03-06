@@ -41,25 +41,18 @@ export default function Home() {
                 If you quit your job,<br />what breaks first — and when?
               </h1>
               <p className="text-lg text-muted-foreground mb-10 leading-relaxed max-w-2xl">
-                QuitReady is a conservative, deterministic financial stress engine for professionals modeling an employment exit. It does not measure your potential. It measures your runway.
+                Most people quit on optimism. QuitReady runs your actual numbers — healthcare costs, self-employment tax, savings depletion, revenue ramp — through a conservative stress model. You see the exact month things get hard, before you're in it.
               </p>
-              <div className="flex flex-col gap-6 items-start">
-                <div className="flex flex-col sm:flex-row gap-4 items-start flex-wrap">
-                  <Link href="/app">
-                    <Button size="lg" className="gap-2 group h-11" data-testid="button-generate-report-hero">
-                      Generate Your Report
-                      <ArrowRight className="w-4 h-4 group-hover:translate-x-0.5 transition-transform" />
-                    </Button>
-                  </Link>
-                  <div className="flex items-center gap-2 text-sm text-muted-foreground border border-border rounded-md px-4 py-2 bg-background h-11">
-                    <Clock className="w-4 h-4 text-muted-foreground/60" />
-                    Approx. 5 minutes
-                  </div>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Badge variant="secondary" className="bg-muted text-muted-foreground font-medium px-2 py-0.5 rounded-sm">
-                    $19.99 · One-time
-                  </Badge>
+              <div className="flex flex-col sm:flex-row gap-4 items-start flex-wrap">
+                <Link href="/app">
+                  <Button size="lg" className="gap-2 group h-11" data-testid="button-generate-report-hero">
+                    Run My Analysis
+                    <ArrowRight className="w-4 h-4 group-hover:translate-x-0.5 transition-transform" />
+                  </Button>
+                </Link>
+                <div className="flex items-center gap-2 text-sm text-muted-foreground border border-border rounded-md px-4 py-2 bg-background h-11">
+                  <Clock className="w-4 h-4 text-muted-foreground/60" />
+                  Approx. 5 minutes
                 </div>
               </div>
             </div>
@@ -69,7 +62,7 @@ export default function Home() {
         {/* Problem Section */}
         <section className="py-24 bg-background border-b border-border">
           <div className="max-w-5xl mx-auto px-6 lg:px-8">
-            <h2 className="text-2xl font-bold font-serif text-foreground mb-12">The Structural Challenges</h2>
+            <h2 className="text-2xl font-bold font-serif text-foreground mb-12">Three things that surprise people after they quit</h2>
             <div className="grid md:grid-cols-3 gap-8">
               <Card className="border-border bg-card hover-elevate transition-all duration-200">
                 <CardHeader className="pb-3">
@@ -78,7 +71,7 @@ export default function Home() {
                 </CardHeader>
                 <CardContent>
                   <p className="text-sm text-muted-foreground leading-relaxed">
-                    Losing employer-sponsored coverage is often the single biggest shock to a household budget. Transitioning to individual plans can cost <span className="text-foreground font-medium">$800–$1,500/month</span> depending on your state and family size.
+                    Most people underestimate this one. Losing employer-sponsored coverage and transitioning to individual plans can cost <span className="text-foreground font-medium">$800–$1,500/month</span> depending on your state and family size — a number that changes your math entirely.
                   </p>
                 </CardContent>
               </Card>
@@ -120,7 +113,7 @@ export default function Home() {
               
               <div className="flex flex-col items-center text-center">
                 <div className="w-12 h-12 rounded-full bg-primary text-primary-foreground flex items-center justify-center font-bold text-lg mb-6 shadow-sm">1</div>
-                <h3 className="text-lg font-bold font-serif mb-3">Enter your financial snapshot</h3>
+                <h3 className="text-lg font-bold font-serif mb-3">Enter your real numbers</h3>
                 <p className="text-sm text-muted-foreground">Input your income, liquid savings, monthly expenses, and projected business ramp. No bank logins required.</p>
               </div>
 
@@ -132,7 +125,7 @@ export default function Home() {
 
               <div className="flex flex-col items-center text-center">
                 <div className="w-12 h-12 rounded-full bg-primary text-primary-foreground flex items-center justify-center font-bold text-lg mb-6 shadow-sm">3</div>
-                <h3 className="text-lg font-bold font-serif mb-3">Get your personalized report</h3>
+                <h3 className="text-lg font-bold font-serif mb-3">Get your 17-page readiness report</h3>
                 <p className="text-sm text-muted-foreground">Instantly download your 17-page readiness report with a full breakdown of your runway and structural risks.</p>
               </div>
             </div>
@@ -144,7 +137,7 @@ export default function Home() {
           <div className="max-w-5xl mx-auto px-6 lg:px-8">
             <div className="text-center mb-16">
               <h2 className="text-3xl font-bold font-serif mb-4">What's in the Report?</h2>
-              <p className="text-muted-foreground">A comprehensive 17-page analysis of your financial transition.</p>
+              <p className="text-muted-foreground">See exactly what's inside before you decide.</p>
             </div>
             <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
               {[
@@ -177,8 +170,8 @@ export default function Home() {
         {/* Pricing Block */}
         <section className="py-24 bg-muted/30 border-b border-border">
           <div className="max-w-3xl mx-auto px-6 text-center">
-            <h2 className="text-4xl font-bold font-serif mb-4">$19.99</h2>
-            <p className="text-lg text-muted-foreground mb-12">One-time purchase · Instant PDF download · Complete financial clarity</p>
+            <h2 className="text-3xl font-bold font-serif mb-3">Everything you need to make the right call.</h2>
+            <p className="text-base text-muted-foreground mb-12">One-time · $19.99 · Instant PDF download</p>
             
             <div className="bg-card border border-border rounded-xl p-8 mb-12 shadow-sm text-left">
               <div className="grid sm:grid-cols-2 gap-4 mb-8">
@@ -202,7 +195,7 @@ export default function Home() {
               </div>
               <Link href="/app">
                 <Button size="lg" className="w-full h-12 text-base font-bold" data-testid="button-generate-report-pricing">
-                  Generate Your Report
+                  Run My Analysis
                 </Button>
               </Link>
             </div>
@@ -279,14 +272,14 @@ export default function Home() {
           <div className="max-w-5xl mx-auto px-6 lg:px-8 text-center relative z-10">
             <img src={logoUrl} alt="QuitReady" className="h-8 w-auto mx-auto mb-10 brightness-0 invert opacity-70" />
             <h2 className="text-4xl font-bold font-serif text-background mb-6">
-              Run your structural model. Know your number.
+              QuitReady. Start Steady.
             </h2>
             <p className="text-muted mb-10 text-lg max-w-2xl mx-auto text-background/60">
-              Stop guessing. See exactly where your financial structure holds up and where it fails. Get the clarity you need to make the right decision.
+              Before you give notice, know your number. QuitReady stress-tests your actual finances against the three things that derail most exits — healthcare, tax, and revenue ramp — and tells you exactly where your structure holds.
             </p>
             <Link href="/app">
               <Button variant="outline" size="lg" className="gap-2 bg-transparent border-background/30 text-background h-12 px-8 hover:bg-background/10 no-default-hover-elevate" data-testid="button-generate-report-bottom">
-                Generate Your Report
+                Run My Analysis
                 <ArrowRight className="w-4 h-4" />
               </Button>
             </Link>
