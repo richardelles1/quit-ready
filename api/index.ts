@@ -1,12 +1,13 @@
-// Imports from the pre-built server bundle produced by `npm run build`.
-// Vercel runs buildCommand before deploying functions, so dist/handler.cjs exists.
-// eslint-disable-next-line @typescript-eslint/no-var-requires
-const { createApp } = require("../dist/handler.cjs");
+import type { Request, Response } from "express";
 
+// dist/handler.cjs is produced by `npm run build` before Vercel deploys functions.
+// CJS modules can be statically imported from ESM context in Node.js.
 let appPromise: Promise<any> | null = null;
 
-export default async function handler(req: any, res: any) {
+export default async function handler(req: Request, res: Response) {
   if (!appPromise) {
+    const mod = await import("../dist/handler.cjs");
+    const createApp = mod.createApp ?? mod.default?.createApp;
     appPromise = createApp();
   }
   const app = await appPromise;
