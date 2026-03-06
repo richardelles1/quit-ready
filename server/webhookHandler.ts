@@ -7,7 +7,7 @@ import crypto from "crypto";
 
 async function fetchPdfBuffer(simulationId: number, host: string): Promise<Buffer | null> {
   try {
-    const url = `${host}/api/simulations/${simulationId}/download-pdf`;
+    const url = `${host}/api/simulations/${simulationId}/pdf`;
     const res = await fetch(url);
     if (!res.ok) {
       console.error(`PDF fetch failed: ${res.status} ${res.statusText}`);
