@@ -1,6 +1,6 @@
 import { build as esbuild } from "esbuild";
 import { build as viteBuild } from "vite";
-import { rm, readFile } from "fs/promises";
+import { rm, readFile, cp } from "fs/promises";
 
 // server deps to bundle to reduce openat(2) syscalls
 // which helps cold start times
@@ -72,6 +72,13 @@ async function buildAll() {
     entryPoints: ["server/handler.ts"],
     outfile: "dist/handler.cjs",
   });
+
+  console.log("copying pdfkit font data...");
+  await cp(
+    "node_modules/pdfkit/js/data",
+    "dist/data",
+    { recursive: true }
+  );
 }
 
 buildAll().catch((err) => {

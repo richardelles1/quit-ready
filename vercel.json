@@ -3,7 +3,7 @@
   "outputDirectory": "dist/public",
   "functions": {
     "api/index.ts": {
-      "includeFiles": "dist/handler.cjs"
+      "includeFiles": "dist/handler.cjs,dist/data/**"
     }
   },
   "rewrites": [
