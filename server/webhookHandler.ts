@@ -7,8 +7,7 @@ import crypto from "crypto";
 
 async function fetchPdfBuffer(simulationId: number, host: string): Promise<Buffer | null> {
   try {
-    const port = process.env.PORT || 5000;
-    const url = `http://localhost:${port}/api/simulations/${simulationId}/download-pdf`;
+    const url = `${host}/api/simulations/${simulationId}/download-pdf`;
     const res = await fetch(url);
     if (!res.ok) {
       console.error(`PDF fetch failed: ${res.status} ${res.statusText}`);
@@ -72,8 +71,9 @@ export async function stripeWebhookHandler(req: Request, res: Response) {
     // Send branded report email with PDF attached (non-blocking)
     const email = session.customer_details?.email;
     if (email) {
-      const origin = req.headers.origin as string
-        || `${req.protocol}://${req.get('host')}`;
+      const origin = (req.headers.origin as string)
+        || process.env.APP_URL
+        || `https://${req.get('host')}`;
 
       // Fetch the generated PDF
       const pdfBuffer = await fetchPdfBuffer(simulationId, origin);
