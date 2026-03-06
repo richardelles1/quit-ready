@@ -32,6 +32,7 @@ export interface IStorage {
   ): Promise<void>;
   getSimulationByStripeSession(stripeSessionId: string): Promise<Simulation | undefined>;
   getSimulationByRerunToken(token: string): Promise<Simulation | undefined>;
+  getSimulationByAccessToken(token: string): Promise<Simulation | undefined>;
   markRerunTokenUsed(id: number): Promise<void>;
 }
 
@@ -76,6 +77,12 @@ export class DatabaseStorage implements IStorage {
   async getSimulationByRerunToken(token: string): Promise<Simulation | undefined> {
     const [result] = await db.select().from(simulations)
       .where(eq(simulations.rerunToken, token));
+    return result;
+  }
+
+  async getSimulationByAccessToken(token: string): Promise<Simulation | undefined> {
+    const [result] = await db.select().from(simulations)
+      .where(eq(simulations.accessToken, token));
     return result;
   }
 

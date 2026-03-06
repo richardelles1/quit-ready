@@ -298,7 +298,7 @@ function SimulatorInner() {
       currentSalary: values.currentSalary ?? 0,
       breakevenMonths: (values.rampDuration || 0) + 3,
     }, {
-      onSuccess: (result) => setLocation(`/results/${result.id}`),
+      onSuccess: (result) => setLocation(`/results/${result.accessToken || result.id}`),
       onError: (err) => toast({ title: "Simulation failed", description: err.message, variant: "destructive" }),
     });
   };

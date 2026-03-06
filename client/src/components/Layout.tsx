@@ -13,18 +13,18 @@ const navLinks = [
 export default function Layout({ children }: { children: ReactNode }) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [location] = useLocation();
-  const [lastReportId, setLastReportId] = useState<number | null>(null);
+  const [lastReportToken, setLastReportToken] = useState<string | null>(null);
   const [bannerDismissed, setBannerDismissed] = useState(false);
 
   useEffect(() => {
     try {
-      const stored = JSON.parse(localStorage.getItem('quitready_reports') || '[]') as number[];
-      if (stored.length > 0) setLastReportId(stored[0]);
+      const stored = JSON.parse(localStorage.getItem('quitready_reports') || '[]') as string[];
+      if (stored.length > 0) setLastReportToken(stored[0]);
     } catch {}
   }, []);
 
   const isResultsPage = location.startsWith('/results/');
-  const showBanner = lastReportId && !isResultsPage && !bannerDismissed;
+  const showBanner = lastReportToken && !isResultsPage && !bannerDismissed;
 
   return (
     <div className="min-h-screen flex flex-col bg-background">
@@ -38,7 +38,7 @@ export default function Layout({ children }: { children: ReactNode }) {
             </p>
           </div>
           <div className="flex items-center gap-3 shrink-0">
-            <Link href={`/results/${lastReportId}`}>
+            <Link href={`/results/${lastReportToken}`}>
               <span
                 className="text-xs font-semibold text-foreground underline underline-offset-2 cursor-pointer whitespace-nowrap"
                 data-testid="link-return-to-report"
@@ -171,6 +171,11 @@ export default function Layout({ children }: { children: ReactNode }) {
                 <li>
                   <Link href="/terms">
                     <span className="text-xs text-muted-foreground hover:text-foreground transition-colors cursor-pointer" data-testid="link-footer-terms">Terms of Use</span>
+                  </Link>
+                </li>
+                <li>
+                  <Link href="/contact">
+                    <span className="text-xs text-muted-foreground hover:text-foreground transition-colors cursor-pointer" data-testid="link-footer-contact">Contact</span>
                   </Link>
                 </li>
               </ul>

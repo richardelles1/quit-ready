@@ -42,6 +42,7 @@ waitForPort = 5000
 [userenv]
 
 [userenv.shared]
+SUPPORT_EMAIL = "support.QuitReady@gmail.com"
 
 [agent]
 integrations = ["javascript_stripe:1.0.0"]

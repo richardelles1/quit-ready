@@ -1,4 +1,5 @@
 import { pgTable, serial, integer, text, boolean, timestamp, real } from "drizzle-orm/pg-core";
+import { sql } from "drizzle-orm";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -67,6 +68,9 @@ export const simulations = pgTable("simulations", {
   // Rerun discount token — single-use link for $4.99 repeat analysis
   rerunToken: text("rerun_token"),
   rerunTokenUsed: boolean("rerun_token_used").notNull().default(false),
+
+  // Public URL token — UUID used in shareable URLs instead of sequential numeric ID
+  accessToken: text("access_token").default(sql`gen_random_uuid()`),
 });
 
 export const insertSimulationSchema = createInsertSchema(simulations).omit({
@@ -96,6 +100,7 @@ export const insertSimulationSchema = createInsertSchema(simulations).omit({
   purchaserName: true,
   rerunToken: true,
   rerunTokenUsed: true,
+  accessToken: true,
 }).extend({
   healthcareType: z.enum(['employer', 'cobra', 'aca', 'partner', 'none']),
   businessModelType: z.enum(['solo_bootstrap', 'contractor_heavy', 'agency_service', 'inventory_heavy', 'saas_product']),

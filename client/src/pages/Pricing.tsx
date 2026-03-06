@@ -36,7 +36,7 @@ const faqs = [
   },
   {
     question: "Is there a refund policy?",
-    answer: "Since the report is a digital product delivered instantly upon purchase, we generally do not offer refunds. However, if you encounter any technical issues with your PDF generation or believe there was a calculation error, please contact our support and we'll make it right."
+    answer: "All sales are final. Because the report is a digital product delivered immediately upon purchase, no refunds will be issued. If you encounter a verified technical issue with PDF generation, contact us through the contact form and we will resolve it."
   }
 ];
 

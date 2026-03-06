@@ -144,6 +144,71 @@ function htmlEmail(sim: Simulation, reportUrl: string, rerunUrl: string): string
 </html>`;
 }
 
+export async function sendContactEmail(
+  name: string,
+  senderEmail: string,
+  message: string
+): Promise<{ success: boolean; error?: string }> {
+  const supportEmail = process.env.SUPPORT_EMAIL;
+  if (!supportEmail) {
+    console.error('SUPPORT_EMAIL env var not set');
+    return { success: false, error: 'Support email not configured' };
+  }
+
+  const subject = `QuitReady Contact: ${message.slice(0, 60)}${message.length > 60 ? '…' : ''}`;
+  const displayName = name ? name : senderEmail;
+
+  const html = `<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="utf-8" /><title>QuitReady Contact</title></head>
+<body style="margin:0;padding:0;background:#f8fafc;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background:#f8fafc;padding:32px 0;">
+    <tr><td align="center">
+      <table width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;">
+        <tr>
+          <td style="background:#0f172a;border-radius:12px 12px 0 0;padding:24px 36px;">
+            <p style="margin:0;color:#94a3b8;font-size:11px;font-weight:700;letter-spacing:2px;text-transform:uppercase;">QuitReady</p>
+            <h1 style="margin:6px 0 0;color:#f8fafc;font-size:18px;font-weight:700;">New Contact Form Submission</h1>
+          </td>
+        </tr>
+        <tr>
+          <td style="background:#ffffff;padding:32px 36px;">
+            <p style="margin:0 0 6px;color:#64748b;font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:1px;">From</p>
+            <p style="margin:0 0 20px;color:#0f172a;font-size:15px;">${displayName} &lt;${senderEmail}&gt;</p>
+            <p style="margin:0 0 6px;color:#64748b;font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:1px;">Message</p>
+            <p style="margin:0;color:#334155;font-size:15px;line-height:1.7;white-space:pre-wrap;">${message.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</p>
+          </td>
+        </tr>
+        <tr>
+          <td style="background:#f1f5f9;border-radius:0 0 12px 12px;padding:14px 36px;">
+            <p style="margin:0;color:#94a3b8;font-size:11px;">Reply directly to this email to respond to ${displayName}.</p>
+          </td>
+        </tr>
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>`;
+
+  try {
+    const { error } = await resend.emails.send({
+      from: FROM_ADDRESS,
+      to: supportEmail,
+      reply_to: senderEmail,
+      subject,
+      html,
+    });
+    if (error) {
+      console.error('Contact email Resend error:', error);
+      return { success: false, error: error.message };
+    }
+    return { success: true };
+  } catch (err: any) {
+    console.error('Contact email exception:', err);
+    return { success: false, error: err.message };
+  }
+}
+
 export async function sendReportEmail(
   sim: Simulation,
   pdfBuffer: Buffer,
@@ -154,7 +219,7 @@ export async function sendReportEmail(
     return { success: false, error: "No purchaser email on record" };
   }
 
-  const reportUrl = `${origin}/results/${sim.id}`;
+  const reportUrl = `${REPORT_BASE_URL}/results/${sim.accessToken || sim.id}`;
   const rerunUrl = `${origin}/rerun/${rerunToken}`;
 
   try {

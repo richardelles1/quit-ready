@@ -461,8 +461,8 @@ function SavingsCurve({ sim, pas: pasCap }: { sim: SimulationResult; pas: number
 // ─── Main component ────────────────────────────────────────────────────────
 export default function Results() {
   const params = useParams();
-  const id = params.id ? parseInt(params.id, 10) : null;
-  const { data: sim, isLoading, isError, refetch } = useSimulation(id);
+  const token = params.id ?? null;
+  const { data: sim, isLoading, isError, refetch } = useSimulation(token);
   const downloadPdf = useDownloadSimulationPdf();
   const createCheckoutSession = useCreateCheckoutSession();
   const { toast } = useToast();
@@ -486,7 +486,7 @@ export default function Results() {
           clearInterval(pollIntervalRef.current!);
           pollIntervalRef.current = null;
           setIsPolling(false);
-          window.history.replaceState({}, '', `/results/${id}`);
+          window.history.replaceState({}, '', `/results/${token}`);
         } else if (pollAttemptsRef.current >= 10) {
           clearInterval(pollIntervalRef.current!);
           pollIntervalRef.current = null;
@@ -500,25 +500,25 @@ export default function Results() {
     };
   }, [sim?.id, sim?.paid]);
 
-  // Persist simulation ID locally so users can find their way back
+  // Persist report token locally so users can find their way back
   React.useEffect(() => {
-    if (id && !isError) {
+    if (token && !isError) {
       try {
-        const existing = JSON.parse(localStorage.getItem('quitready_reports') || '[]') as number[];
-        if (!existing.includes(id)) {
-          localStorage.setItem('quitready_reports', JSON.stringify([id, ...existing].slice(0, 5)));
+        const existing = JSON.parse(localStorage.getItem('quitready_reports') || '[]') as string[];
+        if (!existing.includes(token)) {
+          localStorage.setItem('quitready_reports', JSON.stringify([token, ...existing].slice(0, 5)));
         }
       } catch {}
     }
-  }, [id, isError]);
+  }, [token, isError]);
 
   const [downloadError, setDownloadError] = React.useState(false);
   const [purchaserEmail, setPurchaserEmail] = React.useState('');
   const [emailError, setEmailError] = React.useState('');
   const handleDownload = () => {
-    if (!id) return;
+    if (!sim?.id) return;
     setDownloadError(false);
-    downloadPdf.mutate(id, {
+    downloadPdf.mutate(sim.id, {
       onError: (err) => {
         if (err.message === 'payment_required') {
           toast({ title: "Payment required", description: "Please unlock your report to download the PDF.", variant: "destructive" });
@@ -534,7 +534,7 @@ export default function Results() {
   };
 
   const handleUnlock = () => {
-    if (!id) return;
+    if (!sim?.id) return;
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!purchaserEmail.trim() || !emailRegex.test(purchaserEmail.trim())) {
       setEmailError('Please enter a valid email address so we can send your report.');
@@ -542,7 +542,7 @@ export default function Results() {
     }
     setEmailError('');
     createCheckoutSession.mutate(
-      { simulationId: id, purchaserEmail: purchaserEmail.trim() },
+      { simulationId: sim.id, purchaserEmail: purchaserEmail.trim() },
       {
         onError: (err) => {
           if (err.message === 'already_paid') {

@@ -431,8 +431,8 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       const session = await stripe.checkout.sessions.create({
         mode: 'payment',
         line_items: [{ price: process.env.STRIPE_PRICE_ID!, quantity: 1 }],
-        success_url: `${origin}/results/${simId}?session_id={CHECKOUT_SESSION_ID}`,
-        cancel_url: `${origin}/results/${simId}`,
+        success_url: `${origin}/results/${sim.accessToken || simId}?session_id={CHECKOUT_SESSION_ID}`,
+        cancel_url: `${origin}/results/${sim.accessToken || simId}`,
         customer_email: purchaserEmail || undefined,
         metadata: { simulationId: String(simId) },
       });
@@ -550,7 +550,12 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
   });
 
   app.get(api.simulations.get.path, async (req, res) => {
-    const sim = await storage.getSimulation(Number(req.params.id));
+    const param = req.params.id;
+    // Only allow UUID-format access tokens — block sequential numeric IDs to prevent enumeration
+    if (param.length <= 15) {
+      return res.status(404).json({ message: 'Simulation not found' });
+    }
+    const sim = await storage.getSimulationByAccessToken(param);
     if (!sim) return res.status(404).json({ message: 'Simulation not found' });
     res.json(sim);
   });
@@ -2329,6 +2334,31 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
 
     res.set('Content-Type', 'application/xml; charset=utf-8');
     res.send(xml);
+  });
+
+  // ─── Contact Form ─────────────────────────────────────────────────────────
+  app.post('/api/contact', async (req, res) => {
+    try {
+      const schema = z.object({
+        name: z.string().max(120).optional(),
+        email: z.string().email('Valid email required'),
+        message: z.string().min(10, 'Message must be at least 10 characters').max(4000),
+      });
+      const { name, email, message } = schema.parse(req.body);
+      const { sendContactEmail } = await import('./services/emailService');
+      const result = await sendContactEmail(name || '', email, message);
+      if (!result.success) {
+        console.error('Contact email failed:', result.error);
+        return res.status(500).json({ error: 'send_failed', message: 'Failed to send message. Please try again.' });
+      }
+      res.json({ success: true });
+    } catch (err: any) {
+      if (err?.name === 'ZodError') {
+        return res.status(400).json({ error: 'validation', message: err.errors[0]?.message || 'Invalid input' });
+      }
+      console.error('Contact route error:', err);
+      res.status(500).json({ error: 'server_error', message: 'Something went wrong.' });
+    }
   });
 
   return httpServer;

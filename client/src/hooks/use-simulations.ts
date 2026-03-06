@@ -87,6 +87,8 @@ export interface SimulationResult {
   stripePaymentIntentId: string | null;
   purchaserEmail: string | null;
   purchaserName: string | null;
+  // Public access token (UUID used in shareable URLs)
+  accessToken: string | null;
 }
 
 export function useCreateSimulation() {
@@ -110,24 +112,24 @@ export function useCreateSimulation() {
   });
 }
 
-export function useSimulation(id: number | null) {
+export function useSimulation(token: string | null) {
   return useQuery({
-    queryKey: ['/api/simulations', id],
+    queryKey: ['/api/simulations', token],
     queryFn: async (): Promise<SimulationResult | null> => {
-      if (!id) return null;
-      const res = await fetch(`/api/simulations/${id}`);
+      if (!token) return null;
+      const res = await fetch(`/api/simulations/${token}`);
       if (res.status === 404) return null;
       if (!res.ok) throw new Error('Failed to fetch simulation');
       return res.json();
     },
-    enabled: id !== null,
+    enabled: token !== null,
   });
 }
 
 export function useDownloadSimulationPdf() {
   return useMutation({
-    mutationFn: async (id: number) => {
-      const res = await fetch(`/api/simulations/${id}/pdf`);
+    mutationFn: async (numericId: number) => {
+      const res = await fetch(`/api/simulations/${numericId}/pdf`);
       if (res.status === 402) {
         throw new Error('payment_required');
       }
@@ -139,7 +141,7 @@ export function useDownloadSimulationPdf() {
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `QuitReady_Report_${id}.pdf`;
+      a.download = `QuitReady_Report_${numericId}.pdf`;
       document.body.appendChild(a);
       a.click();
       window.URL.revokeObjectURL(url);

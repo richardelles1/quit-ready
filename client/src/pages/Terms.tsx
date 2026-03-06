@@ -83,7 +83,7 @@ export default function Terms() {
               The $19.99 purchase provides one-time access to a single generated report for the simulation session you completed. The PDF report is yours to download and keep permanently. Web-based interactive report access is available as long as the QuitReady service remains active. We do not guarantee indefinite availability of the web interface.
             </p>
             <p className="text-sm text-muted-foreground leading-relaxed mt-2">
-              Because the report is a digital product delivered immediately upon purchase, refunds are generally not available. If you experience a technical error that prevents PDF delivery, contact us and we will work to resolve it.
+              All sales are final. Because this is a digital product delivered immediately upon purchase, no refunds will be issued. If a verified technical error prevented PDF delivery, contact us via the <a href="/contact" className="underline underline-offset-2 hover:text-foreground transition-colors">contact form</a> and we will resolve it.
             </p>
           </section>
 
@@ -97,7 +97,7 @@ export default function Terms() {
           <section>
             <h2 className="text-base font-bold text-foreground mb-2">10. Contact</h2>
             <p className="text-sm text-muted-foreground leading-relaxed">
-              Questions about these terms? Reply to any QuitReady email you receive, or reach us through the contact information in your purchase confirmation.
+              Questions about these terms or your report? Use the <a href="/contact" className="underline underline-offset-2 hover:text-foreground transition-colors">contact form</a> on this site.
             </p>
           </section>
 
