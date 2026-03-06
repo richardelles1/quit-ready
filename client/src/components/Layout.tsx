@@ -185,7 +185,7 @@ export default function Layout({ children }: { children: ReactNode }) {
             </div>
           </div>
           <div className="border-t border-border pt-6 flex flex-col sm:flex-row justify-between items-start gap-3">
-            <p className="text-xs text-muted-foreground">© 2025 QuitReady. For educational use only.</p>
+            <p className="text-xs text-muted-foreground">© 2026 QuitReady. For educational use only.</p>
             <p className="text-xs text-muted-foreground">U.S.-only. ACA and self-employment tax calculations based on 2024 guidelines.</p>
           </div>
         </div>

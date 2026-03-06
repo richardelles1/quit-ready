@@ -16,7 +16,7 @@ export default function BlogIndex() {
       "@type": "Blog",
       "name": "QuitReady Financial Independence Blog",
       "description": "Strategies and math for professionals transitioning from W-2 to self-employment.",
-      "url": "https://quitready.com/blog"
+      "url": "https://quitready.app/blog"
     }
   });
 

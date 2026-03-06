@@ -34,7 +34,7 @@ export default function BlogPost() {
         "name": "QuitReady",
         "logo": {
           "@type": "ImageObject",
-          "url": "https://quitready.com/logo.png"
+          "url": "https://quitready.app/logo.png"
         }
       }
     }

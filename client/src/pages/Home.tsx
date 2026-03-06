@@ -16,11 +16,11 @@ export default function Home() {
       "@context": "https://schema.org",
       "@type": "WebSite",
       "name": "QuitReady",
-      "url": "https://quitready.com",
+      "url": "https://quitready.app",
       "description": "Financial runway simulator for professionals planning to quit their job.",
       "potentialAction": {
         "@type": "SearchAction",
-        "target": "https://quitready.com/search?q={search_term_string}",
+        "target": "https://quitready.app/search?q={search_term_string}",
         "query-input": "required name=search_term_string"
       }
     }
