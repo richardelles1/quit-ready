@@ -2,7 +2,6 @@ import express, { type Request, Response, NextFunction } from "express";
 import { createServer } from "http";
 import { registerRoutes } from "./routes";
 import { stripeWebhookHandler } from "./webhookHandler";
-import { serveStatic } from "./static";
 
 export function log(message: string, source = "express") {
   const formattedTime = new Date().toLocaleTimeString("en-US", {
@@ -58,10 +57,6 @@ export async function createApp() {
     if (res.headersSent) return next(err);
     return res.status(status).json({ message });
   });
-
-  if (process.env.NODE_ENV === "production") {
-    serveStatic(app);
-  }
 
   return app;
 }
