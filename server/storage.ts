@@ -1,6 +1,7 @@
 import { InsertSimulation, Simulation, simulations } from "@shared/schema";
 import { db } from "./db";
 import { eq } from "drizzle-orm";
+import { randomUUID } from "crypto";
 
 type SimulationComputedFields = {
   tmib: number;
@@ -38,7 +39,10 @@ export interface IStorage {
 
 export class DatabaseStorage implements IStorage {
   async createSimulation(data: InsertSimulation & SimulationComputedFields): Promise<Simulation> {
-    const [result] = await db.insert(simulations).values(data).returning();
+    const [result] = await db.insert(simulations).values({
+      ...data,
+      accessToken: randomUUID(),
+    }).returning();
     return result;
   }
 
